@@ -1,0 +1,153 @@
+:root {
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  color: #13222b;
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.95), transparent 35%),
+    linear-gradient(180deg, #cbeaf2 0%, #eef6e6 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  min-height: 100vh;
+}
+
+.panel {
+  padding: 1.25rem;
+  border-right: 1px solid rgba(19, 34, 43, 0.12);
+  background: rgba(252, 248, 238, 0.84);
+  backdrop-filter: blur(14px);
+}
+
+.eyebrow {
+  display: inline-block;
+  margin-bottom: 0.9rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #3f5968;
+  background: rgba(99, 135, 152, 0.15);
+}
+
+.panel h1 {
+  margin: 0 0 0.6rem;
+  font-size: 2.25rem;
+  line-height: 0.95;
+}
+
+.lede {
+  margin: 0 0 1.25rem;
+  line-height: 1.55;
+  color: #425864;
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.field span {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.field select {
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid rgba(19, 34, 43, 0.18);
+  border-radius: 0.8rem;
+  font: inherit;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.stats {
+  display: grid;
+  gap: 0.7rem;
+  margin-bottom: 1rem;
+}
+
+.stat,
+.artifact-card {
+  padding: 0.85rem 0.95rem;
+  border-radius: 0.95rem;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 18px 45px rgba(24, 50, 58, 0.08);
+}
+
+.stat {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: baseline;
+}
+
+.stat span {
+  color: #5a717c;
+  font-size: 0.92rem;
+}
+
+.artifact-card + .artifact-card {
+  margin-top: 0.85rem;
+}
+
+.artifact-card h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.artifact-card p,
+.artifact-card li,
+.draft-row span {
+  color: #52666f;
+}
+
+.artifact-card ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.draft-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.4rem 0;
+}
+
+.viewport {
+  min-height: 100vh;
+}
+
+.viewport canvas {
+  display: block;
+}
+
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .panel {
+    border-right: 0;
+    border-bottom: 1px solid rgba(19, 34, 43, 0.12);
+  }
+
+  .viewport {
+    min-height: 60vh;
+  }
+}

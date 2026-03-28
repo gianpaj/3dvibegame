@@ -1,0 +1,36 @@
+{
+  "sample_id": "add_house_near_lake_001::prompt_0",
+  "task_id": "add_house_near_lake_001",
+  "adapter_name": "fixture",
+  "raw_output": "{\"schema_version\":\"1.0\"}",
+  "parsed_response": {
+    "schema_version": "1.0",
+    "response_type": "clarification_request",
+    "clarification": {
+      "question": "Which lake should the house be placed near?",
+      "missing_fields": ["reference_object"]
+    },
+    "uncertainty": {
+      "has_ambiguity": true,
+      "fields": ["reference_object"]
+    }
+  },
+  "normalized_plan": {
+    "plan_version": "0.1",
+    "request_id": "add_house_near_lake_001::prompt_0",
+    "plan_kind": "clarification",
+    "source_response_type": "clarification_request",
+    "uncertainty": {
+      "has_ambiguity": true,
+      "fields": ["reference_object"]
+    },
+    "intents": [],
+    "clarification": {
+      "question": "Which lake should the house be placed near?",
+      "missing_fields": ["reference_object"]
+    },
+    "diagnostics": []
+  },
+  "render_drafts": [],
+  "diagnostics": []
+}

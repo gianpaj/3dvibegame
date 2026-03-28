@@ -1,5 +1,11 @@
 {
   "name": "3dvibegame",
   "private": true,
-  "packageManager": "pnpm@10.21.0"
+  "packageManager": "pnpm@10.21.0",
+  "scripts": {
+    "demo:dev": "pnpm --filter @3dvibegame/scene-runtime-demo dev",
+    "demo:build": "pnpm --filter @3dvibegame/scene-runtime-demo build",
+    "runtime:build": "pnpm --filter @3dvibegame/scene-runtime-ts build",
+    "typecheck": "pnpm -r --filter @3dvibegame/scene-runtime-ts --filter @3dvibegame/scene-runtime-demo typecheck"
+  }
 }
