@@ -8,7 +8,7 @@
 
 - `packages/website` — current placeholder marketing site
 - `packages/scene-runtime-ts` — TypeScript consumer port of the Python `scene_runtime` contract
-- `packages/scene-runtime-demo` — React Three Fiber demo for inspecting runtime fixtures in the browser
+- `packages/scene-runtime-demo` — plain Three.js demo for inspecting runtime fixtures in the browser
 
 ## Demo commands
 
