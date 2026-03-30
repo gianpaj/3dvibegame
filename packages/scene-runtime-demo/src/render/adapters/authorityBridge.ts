@@ -1,38 +1,36 @@
-import type { ObjectIntent } from "@3dvibegame/scene-runtime-ts";
+import type { AuthorityWorld } from "@3dvibegame/scene-authority-ts";
 import * as THREE from "three";
 
-import type { PipelineSnapshot } from "../../runtime/pipeline";
-import { createDraftObject } from "../objects/createDraftObject";
+import { createAuthorityObject } from "../objects/createAuthorityObject";
 
-interface RenderBridgeConfig {
+interface AuthorityBridgeConfig {
   draftRoot: THREE.Group;
   anchors: Map<string, THREE.Vector3>;
   defaultFocus: THREE.Vector3;
 }
 
-export function createRenderBridge({
+export function createAuthorityBridge({
   draftRoot,
   anchors,
   defaultFocus,
-}: RenderBridgeConfig) {
+}: AuthorityBridgeConfig) {
   return {
-    renderSnapshot(snapshot: PipelineSnapshot) {
+    renderWorld(world: AuthorityWorld) {
       clearGroup(draftRoot);
 
-      if (!snapshot.renderDrafts.length) {
+      if (!world.objects.length) {
         return defaultFocus.clone();
       }
 
-      const intents = new Map<string, ObjectIntent>(
-        (snapshot.normalizedPlan?.intents ?? []).map((intent) => [intent.intent_id, intent]),
-      );
-
       const focusAccumulator = new THREE.Vector3();
 
-      snapshot.renderDrafts.forEach((draft) => {
-        const created = createDraftObject({
-          draft,
-          intent: intents.get(draft.intent_id),
+      world.objects.forEach((object) => {
+        if (object.state === "deleted" || object.state === "archived") {
+          return;
+        }
+
+        const created = createAuthorityObject({
+          object,
           resolveAnchor(referenceId) {
             return referenceId ? anchors.get(referenceId)?.clone() ?? null : null;
           },
@@ -41,7 +39,7 @@ export function createRenderBridge({
         focusAccumulator.add(created.focusPoint);
       });
 
-      return focusAccumulator.multiplyScalar(1 / snapshot.renderDrafts.length);
+      return focusAccumulator.multiplyScalar(1 / Math.max(world.objects.length, 1));
     },
   };
 }

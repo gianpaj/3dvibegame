@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@3dvibegame/scene-authority-ts": "workspace:*",
     "@3dvibegame/scene-runtime-ts": "workspace:*",
     "three": "^0.180.0"
   },

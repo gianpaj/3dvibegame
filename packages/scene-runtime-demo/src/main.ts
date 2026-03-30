@@ -1,13 +1,13 @@
 import "./styles.css";
 
-import type { FixtureKey } from "./runtime/fixtures";
-import { fixtureCatalog } from "./runtime/fixtures";
-import { buildPipelineSnapshot } from "./runtime/pipeline";
+import type { ScenarioKey } from "./runtime/scenarios";
+import { scenarioCatalog } from "./runtime/scenarios";
+import { createLifecycleController } from "./runtime/lifecycle";
 import { createCameraRig } from "./render/app/createCameraRig";
 import { createLoop } from "./render/app/createLoop";
 import { createRenderer } from "./render/app/createRenderer";
 import { createScene } from "./render/app/createScene";
-import { createRenderBridge } from "./render/adapters/renderBridge";
+import { createAuthorityBridge } from "./render/adapters/authorityBridge";
 import { createHud } from "./ui/createHud";
 
 const root = document.getElementById("root");
@@ -35,7 +35,7 @@ const sceneState = createScene();
 const cameraRig = createCameraRig(renderer.renderer);
 cameraRig.focus(sceneState.defaultFocus);
 
-const renderBridge = createRenderBridge({
+const authorityBridge = createAuthorityBridge({
   draftRoot: sceneState.draftRoot,
   anchors: sceneState.anchors,
   defaultFocus: sceneState.defaultFocus,
@@ -51,10 +51,12 @@ loop.add(() => {
 });
 loop.start();
 
+const lifecycle = createLifecycleController("pine_lifecycle");
 const hud = createHud({
   root: hudRoot,
-  fixtures: fixtureCatalog,
-  onFixtureChange: selectFixture,
+  scenarios: scenarioCatalog,
+  onScenarioChange: selectScenario,
+  onAction: runAction,
 });
 
 const resize = () => {
@@ -76,11 +78,21 @@ renderer.canvas.addEventListener("webglcontextrestored", () => {
   resize();
 });
 
-selectFixture("barrel_triangle");
+renderSnapshot();
 
-function selectFixture(key: FixtureKey) {
-  const snapshot = buildPipelineSnapshot(key);
-  const focusPoint = renderBridge.renderSnapshot(snapshot);
+function selectScenario(key: ScenarioKey) {
+  lifecycle.selectScenario(key);
+  renderSnapshot();
+}
+
+function runAction(actionId: Parameters<typeof lifecycle.dispatch>[0]) {
+  lifecycle.dispatch(actionId);
+  renderSnapshot();
+}
+
+function renderSnapshot() {
+  const snapshot = lifecycle.getSnapshot();
+  const focusPoint = authorityBridge.renderWorld(snapshot.world);
   cameraRig.focus(focusPoint);
   hud.setSnapshot(snapshot);
 }

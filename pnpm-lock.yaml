@@ -8,8 +8,17 @@ importers:
 
   .: {}
 
+  packages/scene-authority-ts:
+    devDependencies:
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+
   packages/scene-runtime-demo:
     dependencies:
+      '@3dvibegame/scene-authority-ts':
+        specifier: workspace:*
+        version: link:../scene-authority-ts
       '@3dvibegame/scene-runtime-ts':
         specifier: workspace:*
         version: link:../scene-runtime-ts

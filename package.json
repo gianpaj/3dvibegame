@@ -6,6 +6,6 @@
     "demo:dev": "pnpm --filter @3dvibegame/scene-runtime-demo dev",
     "demo:build": "pnpm --filter @3dvibegame/scene-runtime-demo build",
     "runtime:build": "pnpm --filter @3dvibegame/scene-runtime-ts build",
-    "typecheck": "pnpm -r --filter @3dvibegame/scene-runtime-ts --filter @3dvibegame/scene-runtime-demo typecheck"
+    "typecheck": "pnpm -r --filter @3dvibegame/scene-runtime-ts --filter @3dvibegame/scene-authority-ts --filter @3dvibegame/scene-runtime-demo typecheck"
   }
 }

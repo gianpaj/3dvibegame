@@ -142,6 +142,32 @@ body {
   margin-bottom: 0.9rem;
 }
 
+.action-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.action-grid button {
+  padding: 0.62rem 0.8rem;
+  border: 1px solid rgba(19, 34, 43, 0.14);
+  border-radius: 999px;
+  background: rgba(219, 241, 226, 0.92);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    background 120ms ease;
+}
+
+.action-grid button:hover {
+  background: rgba(205, 235, 215, 0.98);
+  box-shadow: 0 10px 24px rgba(24, 50, 58, 0.08);
+  transform: translateY(-1px);
+}
+
 .stat,
 .stage-card,
 .diagnostic-card,
@@ -179,6 +205,11 @@ body {
 .diagnostic-card li {
   margin: 0.22rem 0;
   line-height: 1.45;
+}
+
+.diagnostic-lede {
+  font-weight: 700;
+  color: #324751;
 }
 
 .diagnostic-card ul {

@@ -1,148 +1,189 @@
-import type { PipelineSnapshot } from "../runtime/pipeline";
-import type { FixtureKey } from "../runtime/fixtures";
+import type { LifecycleActionId, LifecycleSnapshot } from "../runtime/lifecycle";
+import type { ScenarioKey } from "../runtime/scenarios";
 
-interface FixtureOption {
-  key: FixtureKey;
+interface ScenarioOption {
+  key: ScenarioKey;
   label: string;
   description: string;
 }
 
 interface HudConfig {
   root: HTMLElement;
-  fixtures: FixtureOption[];
-  onFixtureChange(key: FixtureKey): void;
+  scenarios: ScenarioOption[];
+  onScenarioChange(key: ScenarioKey): void;
+  onAction(actionId: LifecycleActionId): void;
 }
 
-export function createHud({ root, fixtures, onFixtureChange }: HudConfig) {
+const actionLabels: Record<LifecycleActionId, string> = {
+  queue_create: "Queue create request",
+  submit_ai_draft: "Submit AI draft",
+  nudge_draft: "Nudge draft",
+  scale_draft: "Scale draft",
+  release_object: "Release object",
+  expire_grace: "Expire grace",
+  request_edit_lock: "Player 2 lock",
+  submit_object_edit: "Submit edit",
+  cancel_edit: "Cancel edit",
+  expire_edit_lock: "Expire lock",
+  expire_cooldown: "Expire cooldown",
+};
+
+export function createHud({
+  root,
+  scenarios,
+  onScenarioChange,
+  onAction,
+}: HudConfig) {
   root.innerHTML = `
     <div class="hud__panel">
-      <div class="eyebrow">Scene Runtime Three Prototype</div>
-      <h1>Normalized plan to renderer</h1>
+      <div class="eyebrow">Authoritative Lifecycle Prototype</div>
+      <h1>Builder spec to live object state</h1>
       <p class="lede">
-        Plain Three.js consumer for the Vibe World rough-draft pipeline. The
-        viewport renders saved artifacts through the normalized scene plan and
-        render-draft contracts.
+        Fixture-backed authority simulation for the Vibe World object lifecycle.
+        The client now renders authoritative object state backed by
+        <code>BuilderSpec</code>, not preview drafts.
       </p>
 
       <label class="field">
-        <span>Fixture</span>
-        <select data-role="fixture-select">
-          ${fixtures
+        <span>Scenario</span>
+        <select data-role="scenario-select">
+          ${scenarios
             .map(
-              (fixture) =>
-                `<option value="${fixture.key}">${fixture.label}</option>`,
+              (scenario) =>
+                `<option value="${scenario.key}">${scenario.label}</option>`,
             )
             .join("")}
         </select>
       </label>
 
-      <div class="fixture-note" data-role="fixture-description"></div>
+      <div class="fixture-note" data-role="scenario-description"></div>
       <div class="stats" data-role="stats"></div>
-      <div class="pipeline" data-role="pipeline"></div>
-      <div class="diagnostics" data-role="diagnostics"></div>
+      <section class="stage-card">
+        <h2>Prompt</h2>
+        <p data-role="source-prompt"></p>
+      </section>
+
+      <section class="stage-card">
+        <h2>Available actions</h2>
+        <div class="action-grid" data-role="actions"></div>
+      </section>
+
+      <section class="diagnostic-card" data-role="events"></section>
 
       <details class="json-card">
-        <summary>Parsed response</summary>
-        <pre data-role="parsed-json"></pre>
+        <summary>Authority object JSON</summary>
+        <pre data-role="object-json"></pre>
       </details>
 
       <details class="json-card">
-        <summary>Normalized plan</summary>
-        <pre data-role="normalized-json"></pre>
+        <summary>Builder spec JSON</summary>
+        <pre data-role="builder-json"></pre>
       </details>
 
       <details class="json-card">
-        <summary>Render drafts</summary>
-        <pre data-role="drafts-json"></pre>
+        <summary>World JSON</summary>
+        <pre data-role="world-json"></pre>
       </details>
     </div>
 
     <div class="hud__chip hud__chip--objective">
-      Goal: prove the renderer can consume normalized plans and rough drafts.
+      Goal: prove grace, public, edit lock, and cooldown against authoritative state.
     </div>
 
     <div class="hud__chip hud__chip--hint">
-      Drag to orbit. Scroll to zoom. Static anchors: cabin_1, campfire_1, lake_1.
+      Drag to orbit. The creator is <code>player_1</code>. The rival editor is <code>player_2</code>.
     </div>
 
     <div class="hud__status" data-role="context-message"></div>
   `;
 
-  const fixtureSelect = root.querySelector<HTMLSelectElement>(
-    '[data-role="fixture-select"]',
+  const scenarioSelect = root.querySelector<HTMLSelectElement>(
+    '[data-role="scenario-select"]',
   );
-  const fixtureDescription = root.querySelector<HTMLElement>(
-    '[data-role="fixture-description"]',
+  const scenarioDescription = root.querySelector<HTMLElement>(
+    '[data-role="scenario-description"]',
   );
   const stats = root.querySelector<HTMLElement>('[data-role="stats"]');
-  const pipeline = root.querySelector<HTMLElement>('[data-role="pipeline"]');
-  const diagnostics = root.querySelector<HTMLElement>('[data-role="diagnostics"]');
-  const parsedJson = root.querySelector<HTMLElement>('[data-role="parsed-json"]');
-  const normalizedJson = root.querySelector<HTMLElement>(
-    '[data-role="normalized-json"]',
-  );
-  const draftsJson = root.querySelector<HTMLElement>('[data-role="drafts-json"]');
+  const sourcePrompt = root.querySelector<HTMLElement>('[data-role="source-prompt"]');
+  const actions = root.querySelector<HTMLElement>('[data-role="actions"]');
+  const events = root.querySelector<HTMLElement>('[data-role="events"]');
+  const objectJson = root.querySelector<HTMLElement>('[data-role="object-json"]');
+  const builderJson = root.querySelector<HTMLElement>('[data-role="builder-json"]');
+  const worldJson = root.querySelector<HTMLElement>('[data-role="world-json"]');
   const contextMessage = root.querySelector<HTMLElement>(
     '[data-role="context-message"]',
   );
 
   if (
-    !fixtureSelect ||
-    !fixtureDescription ||
+    !scenarioSelect ||
+    !scenarioDescription ||
     !stats ||
-    !pipeline ||
-    !diagnostics ||
-    !parsedJson ||
-    !normalizedJson ||
-    !draftsJson ||
+    !sourcePrompt ||
+    !actions ||
+    !events ||
+    !objectJson ||
+    !builderJson ||
+    !worldJson ||
     !contextMessage
   ) {
-    throw new Error("Failed to create HUD layout");
+    throw new Error("Failed to create lifecycle HUD layout");
   }
 
-  fixtureSelect.addEventListener("change", (event) => {
-    onFixtureChange((event.target as HTMLSelectElement).value as FixtureKey);
+  scenarioSelect.addEventListener("change", (event) => {
+    onScenarioChange((event.target as HTMLSelectElement).value as ScenarioKey);
   });
 
   return {
-    setSnapshot(snapshot: PipelineSnapshot) {
-      fixtureSelect.value = snapshot.fixtureKey;
-      fixtureDescription.textContent = snapshot.fixtureDescription;
+    setSnapshot(snapshot: LifecycleSnapshot) {
+      scenarioSelect.value = snapshot.scenarioKey;
+      scenarioDescription.textContent = snapshot.description;
+      sourcePrompt.textContent = snapshot.sourcePrompt;
 
+      const object = snapshot.object;
       stats.innerHTML = [
-        statCard("Response type", snapshot.summary.responseType),
-        statCard("Plan kind", snapshot.normalizedPlan?.plan_kind ?? "none"),
-        statCard("Drafts", String(snapshot.renderDrafts.length)),
-        statCard("Nodes", String(snapshot.summary.renderDraftNodeCount)),
+        statCard("Jobs", String(snapshot.world.jobs.length)),
+        statCard("Objects", String(snapshot.world.objects.length)),
+        statCard("State", object?.state ?? "none"),
+        statCard("Version", object ? String(object.version) : "0"),
+        statCard("Grace owner", object?.grace_owner_id ?? "none"),
+        statCard("Lock owner", object?.lock_owner_id ?? "none"),
       ].join("");
 
-      pipeline.innerHTML = [
-        stageCard("Artifact", [
-          `sample: ${snapshot.summary.sampleId}`,
-          `task: ${snapshot.summary.taskId}`,
-        ]),
-        stageCard("Parsed response", [
-          `status: ${snapshot.parsedResponse ? "available" : "missing"}`,
-          `type: ${snapshot.parsedResponse?.response_type ?? "none"}`,
-          `actions: ${snapshot.parsedResponse?.actions?.length ?? 0}`,
-        ]),
-        stageCard("Normalized plan", [
-          `source: ${snapshot.normalizedPlanSource}`,
-          `kind: ${snapshot.normalizedPlan?.plan_kind ?? "none"}`,
-          `intents: ${snapshot.normalizedPlan?.intents.length ?? 0}`,
-        ]),
-        stageCard("Render drafts", [
-          `source: ${snapshot.renderDraftSource}`,
-          `drafts: ${snapshot.renderDrafts.length}`,
-          `warnings: ${snapshot.summary.totalWarnings}`,
-        ]),
-      ].join("");
+      actions.innerHTML = snapshot.availableActions
+        .map(
+          (actionId) =>
+            `<button type="button" data-action="${actionId}">${actionLabels[actionId]}</button>`,
+        )
+        .join("");
 
-      diagnostics.innerHTML = buildDiagnostics(snapshot);
+      Array.from(actions.querySelectorAll<HTMLButtonElement>("button")).forEach(
+        (button) => {
+          button.addEventListener("click", () => {
+            onAction(button.dataset.action as LifecycleActionId);
+          });
+        },
+      );
 
-      parsedJson.textContent = prettyJson(snapshot.parsedResponse);
-      normalizedJson.textContent = prettyJson(snapshot.normalizedPlan);
-      draftsJson.textContent = prettyJson(snapshot.renderDrafts);
+      events.innerHTML = `
+        <h2>Authority events</h2>
+        <p class="diagnostic-lede">${escapeHtml(snapshot.lastMessage)}</p>
+        ${
+          snapshot.world.events.length
+            ? `<ul>${snapshot.world.events
+                .map(
+                  (event) =>
+                    `<li>${escapeHtml(
+                      `${event.kind}: ${event.message}`,
+                    )}</li>`,
+                )
+                .join("")}</ul>`
+            : "<p>No authority events yet.</p>"
+        }
+      `;
+
+      objectJson.textContent = prettyJson(snapshot.object);
+      builderJson.textContent = prettyJson(snapshot.object?.builder_spec ?? null);
+      worldJson.textContent = prettyJson(snapshot.world);
     },
     setContextMessage(message: string) {
       contextMessage.textContent = message;
@@ -160,47 +201,8 @@ function statCard(label: string, value: string) {
   `;
 }
 
-function stageCard(title: string, lines: string[]) {
-  return `
-    <section class="stage-card">
-      <h2>${escapeHtml(title)}</h2>
-      ${lines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
-    </section>
-  `;
-}
-
-function buildDiagnostics(snapshot: PipelineSnapshot) {
-  const messages = [...snapshot.warnings];
-
-  if (snapshot.normalizedPlan?.clarification) {
-    messages.push(`clarification: ${snapshot.normalizedPlan.clarification.question}`);
-  }
-
-  if (snapshot.normalizedPlan?.refusal) {
-    messages.push(`refusal: ${snapshot.normalizedPlan.refusal.reason}`);
-  }
-
-  if (messages.length === 0) {
-    return `
-      <section class="diagnostic-card">
-        <h2>Diagnostics</h2>
-        <p>No runtime warnings for this fixture.</p>
-      </section>
-    `;
-  }
-
-  return `
-    <section class="diagnostic-card">
-      <h2>Diagnostics</h2>
-      <ul>
-        ${messages.map((message) => `<li>${escapeHtml(message)}</li>`).join("")}
-      </ul>
-    </section>
-  `;
-}
-
 function prettyJson(value: unknown) {
-  return value ? JSON.stringify(value, null, 2) : "No data for this stage.";
+  return value ? JSON.stringify(value, null, 2) : "No object exists yet.";
 }
 
 function escapeHtml(value: string) {
