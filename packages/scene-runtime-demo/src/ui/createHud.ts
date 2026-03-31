@@ -40,8 +40,9 @@ export function createHud({
       <h1>Builder spec to live object state</h1>
       <p class="lede">
         Fixture-backed authority simulation for the Vibe World object lifecycle.
-        The client now renders authoritative object state backed by
-        <code>BuilderSpec</code>, not preview drafts.
+        This slice compiles voxel-native source fixtures into
+        <code>BuilderSpec</code> runtime output, then renders authoritative
+        object state from that compiled artifact.
       </p>
 
       <label class="field">

@@ -29,6 +29,12 @@ export function createAuthorityObject({
     object.builder_spec.parts.forEach((part, partIndex) => {
       const partMesh = createPartMesh(part, partIndex);
       partMesh.position.copy(resolvePartPosition(object.builder_spec.parts, part, partIndex));
+      if (part.local_rotation) {
+        partMesh.rotation.set(...part.local_rotation);
+      }
+      if (part.local_scale) {
+        partMesh.scale.set(...part.local_scale);
+      }
       instanceGroup.add(partMesh);
     });
 
@@ -73,6 +79,10 @@ function resolvePartPosition(
   part: BuilderPart,
   partIndex: number,
 ) {
+  if (part.local_position) {
+    return new THREE.Vector3(...part.local_position);
+  }
+
   const yBase = part.dimensions[1] / 2;
 
   if (part.part_id === "canopy") {

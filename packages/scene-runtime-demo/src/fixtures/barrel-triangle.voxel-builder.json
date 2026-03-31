@@ -1,0 +1,59 @@
+{
+  "spec_version": "0.1",
+  "request_id": "three_red_barrels_around_campfire_001::prompt_0",
+  "intent_id": "three_red_barrels_around_campfire_001::prompt_0::intent_0",
+  "operation": "create",
+  "target_object_id": null,
+  "base_object_version": null,
+  "object_category": "barrel",
+  "size_tier": "small",
+  "style_tags": ["chunky", "grouped"],
+  "behaviors": [],
+  "grid": {
+    "unit_meters": 0.5,
+    "up_axis": "y",
+    "rotation_step_degrees": 90
+  },
+  "placement": {
+    "mode": "relative",
+    "reference_object": "campfire_1",
+    "relation": "around",
+    "offset": [0, 0, 0]
+  },
+  "materials": [
+    {
+      "material_id": "red",
+      "tags": ["painted"]
+    }
+  ],
+  "anchors": [],
+  "operations": [
+    {
+      "op_id": "barrel_seed",
+      "kind": "add_line",
+      "from": [5, 0, 0],
+      "to": [5, 2.5, 0],
+      "radius": 1,
+      "shape": "rounded",
+      "material_id": "red",
+      "tags": ["barrel", "seed"]
+    },
+    {
+      "op_id": "barrel_ring",
+      "kind": "clone_region",
+      "target": {
+        "by_tags": ["seed"]
+      },
+      "copies": {
+        "type": "radial",
+        "count": 2,
+        "center": [0, 0, 0],
+        "axis": "y"
+      }
+    }
+  ],
+  "compile_hints": {
+    "preferred_runtime": "primitive_parts"
+  },
+  "diagnostics": []
+}

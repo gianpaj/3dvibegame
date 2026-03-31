@@ -33,6 +33,9 @@ export interface BuilderPart {
   material: string;
   dimensions: [number, number, number];
   modifiers: string[];
+  local_position?: [number, number, number];
+  local_rotation?: [number, number, number];
+  local_scale?: [number, number, number];
 }
 
 export interface BuilderInstance {

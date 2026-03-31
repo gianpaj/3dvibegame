@@ -1,8 +1,12 @@
-import type { BuilderSpec } from "@3dvibegame/scene-authority-ts";
+import {
+  compileVoxelBuilderSpec,
+  parseVoxelBuilderSpec,
+  type BuilderSpec,
+} from "@3dvibegame/scene-authority-ts";
 
-import barrelTriangleBuilder from "../fixtures/barrel-triangle.builder.json";
-import pineTreeBuilder from "../fixtures/pine-tree.builder.json";
-import pineTreeEditBuilder from "../fixtures/pine-tree-edit.builder.json";
+import barrelTriangleVoxel from "../fixtures/barrel-triangle.voxel-builder.json";
+import pineTreeVoxel from "../fixtures/pine-tree.voxel-builder.json";
+import pineTreeEditVoxel from "../fixtures/pine-tree-edit.voxel-builder.json";
 
 export interface LifecycleScenario {
   key: ScenarioKey;
@@ -25,28 +29,28 @@ export const scenarios: Record<ScenarioKey, LifecycleScenario> = {
     key: "pine_lifecycle",
     label: "Pine tree lifecycle",
     description:
-      "Queue a create request, accept the AI draft into grace, move and scale it, then hand it into public/edit/cooldown flow.",
+      "Queue a create request, compile a voxel-native tree draft into the current BuilderSpec runtime shape, then hand it into public/edit/cooldown flow.",
     sourcePrompt: "Add a pine tree to the left of the cabin.",
     creatorId: "player_1",
     rivalId: "player_2",
     jobId: "job_tree_1",
     objectId: "object_tree_1",
     graceSeconds: 12,
-    draftBuilder: toBuilderSpec(pineTreeBuilder),
-    editBuilder: toBuilderSpec(pineTreeEditBuilder),
+    draftBuilder: toBuilderSpec(pineTreeVoxel),
+    editBuilder: toBuilderSpec(pineTreeEditVoxel),
   },
   barrel_grace: {
     key: "barrel_grace",
     label: "Barrel group grace",
     description:
-      "Grouped create flow using authoritative builder-backed instances around the campfire anchor.",
+      "Grouped create flow compiled from a voxel source fixture, including radial clone layout around the campfire anchor.",
     sourcePrompt: "Place three red barrels around the campfire.",
     creatorId: "player_1",
     rivalId: "player_2",
     jobId: "job_barrel_1",
     objectId: "object_barrels_1",
     graceSeconds: 8,
-    draftBuilder: toBuilderSpec(barrelTriangleBuilder),
+    draftBuilder: toBuilderSpec(barrelTriangleVoxel),
   },
 };
 
@@ -57,5 +61,5 @@ export const scenarioCatalog = Object.values(scenarios).map((scenario) => ({
 }));
 
 function toBuilderSpec(value: unknown) {
-  return value as BuilderSpec;
+  return compileVoxelBuilderSpec(parseVoxelBuilderSpec(value)) as BuilderSpec;
 }

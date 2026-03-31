@@ -6,6 +6,12 @@ Build the next validation slice after planning, preview rendering, and determini
 
 `fixture-backed BuilderSpec -> authoritative object state -> client visualization`
 
+## Decision Update
+
+For the longer-term object model, the repo should treat a voxel-aware authoring spec as the canonical creative source for editable objects.
+
+This lifecycle prototype does not need to block on that migration. It can continue to use fixture-backed `BuilderSpec` payloads as a compiled runtime artifact while the voxel-native source format and compiler are introduced in parallel.
+
 This prototype should prove the Vibe World object lifecycle in the browser without requiring live AI calls or multiplayer networking.
 
 ## Why This Slice
@@ -29,7 +35,7 @@ If this loop is awkward or forces ad hoc state, the project still lacks a stable
 The prototype will:
 
 - add a TypeScript authority package for object lifecycle contracts and reducers
-- consume fixture-backed `BuilderSpec` payloads
+- consume fixture-backed `BuilderSpec` payloads as the current compiled runtime representation
 - render authoritative objects from builder-backed state, not render-draft previews
 - simulate one creator and one second player for lock contention
 - expose lifecycle actions in the DOM HUD
@@ -63,6 +69,11 @@ The demo should:
 - accept fixture-backed draft submission
 - drive object state changes through reducer-style actions
 - render authoritative objects through a builder-backed render adapter
+
+Longer term, authority objects should evolve toward:
+
+- canonical voxel-aware source spec for editable versions
+- compiled runtime artifact cache for rendering and performance
 
 ## First scenario set
 
