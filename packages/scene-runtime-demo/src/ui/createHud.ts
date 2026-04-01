@@ -1,114 +1,153 @@
-import type { LifecycleActionId, LifecycleSnapshot } from "../runtime/lifecycle";
+import type {
+  GenerationActionId,
+  GenerationSnapshot,
+} from "../runtime/generationSession";
 import type { ScenarioKey } from "../runtime/scenarios";
 
 interface ScenarioOption {
   key: ScenarioKey;
   label: string;
   description: string;
+  sourcePrompt: string;
 }
 
 interface HudConfig {
   root: HTMLElement;
   scenarios: ScenarioOption[];
-  onScenarioChange(key: ScenarioKey): void;
-  onAction(actionId: LifecycleActionId): void;
+  onPromptSubmit(prompt: string): void;
+  onAction(actionId: GenerationActionId): void;
 }
 
-const actionLabels: Record<LifecycleActionId, string> = {
-  queue_create: "Queue create request",
-  submit_ai_draft: "Submit AI draft",
-  nudge_draft: "Nudge draft",
+const actionLabels: Record<GenerationActionId, string> = {
+  nudge_draft: "Move draft",
+  rotate_draft: "Rotate draft",
   scale_draft: "Scale draft",
   release_object: "Release object",
-  expire_grace: "Expire grace",
-  request_edit_lock: "Player 2 lock",
-  submit_object_edit: "Submit edit",
-  cancel_edit: "Cancel edit",
-  expire_edit_lock: "Expire lock",
-  expire_cooldown: "Expire cooldown",
 };
+
+const stageLabels = {
+  idle: "Idle",
+  queued: "Queued",
+  planning: "Planning",
+  voxel_source_ready: "Voxel source ready",
+  compiled_artifact_ready: "Compiled artifact ready",
+  grace: "Grace",
+  released: "Released",
+  failed: "Failed",
+} as const;
 
 export function createHud({
   root,
   scenarios,
-  onScenarioChange,
+  onPromptSubmit,
   onAction,
 }: HudConfig) {
+  const initialPrompt = scenarios[0]?.sourcePrompt ?? "";
+
   root.innerHTML = `
     <div class="hud__panel">
-      <div class="eyebrow">Authoritative Lifecycle Prototype</div>
-      <h1>Builder spec to live object state</h1>
+      <div class="eyebrow">Validation-First Vertical Slice</div>
+      <h1>Text to voxel source to released object</h1>
       <p class="lede">
-        Fixture-backed authority simulation for the Vibe World object lifecycle.
-        This slice compiles voxel-native source fixtures into
-        <code>BuilderSpec</code> runtime output, then renders authoritative
-        object state from that compiled artifact.
+        Fixture-backed single-player prototype for the real object loop.
+        Submit a prompt, inspect staged generation, adjust the draft during grace,
+        then release it into the world.
       </p>
 
-      <label class="field">
-        <span>Scenario</span>
-        <select data-role="scenario-select">
-          ${scenarios
-            .map(
-              (scenario) =>
-                `<option value="${scenario.key}">${scenario.label}</option>`,
-            )
-            .join("")}
-        </select>
-      </label>
+      <form class="prompt-form" data-role="prompt-form">
+        <label class="field">
+          <span>Prompt</span>
+          <textarea
+            rows="3"
+            data-role="prompt-input"
+            placeholder="Add a pine tree to the left of the cabin."
+          ></textarea>
+        </label>
+        <button class="primary-button" type="submit">Generate draft</button>
+      </form>
 
-      <div class="fixture-note" data-role="scenario-description"></div>
-      <div class="stats" data-role="stats"></div>
       <section class="stage-card">
-        <h2>Prompt</h2>
-        <p data-role="source-prompt"></p>
+        <h2>Prompt recipes</h2>
+        <div class="prompt-chip-grid" data-role="prompt-recipes"></div>
+        <p class="fixture-note" data-role="scenario-description"></p>
+      </section>
+
+      <div class="stats" data-role="stats"></div>
+
+      <section class="stage-card">
+        <h2>Stage timeline</h2>
+        <ol class="stage-list" data-role="stage-events"></ol>
       </section>
 
       <section class="stage-card">
-        <h2>Available actions</h2>
+        <h2>Structured intent</h2>
+        <p data-role="intent-summary"></p>
+      </section>
+
+      <section class="stage-card">
+        <h2>Canonical voxel source</h2>
+        <p data-role="voxel-summary"></p>
+      </section>
+
+      <section class="stage-card">
+        <h2>Compiled runtime artifact</h2>
+        <p data-role="artifact-summary"></p>
+      </section>
+
+      <section class="stage-card">
+        <h2>Creator actions</h2>
         <div class="action-grid" data-role="actions"></div>
       </section>
 
       <section class="diagnostic-card" data-role="events"></section>
 
       <details class="json-card">
-        <summary>Authority object JSON</summary>
-        <pre data-role="object-json"></pre>
+        <summary>Structured intent JSON</summary>
+        <pre data-role="intent-json"></pre>
       </details>
 
       <details class="json-card">
-        <summary>Builder spec JSON</summary>
+        <summary>Voxel source JSON</summary>
+        <pre data-role="voxel-json"></pre>
+      </details>
+
+      <details class="json-card">
+        <summary>Builder artifact JSON</summary>
         <pre data-role="builder-json"></pre>
       </details>
 
       <details class="json-card">
-        <summary>World JSON</summary>
+        <summary>Authority world JSON</summary>
         <pre data-role="world-json"></pre>
       </details>
     </div>
 
     <div class="hud__chip hud__chip--objective">
-      Goal: prove grace, public, edit lock, and cooldown against authoritative state.
+      Goal: validate a prompt-driven grace-period loop before multiplayer.
     </div>
 
     <div class="hud__chip hud__chip--hint">
-      Drag to orbit. The creator is <code>player_1</code>. The rival editor is <code>player_2</code>.
+      This prototype is deterministic and fixture-backed. Prompt text selects the closest recipe path.
     </div>
 
     <div class="hud__status" data-role="context-message"></div>
   `;
 
-  const scenarioSelect = root.querySelector<HTMLSelectElement>(
-    '[data-role="scenario-select"]',
-  );
+  const form = root.querySelector<HTMLFormElement>('[data-role="prompt-form"]');
+  const promptInput = root.querySelector<HTMLTextAreaElement>('[data-role="prompt-input"]');
+  const recipeGrid = root.querySelector<HTMLElement>('[data-role="prompt-recipes"]');
   const scenarioDescription = root.querySelector<HTMLElement>(
     '[data-role="scenario-description"]',
   );
   const stats = root.querySelector<HTMLElement>('[data-role="stats"]');
-  const sourcePrompt = root.querySelector<HTMLElement>('[data-role="source-prompt"]');
+  const stageEvents = root.querySelector<HTMLElement>('[data-role="stage-events"]');
+  const intentSummary = root.querySelector<HTMLElement>('[data-role="intent-summary"]');
+  const voxelSummary = root.querySelector<HTMLElement>('[data-role="voxel-summary"]');
+  const artifactSummary = root.querySelector<HTMLElement>('[data-role="artifact-summary"]');
   const actions = root.querySelector<HTMLElement>('[data-role="actions"]');
   const events = root.querySelector<HTMLElement>('[data-role="events"]');
-  const objectJson = root.querySelector<HTMLElement>('[data-role="object-json"]');
+  const intentJson = root.querySelector<HTMLElement>('[data-role="intent-json"]');
+  const voxelJson = root.querySelector<HTMLElement>('[data-role="voxel-json"]');
   const builderJson = root.querySelector<HTMLElement>('[data-role="builder-json"]');
   const worldJson = root.querySelector<HTMLElement>('[data-role="world-json"]');
   const contextMessage = root.querySelector<HTMLElement>(
@@ -116,57 +155,121 @@ export function createHud({
   );
 
   if (
-    !scenarioSelect ||
+    !form ||
+    !promptInput ||
+    !recipeGrid ||
     !scenarioDescription ||
     !stats ||
-    !sourcePrompt ||
+    !stageEvents ||
+    !intentSummary ||
+    !voxelSummary ||
+    !artifactSummary ||
     !actions ||
     !events ||
-    !objectJson ||
+    !intentJson ||
+    !voxelJson ||
     !builderJson ||
     !worldJson ||
     !contextMessage
   ) {
-    throw new Error("Failed to create lifecycle HUD layout");
+    throw new Error("Failed to create validation-first HUD layout");
   }
 
-  scenarioSelect.addEventListener("change", (event) => {
-    onScenarioChange((event.target as HTMLSelectElement).value as ScenarioKey);
+  promptInput.value = initialPrompt;
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    onPromptSubmit(promptInput.value);
   });
 
-  return {
-    setSnapshot(snapshot: LifecycleSnapshot) {
-      scenarioSelect.value = snapshot.scenarioKey;
-      scenarioDescription.textContent = snapshot.description;
-      sourcePrompt.textContent = snapshot.sourcePrompt;
+  recipeGrid.innerHTML = scenarios
+    .map(
+      (scenario) => `
+        <button
+          class="prompt-chip"
+          type="button"
+          data-prompt="${escapeHtml(scenario.sourcePrompt)}"
+        >
+          ${escapeHtml(scenario.label)}
+        </button>
+      `,
+    )
+    .join("");
 
-      const object = snapshot.object;
+  Array.from(recipeGrid.querySelectorAll<HTMLButtonElement>("button")).forEach(
+    (button) => {
+      button.addEventListener("click", () => {
+        promptInput.value = button.dataset.prompt ?? "";
+      });
+    },
+  );
+
+  return {
+    setSnapshot(snapshot: GenerationSnapshot) {
+      if (document.activeElement !== promptInput) {
+        promptInput.value = snapshot.sourcePrompt;
+      }
+
+      scenarioDescription.textContent = `${snapshot.matchedScenarioLabel}: ${snapshot.matchedScenarioDescription}`;
+
       stats.innerHTML = [
-        statCard("Jobs", String(snapshot.world.jobs.length)),
+        statCard("Stage", stageLabels[snapshot.stage]),
+        statCard("World state", snapshot.object?.state ?? "none"),
+        statCard("Matched recipe", snapshot.matchedScenarioLabel),
         statCard("Objects", String(snapshot.world.objects.length)),
-        statCard("State", object?.state ?? "none"),
-        statCard("Version", object ? String(object.version) : "0"),
-        statCard("Grace owner", object?.grace_owner_id ?? "none"),
-        statCard("Lock owner", object?.lock_owner_id ?? "none"),
+        statCard(
+          "Parts",
+          snapshot.compiledArtifact
+            ? String(snapshot.compiledArtifact.payload.complexity.part_count)
+            : "0",
+        ),
+        statCard("Version", snapshot.object ? String(snapshot.object.version) : "0"),
       ].join("");
 
-      actions.innerHTML = snapshot.availableActions
-        .map(
-          (actionId) =>
-            `<button type="button" data-action="${actionId}">${actionLabels[actionId]}</button>`,
-        )
-        .join("");
+      stageEvents.innerHTML = snapshot.stageEvents.length
+        ? snapshot.stageEvents
+            .map(
+              (event) => `
+                <li class="stage-event" data-status="${event.status}">
+                  <strong>${escapeHtml(stageLabels[event.stage])}</strong>
+                  <span>${escapeHtml(event.message)}</span>
+                </li>
+              `,
+            )
+            .join("")
+        : `<li class="stage-event" data-status="pending"><strong>Idle</strong><span>Submit a prompt to start the staged flow.</span></li>`;
+
+      intentSummary.textContent = snapshot.plannedIntent
+        ? `${snapshot.plannedIntent.object_category} • ${snapshot.plannedIntent.size_tier} • ${snapshot.plannedIntent.placement.mode} placement`
+        : "No structured intent yet.";
+
+      voxelSummary.textContent = snapshot.voxelArtifact
+        ? snapshot.voxelArtifact.summary
+        : "Waiting for voxel-native source.";
+
+      artifactSummary.textContent = snapshot.compiledArtifact
+        ? snapshot.compiledArtifact.summary
+        : "Waiting for compiled runtime artifact.";
+
+      actions.innerHTML = snapshot.availableActions.length
+        ? snapshot.availableActions
+            .map(
+              (actionId) =>
+                `<button type="button" data-action="${actionId}">${actionLabels[actionId]}</button>`,
+            )
+            .join("")
+        : `<p class="empty-actions">Creator actions unlock once the authoritative draft enters grace.</p>`;
 
       Array.from(actions.querySelectorAll<HTMLButtonElement>("button")).forEach(
         (button) => {
           button.addEventListener("click", () => {
-            onAction(button.dataset.action as LifecycleActionId);
+            onAction(button.dataset.action as GenerationActionId);
           });
         },
       );
 
       events.innerHTML = `
-        <h2>Authority events</h2>
+        <h2>Session diagnostics</h2>
         <p class="diagnostic-lede">${escapeHtml(snapshot.lastMessage)}</p>
         ${
           snapshot.world.events.length
@@ -182,8 +285,9 @@ export function createHud({
         }
       `;
 
-      objectJson.textContent = prettyJson(snapshot.object);
-      builderJson.textContent = prettyJson(snapshot.object?.builder_spec ?? null);
+      intentJson.textContent = prettyJson(snapshot.plannedIntent);
+      voxelJson.textContent = prettyJson(snapshot.voxelArtifact?.payload ?? null);
+      builderJson.textContent = prettyJson(snapshot.compiledArtifact?.payload ?? null);
       worldJson.textContent = prettyJson(snapshot.world);
     },
     setContextMessage(message: string) {
@@ -203,7 +307,7 @@ function statCard(label: string, value: string) {
 }
 
 function prettyJson(value: unknown) {
-  return value ? JSON.stringify(value, null, 2) : "No object exists yet.";
+  return value ? JSON.stringify(value, null, 2) : "No data yet.";
 }
 
 function escapeHtml(value: string) {

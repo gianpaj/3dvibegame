@@ -115,7 +115,8 @@ body {
   font-weight: 700;
 }
 
-.field select {
+.field select,
+.field textarea {
   width: 100%;
   padding: 0.78rem 0.95rem;
   border: 1px solid rgba(19, 34, 43, 0.18);
@@ -123,6 +124,31 @@ body {
   background: rgba(255, 255, 255, 0.9);
   color: inherit;
   font: inherit;
+}
+
+.field textarea {
+  min-height: 5.8rem;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.prompt-form {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+
+.primary-button {
+  justify-self: start;
+  padding: 0.72rem 0.95rem;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #2f6f68 0%, #4e8a5a 100%);
+  color: #f9fffb;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 14px 30px rgba(44, 92, 84, 0.22);
 }
 
 .fixture-note {
@@ -148,7 +174,8 @@ body {
   gap: 0.55rem;
 }
 
-.action-grid button {
+.action-grid button,
+.prompt-chip {
   padding: 0.62rem 0.8rem;
   border: 1px solid rgba(19, 34, 43, 0.14);
   border-radius: 999px;
@@ -162,10 +189,17 @@ body {
     background 120ms ease;
 }
 
-.action-grid button:hover {
+.action-grid button:hover,
+.prompt-chip:hover {
   background: rgba(205, 235, 215, 0.98);
   box-shadow: 0 10px 24px rgba(24, 50, 58, 0.08);
   transform: translateY(-1px);
+}
+
+.prompt-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
 }
 
 .stat,
@@ -194,6 +228,42 @@ body {
   margin-bottom: 0.85rem;
 }
 
+.stage-list {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stage-event {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.72rem 0.8rem;
+  border-radius: 0.85rem;
+  background: rgba(243, 248, 248, 0.95);
+}
+
+.stage-event strong {
+  font-size: 0.88rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #35505d;
+}
+
+.stage-event span {
+  color: #51656f;
+  line-height: 1.4;
+}
+
+.stage-event[data-status="error"] {
+  background: rgba(255, 230, 226, 0.95);
+}
+
+.stage-event[data-status="pending"] {
+  background: rgba(242, 243, 232, 0.95);
+}
+
 .stage-card h2,
 .diagnostic-card h2 {
   margin-bottom: 0.35rem;
@@ -215,6 +285,12 @@ body {
 .diagnostic-card ul {
   margin: 0;
   padding-left: 1.15rem;
+}
+
+.empty-actions {
+  margin: 0;
+  color: #5a717c;
+  line-height: 1.45;
 }
 
 .json-card {

@@ -1,8 +1,7 @@
 import "./styles.css";
 
-import type { ScenarioKey } from "./runtime/scenarios";
 import { scenarioCatalog } from "./runtime/scenarios";
-import { createLifecycleController } from "./runtime/lifecycle";
+import { createGenerationSessionController } from "./runtime/generationSession";
 import { createCameraRig } from "./render/app/createCameraRig";
 import { createLoop } from "./render/app/createLoop";
 import { createRenderer } from "./render/app/createRenderer";
@@ -51,13 +50,14 @@ loop.add(() => {
 });
 loop.start();
 
-const lifecycle = createLifecycleController("pine_lifecycle");
+const generation = createGenerationSessionController();
 const hud = createHud({
   root: hudRoot,
   scenarios: scenarioCatalog,
-  onScenarioChange: selectScenario,
+  onPromptSubmit: submitPrompt,
   onAction: runAction,
 });
+const unsubscribe = generation.subscribe(renderSnapshot);
 
 const resize = () => {
   const { clientWidth, clientHeight } = viewport;
@@ -80,19 +80,22 @@ renderer.canvas.addEventListener("webglcontextrestored", () => {
 
 renderSnapshot();
 
-function selectScenario(key: ScenarioKey) {
-  lifecycle.selectScenario(key);
-  renderSnapshot();
+function submitPrompt(prompt: string) {
+  generation.submitPrompt(prompt);
 }
 
-function runAction(actionId: Parameters<typeof lifecycle.dispatch>[0]) {
-  lifecycle.dispatch(actionId);
-  renderSnapshot();
+function runAction(actionId: Parameters<typeof generation.dispatch>[0]) {
+  generation.dispatch(actionId);
 }
 
 function renderSnapshot() {
-  const snapshot = lifecycle.getSnapshot();
+  const snapshot = generation.getSnapshot();
   const focusPoint = authorityBridge.renderWorld(snapshot.world);
   cameraRig.focus(focusPoint);
   hud.setSnapshot(snapshot);
 }
+
+window.addEventListener("beforeunload", () => {
+  unsubscribe();
+  generation.dispose();
+});
