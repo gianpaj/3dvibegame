@@ -102,6 +102,7 @@ function toIntent(
       offset: [...spec.placement.offset],
     },
     notes: [note],
+    conversation_context: null,
   };
 }
 

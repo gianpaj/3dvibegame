@@ -1,6 +1,11 @@
 import {
+  appendPlayerTurn,
+  buildConversationContext,
+  classifyFollowUpIntent,
+  createConversationThread,
   createAuthorityWorld,
   createSpecTemplateCache,
+  discardDraft,
   releaseEditLock,
   releaseObject,
   requestEditLock,
@@ -8,11 +13,14 @@ import {
   submitAIDraft,
   updateDraftTransform,
   updateLockedTransform,
+  updateThreadActiveObject,
   type AuthorityWorld,
   type CompiledBuilderArtifact,
+  type ConversationThread,
   type GenerationIntent,
   type GenerationStage,
   type GenerationStageEvent,
+  type PriorSpecSummary,
   type VoxelSourceArtifact,
 } from "@3dvibegame/scene-authority-ts";
 
@@ -89,6 +97,7 @@ export function createGenerationSessionController(
     }
   > = {};
   let objectSessionsById: Record<string, CachedObjectSession> = {};
+  let conversationThread: ConversationThread = createConversationThread();
   let requestSequence = 0;
   let eventSequence = 0;
   let timers: number[] = [];
@@ -125,14 +134,47 @@ export function createGenerationSessionController(
     submitPrompt(prompt: string) {
       const trimmed = prompt.trim();
       const activeObject = resolveCurrentObject();
+      const hasActiveDraft = !!activeObject && activeObject.state === "grace";
 
-      if (activeObject && activeObject.state !== "public" && activeObject.state !== "cooldown") {
+      // Classify the intent before doing anything else so we know whether to
+      // discard the current grace draft (replace) or modify it (refine / create).
+      const classified = classifyFollowUpIntent(trimmed, hasActiveDraft);
+
+      if (classified.intent_class === "replace" && hasActiveDraft && activeObject) {
+        // Discard the grace draft so the player can start fresh.
+        try {
+          const discarded = discardDraft(world, {
+            objectId: activeObject.object_id,
+            playerId,
+          });
+          world = discarded.world;
+          pushStageEvent("failed", `Discarded draft to replace it.`, "complete");
+          conversationThread = updateThreadActiveObject(conversationThread, null);
+        } catch (error) {
+          // If discard fails (race condition, wrong state), fall through as a create.
+        }
+        // activeObject is now gone — clear local refs
+        activeObjectId = null;
+      } else if (
+        activeObject &&
+        activeObject.state !== "public" &&
+        activeObject.state !== "cooldown" &&
+        classified.intent_class !== "replace"
+      ) {
+        // Block new prompts while a non-grace draft is in-flight, unless replacing.
         lastMessage = "Release or finish the current draft before starting another object.";
         pushStageEvent("failed", lastMessage, "error");
         syncDocument();
         notify();
         return;
       }
+
+      // Record this player turn in the thread before resetting session state.
+      conversationThread = appendPlayerTurn(
+        conversationThread,
+        trimmed,
+        classified.intent_class,
+      );
 
       clearTimers();
       clearEditLockTimer();
@@ -177,12 +219,28 @@ export function createGenerationSessionController(
         notify();
 
         schedule(320, () => {
+          // Build prior spec summary from the most recently discarded/active object
+          // so the AI can understand relative terms like "longer" or "a bus instead".
+          const priorSpec = resolvePriorSpecSummary();
+          const conversationContext =
+            conversationThread.turns.length > 1
+              ? buildConversationContext(
+                  conversationThread,
+                  classified.intent_class,
+                  priorSpec,
+                )
+              : null;
+
           plannedIntent = {
             ...scenario.plannedIntent,
             source_prompt: trimmed,
+            conversation_context: conversationContext,
           };
           stage = "planning";
           lastMessage = `Structured prompt into ${plannedIntent.object_category} intent with ${plannedIntent.placement.mode} placement.`;
+          if (classified.intent_class !== "create") {
+            lastMessage += ` [${classified.intent_class}: ${classified.reason}]`;
+          }
           pushStageEvent("planning", lastMessage, "complete");
           syncDocument();
           notify();
@@ -252,6 +310,7 @@ export function createGenerationSessionController(
           });
           world = drafted.world;
           activeObjectId = objectId;
+          conversationThread = updateThreadActiveObject(conversationThread, objectId);
           objectArtifactsById[objectId] = {
             voxel_artifact: voxelArtifact,
             compiled_artifact: compiledArtifact,
@@ -717,6 +776,30 @@ export function createGenerationSessionController(
         ? "Object is in cooldown and cannot be edited yet."
         : `Object is in ${object.state} state and cannot be edited.`;
     return null;
+  }
+
+  /**
+   * Build a PriorSpecSummary from the most recently active object's voxel artifact.
+   * Used to give the AI context like "the previous thing was a small red barrel" so
+   * "longer" or "a bus instead" is interpreted relative to something concrete.
+   */
+  function resolvePriorSpecSummary(): PriorSpecSummary | null {
+    const recentObjectId =
+      activeObjectId ??
+      Object.keys(objectArtifactsById).at(-1) ??
+      null;
+    if (!recentObjectId) return null;
+
+    const artifacts = objectArtifactsById[recentObjectId];
+    const voxelSpec = artifacts?.voxel_artifact?.payload;
+    if (!voxelSpec) return null;
+
+    return {
+      object_category: voxelSpec.object_category,
+      size_tier: voxelSpec.size_tier,
+      style_tags: [...voxelSpec.style_tags],
+      behaviors: [...voxelSpec.behaviors],
+    };
   }
 
   function refreshEditLock(object: AuthorityWorld["objects"][number]) {

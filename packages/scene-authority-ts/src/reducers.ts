@@ -158,6 +158,39 @@ export function releaseObject(
   });
 }
 
+/**
+ * Discard a draft object during the grace window. Only the grace owner can
+ * call this. Used when the player rejects their own draft mid-conversation
+ * (e.g. "no, I want a bus instead") before it has been released to the world.
+ * The object transitions to "deleted" and is removed from the active world.
+ */
+export function discardDraft(
+  world: AuthorityWorld,
+  input: {
+    objectId: string;
+    playerId: string;
+  },
+): AuthorityActionResult {
+  const nextWorld = cloneWorld(world);
+  const object = getMutableObject(nextWorld, input.objectId);
+  assertState(object, "grace");
+  if (object.grace_owner_id !== input.playerId) {
+    throw new Error("only the grace owner can discard this draft");
+  }
+
+  object.state = "deleted";
+  object.grace_owner_id = null;
+  object.grace_remaining_seconds = 0;
+  nextWorld.objects = nextWorld.objects.filter((o) => o.object_id !== input.objectId);
+
+  return commitEvent(nextWorld, {
+    kind: "discard_draft",
+    object_id: input.objectId,
+    player_id: input.playerId,
+    message: `discarded draft ${input.objectId} during grace period`,
+  });
+}
+
 export function updateLockedTransform(
   world: AuthorityWorld,
   input: {

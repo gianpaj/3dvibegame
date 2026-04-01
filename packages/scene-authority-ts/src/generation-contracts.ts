@@ -1,4 +1,5 @@
 import type { BuilderRelation, BuilderSpec } from "./contracts";
+import type { ConversationContext } from "./conversation-thread";
 import type { VoxelBuilderSpec, VoxelVector3 } from "./voxel-contracts";
 
 export type GenerationStage =
@@ -27,6 +28,13 @@ export interface GenerationIntent {
   behaviors: string[];
   placement: GenerationPlacementIntent;
   notes: string[];
+  /**
+   * Multi-turn conversation context passed to the AI worker on follow-up prompts.
+   * Null on the first prompt in a session (no prior context).
+   * The AI uses this to resolve references ("it", "the car", "a longer one") and
+   * understand what was previously rejected on "replace" intents.
+   */
+  conversation_context: ConversationContext | null;
 }
 
 export interface GenerationArtifact<TTarget extends string, TPayload> {
