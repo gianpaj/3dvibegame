@@ -8,6 +8,7 @@ export type GenerationStage =
   | "voxel_source_ready"
   | "compiled_artifact_ready"
   | "grace"
+  | "edit_locked"
   | "released"
   | "failed";
 
@@ -40,6 +41,7 @@ export interface GenerationStageEvent {
   stage: GenerationStage;
   message: string;
   status: "pending" | "complete" | "error";
+  timestamp: string;
 }
 
 export type VoxelSourceArtifact = GenerationArtifact<

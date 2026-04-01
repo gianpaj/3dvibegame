@@ -158,6 +158,31 @@ export function releaseObject(
   });
 }
 
+export function updateLockedTransform(
+  world: AuthorityWorld,
+  input: {
+    objectId: string;
+    playerId: string;
+    patch: DraftTransformPatch;
+  },
+): AuthorityActionResult {
+  const nextWorld = cloneWorld(world);
+  const object = getMutableObject(nextWorld, input.objectId);
+  assertState(object, "edit_locked");
+  if (object.lock_owner_id !== input.playerId) {
+    throw new Error("only the lock owner can update locked transform");
+  }
+
+  object.transform = applyTransformPatch(object.transform, input.patch);
+
+  return commitEvent(nextWorld, {
+    kind: "update_locked_transform",
+    object_id: input.objectId,
+    player_id: input.playerId,
+    message: "updated locked object transform during edit session",
+  });
+}
+
 export function requestEditLock(
   world: AuthorityWorld,
   input: {
@@ -181,6 +206,33 @@ export function requestEditLock(
     object_id: input.objectId,
     player_id: input.playerId,
     message: "granted exclusive edit lock",
+  });
+}
+
+export function releaseEditLock(
+  world: AuthorityWorld,
+  input: {
+    objectId: string;
+    playerId: string;
+  },
+): AuthorityActionResult {
+  const nextWorld = cloneWorld(world);
+  const object = getMutableObject(nextWorld, input.objectId);
+  assertState(object, "edit_locked");
+  if (object.lock_owner_id !== input.playerId) {
+    throw new Error("only the lock owner can release this edit");
+  }
+
+  object.state = "public";
+  object.lock_owner_id = null;
+  object.latest_editor = input.playerId;
+  object.version += 1;
+
+  return commitEvent(nextWorld, {
+    kind: "release_edit_lock",
+    object_id: input.objectId,
+    player_id: input.playerId,
+    message: "released edit lock and published transform changes",
   });
 }
 

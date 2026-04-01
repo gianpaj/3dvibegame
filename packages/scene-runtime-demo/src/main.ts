@@ -1,13 +1,14 @@
 import "./styles.css";
 
-import { scenarioCatalog } from "./runtime/scenarios";
-import { createGenerationSessionController } from "./runtime/generationSession";
-import { createCameraRig } from "./render/app/createCameraRig";
-import { createLoop } from "./render/app/createLoop";
-import { createRenderer } from "./render/app/createRenderer";
-import { createScene } from "./render/app/createScene";
-import { createAuthorityBridge } from "./render/adapters/authorityBridge";
-import { createHud } from "./ui/createHud";
+import { createGenerationSessionController, scenarioCatalog } from "./core";
+import { createEditorCommands, createHud } from "./editor";
+import {
+  createAuthorityBridge,
+  createCameraRig,
+  createLoop,
+  createRenderer,
+  createScene,
+} from "./viewer";
 
 const root = document.getElementById("root");
 
@@ -51,13 +52,22 @@ loop.add(() => {
 loop.start();
 
 const generation = createGenerationSessionController();
+const editorCommands = createEditorCommands(generation);
 const hud = createHud({
   root: hudRoot,
   scenarios: scenarioCatalog,
-  onPromptSubmit: submitPrompt,
-  onAction: runAction,
+  onPromptSubmit(prompt) {
+    editorCommands.submitPrompt(prompt);
+  },
+  onAction(actionId) {
+    editorCommands.dispatchAction(actionId);
+  },
+  onObjectSelect(objectId) {
+    editorCommands.selectObject(objectId);
+  },
 });
 const unsubscribe = generation.subscribe(renderSnapshot);
+let pointerDown: { x: number; y: number } | null = null;
 
 const resize = () => {
   const { clientWidth, clientHeight } = viewport;
@@ -78,19 +88,44 @@ renderer.canvas.addEventListener("webglcontextrestored", () => {
   resize();
 });
 
+renderer.canvas.addEventListener("pointerdown", (event: PointerEvent) => {
+  if (event.button !== 0) return;
+  pointerDown = { x: event.clientX, y: event.clientY };
+});
+
+renderer.canvas.addEventListener("pointerup", (event: PointerEvent) => {
+  if (event.button !== 0 || !pointerDown) return;
+
+  const distance = Math.hypot(
+    event.clientX - pointerDown.x,
+    event.clientY - pointerDown.y,
+  );
+  pointerDown = null;
+
+  if (distance > 6) {
+    return;
+  }
+
+  const objectId = authorityBridge.pickObject(
+    event.clientX,
+    event.clientY,
+    cameraRig.camera,
+    renderer.canvas,
+  );
+
+  if (objectId) {
+    editorCommands.selectObject(objectId);
+    return;
+  }
+
+  editorCommands.deselectObject();
+});
+
 renderSnapshot();
-
-function submitPrompt(prompt: string) {
-  generation.submitPrompt(prompt);
-}
-
-function runAction(actionId: Parameters<typeof generation.dispatch>[0]) {
-  generation.dispatch(actionId);
-}
 
 function renderSnapshot() {
   const snapshot = generation.getSnapshot();
-  const focusPoint = authorityBridge.renderWorld(snapshot.world);
+  const focusPoint = authorityBridge.renderDocument(snapshot.document);
   cameraRig.focus(focusPoint);
   hud.setSnapshot(snapshot);
 }
@@ -98,4 +133,5 @@ function renderSnapshot() {
 window.addEventListener("beforeunload", () => {
   unsubscribe();
   generation.dispose();
+  authorityBridge.dispose();
 });
