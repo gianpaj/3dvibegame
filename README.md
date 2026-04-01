@@ -84,3 +84,27 @@ pnpm demo:dev
 pnpm demo:build
 pnpm typecheck
 ```
+
+## Manual deploy
+
+`packages/scene-runtime-demo` is deployed as a Cloudflare Pages project named `3dvibegame` in account `f993cefa62ff85589a32173f0813fbad`.
+
+Build and deploy it manually from the repo root:
+
+```bash
+pnpm demo:build
+CLOUDFLARE_ACCOUNT_ID=f993cefa62ff85589a32173f0813fbad \
+  wrangler pages deploy packages/scene-runtime-demo/dist \
+  --project-name 3dvibegame \
+  --branch master
+```
+
+Useful URLs:
+
+- production domain: <https://3dvibegame.com>
+- Pages dashboard: <https://dash.cloudflare.com/f993cefa62ff85589a32173f0813fbad/pages/view/3dvibegame>
+
+Notes:
+
+- The old `3dvibegame` Worker in Cloudflare Workers is separate from the Pages project.
+- As of 2026-04-01, the custom domain `3dvibegame.com` is attached in Cloudflare but still shows `pending`. If the custom domain is not serving yet, use `https://3dvibegame.pages.dev`.
