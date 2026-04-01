@@ -1,5 +1,6 @@
 import {
   createAuthorityWorld,
+  createSpecTemplateCache,
   releaseEditLock,
   releaseObject,
   requestEditLock,
@@ -23,6 +24,10 @@ import {
 import { demoEventBus } from "../events/bus";
 import { buildSceneDocument, createEmptySceneDocument } from "../state";
 import type { SceneDocument } from "../state";
+
+// Shared across all sessions in the page — the cache persists as long as the tab is open.
+// On a real backend this would be a server-side or distributed cache.
+const specTemplateCache = createSpecTemplateCache();
 
 export type GenerationActionId =
   | "nudge_draft"
@@ -184,14 +189,42 @@ export function createGenerationSessionController(
         });
 
         schedule(880, () => {
-          voxelArtifact = {
-            target: "voxel_source",
-            summary: summarizeVoxelSource(scenario),
-            payload: scenario.voxelSource,
-            diagnostics: [...scenario.voxelSource.diagnostics],
-          };
-          stage = "voxel_source_ready";
-          lastMessage = `Voxel source ready with ${scenario.voxelSource.operations.length} ordered operations.`;
+          const intent = plannedIntent;
+          const derivedSpec =
+            intent &&
+            specTemplateCache.deriveIfApplicable(
+              intent.object_category,
+              intent.size_tier,
+              intent.style_tags,
+              trimmed,
+              `${jobId}::voxel_source`,
+              `${jobId}::intent`,
+            );
+
+          if (derivedSpec) {
+            // Cache hit: reuse the stored base shape and apply color/style overrides.
+            // No AI worker call needed — the geometry is identical.
+            voxelArtifact = {
+              target: "voxel_source",
+              summary: `cache:${intent!.object_category}:${intent!.size_tier} • ${derivedSpec.operations.length} ops`,
+              payload: derivedSpec,
+              diagnostics: [...derivedSpec.diagnostics],
+            };
+            stage = "voxel_source_ready";
+            lastMessage = `Cache hit: derived ${intent!.object_category} from stored template (${derivedSpec.operations.length} ops).`;
+          } else {
+            // Cache miss: use the fixture/AI worker path, then store for future reuse.
+            specTemplateCache.store(scenario.voxelSource);
+            voxelArtifact = {
+              target: "voxel_source",
+              summary: summarizeVoxelSource(scenario),
+              payload: scenario.voxelSource,
+              diagnostics: [...scenario.voxelSource.diagnostics],
+            };
+            stage = "voxel_source_ready";
+            lastMessage = `Voxel source ready with ${scenario.voxelSource.operations.length} ordered operations.`;
+          }
+
           pushStageEvent("voxel_source_ready", lastMessage, "complete");
           syncDocument();
           notify();
