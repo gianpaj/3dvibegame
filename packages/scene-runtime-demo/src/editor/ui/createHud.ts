@@ -33,11 +33,19 @@ interface HudConfig {
 const actionLabels: Record<GenerationActionId, string> = {
   refine_silhouette: "Refine silhouette",
   add_ornament: "Add ornament",
+  nudge_draft: "Move",
+  rotate_draft: "Rotate",
+  scale_draft: "Scale",
+  release_object: "Release",
 };
 
 const actionDescriptions: Record<GenerationActionId, string> = {
   refine_silhouette: "Broaden the stance and make the character read clearly at distance.",
   add_ornament: "Add the chest rune and shoulder details for stronger identity.",
+  nudge_draft: "Shift the avatar slightly in the preview.",
+  rotate_draft: "Turn the avatar to inspect its silhouette.",
+  scale_draft: "Increase the avatar scale a little.",
+  release_object: "Publish the draft so refine steps can start.",
 };
 
 const stageLabels = {
@@ -494,7 +502,7 @@ export function createHud({
     return `
       <div class="dock-card dock-card--actions">
         <div>
-          <span>Next refine</span>
+          <span>Avatar actions</span>
           <strong>${escapeHtml(actionLabels[snapshot.availableActions[0]])}</strong>
           <p>${escapeHtml(actionDescriptions[snapshot.availableActions[0]])}</p>
         </div>
@@ -674,8 +682,6 @@ function isBusy(snapshot: GenerationSnapshot) {
     snapshot.stage === "planning" ||
     snapshot.stage === "voxel_source_ready" ||
     snapshot.stage === "compiled_artifact_ready" ||
-    snapshot.stage === "grace" ||
-    snapshot.stage === "edit_locked" ||
     snapshot.stage === "cooldown"
   );
 }

@@ -13,6 +13,7 @@ export type AuthorityActionKind =
   | "update_draft_transform"
   | "update_locked_transform"
   | "release_object"
+  | "discard_draft"
   | "request_edit_lock"
   | "release_edit_lock"
   | "submit_object_edit"

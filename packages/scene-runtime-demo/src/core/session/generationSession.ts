@@ -1,16 +1,28 @@
 import {
+  appendPlayerTurn,
+  buildConversationContext,
+  classifyFollowUpIntent,
+  createConversationThread,
   createAuthorityWorld,
+  createSpecTemplateCache,
+  discardDraft,
   expireCooldown,
+  releaseEditLock,
   releaseObject,
   requestCreateObject,
   requestEditLock,
   submitAIDraft,
   submitObjectEdit,
+  updateDraftTransform,
+  updateLockedTransform,
+  updateThreadActiveObject,
   type AuthorityWorld,
   type CompiledBuilderArtifact,
+  type ConversationThread,
   type GenerationIntent,
   type GenerationStage,
   type GenerationStageEvent,
+  type PriorSpecSummary,
   type VoxelSourceArtifact,
 } from "@3dvibegame/scene-authority-ts";
 
@@ -25,7 +37,16 @@ import { demoEventBus } from "../events/bus";
 import { buildSceneDocument, createEmptySceneDocument } from "../state";
 import type { SceneDocument } from "../state";
 
-export type GenerationActionId = ScenarioActionId;
+// Shared across all sessions in the page — the cache persists as long as the tab is open.
+// On a real backend this would be a server-side or distributed cache.
+const specTemplateCache = createSpecTemplateCache();
+
+export type GenerationActionId =
+  | ScenarioActionId
+  | "nudge_draft"
+  | "rotate_draft"
+  | "scale_draft"
+  | "release_object";
 
 export interface GenerationSnapshot {
   playerId: string;
@@ -79,9 +100,12 @@ export function createGenerationSessionController(
   let compiledArtifact: CompiledBuilderArtifact | null = null;
   let objectArtifactsById: Record<string, CachedObjectArtifacts> = {};
   let objectSessionsById: Record<string, CachedObjectSession> = {};
+  let conversationThread: ConversationThread = createConversationThread();
   let requestSequence = 0;
   let eventSequence = 0;
   let timers: number[] = [];
+  let editLockTimer: number | null = null;
+  const editLockDurationMs = 5_000;
   const listeners = new Set<() => void>();
 
   return {
@@ -113,8 +137,48 @@ export function createGenerationSessionController(
     },
     submitPrompt(prompt: string) {
       const trimmed = prompt.trim();
+      const activeObject = resolveCurrentObject();
+      const hasActiveDraft = !!activeObject && activeObject.state === "grace";
+      const priorSpecForPrompt = resolvePriorSpecSummary();
+
+      const classified = classifyFollowUpIntent(trimmed, hasActiveDraft);
+
+      if (classified.intent_class === "replace" && hasActiveDraft && activeObject) {
+        try {
+          const discarded = discardDraft(world, {
+            objectId: activeObject.object_id,
+            playerId,
+          });
+          world = discarded.world;
+          pushStageEvent("failed", "Discarded draft to replace it.", "complete");
+          conversationThread = updateThreadActiveObject(conversationThread, null);
+        } catch (error) {
+          // If discard fails because state changed, fall through and queue the new create.
+        }
+        activeObjectId = null;
+      } else if (
+        activeObject &&
+        activeObject.state !== "public" &&
+        activeObject.state !== "cooldown" &&
+        classified.intent_class !== "replace"
+      ) {
+        // Block new prompts while a non-grace draft is in-flight, unless replacing.
+        lastMessage = "Release or finish the current draft before starting another object.";
+        pushStageEvent("failed", lastMessage, "error");
+        syncDocument();
+        notify();
+        return;
+      }
+
+      // Record this player turn in the thread before resetting session state.
+      conversationThread = appendPlayerTurn(
+        conversationThread,
+        trimmed,
+        classified.intent_class,
+      );
 
       clearTimers();
+      clearEditLockTimer();
       resetSessionState();
 
       if (!trimmed) {
@@ -148,26 +212,69 @@ export function createGenerationSessionController(
         notify();
 
         schedule(320, () => {
+          // Build prior spec summary from the most recently discarded/active object
+          // so the AI can understand relative terms like "longer" or "a bus instead".
+          const conversationContext =
+            conversationThread.turns.length > 1
+              ? buildConversationContext(
+                  conversationThread,
+                  classified.intent_class,
+                  priorSpecForPrompt,
+                )
+              : null;
+
           plannedIntent = {
             ...scenario.plannedIntent,
             source_prompt: trimmed,
+            conversation_context: conversationContext,
           };
           stage = "planning";
-          lastMessage = `Structured the request into an ${plannedIntent.object_category} intent with ${plannedIntent.style_tags.join(", ")} style cues.`;
+          lastMessage = `Structured the request into an ${plannedIntent.object_category} intent with ${plannedIntent.style_tags.join(", ")} style cues and ${plannedIntent.placement.mode} placement.`;
+          if (classified.intent_class !== "create") {
+            lastMessage += ` [${classified.intent_class}: ${classified.reason}]`;
+          }
           pushStageEvent("planning", lastMessage, "complete");
           syncDocument();
           notify();
         });
 
-        schedule(820, () => {
-          voxelArtifact = {
-            target: "voxel_source",
-            summary: summarizeVoxelSource(scenario.voxelSource),
-            payload: clonePayload(scenario.voxelSource),
-            diagnostics: [...scenario.voxelSource.diagnostics],
-          };
-          stage = "voxel_source_ready";
-          lastMessage = `Avatar voxel source ready with ${scenario.voxelSource.operations.length} ordered operations.`;
+        schedule(880, () => {
+          const intent = plannedIntent;
+          const derivedSpec =
+            intent &&
+            specTemplateCache.deriveIfApplicable(
+              intent.object_category,
+              intent.size_tier,
+              intent.style_tags,
+              trimmed,
+              `${jobId}::voxel_source`,
+              `${jobId}::intent`,
+            );
+
+          if (derivedSpec) {
+            // Cache hit: reuse the stored base shape and apply color/style overrides.
+            // No AI worker call needed — the geometry is identical.
+            voxelArtifact = {
+              target: "voxel_source",
+              summary: `cache:${intent!.object_category}:${intent!.size_tier} • ${derivedSpec.operations.length} ops`,
+              payload: clonePayload(derivedSpec),
+              diagnostics: [...derivedSpec.diagnostics],
+            };
+            stage = "voxel_source_ready";
+            lastMessage = `Cache hit: derived avatar ${intent!.object_category} from stored template (${derivedSpec.operations.length} ops).`;
+          } else {
+            // Cache miss: use the fixture/AI worker path, then store for future reuse.
+            specTemplateCache.store(scenario.voxelSource);
+            voxelArtifact = {
+              target: "voxel_source",
+              summary: summarizeVoxelSource(scenario.voxelSource),
+              payload: clonePayload(scenario.voxelSource),
+              diagnostics: [...scenario.voxelSource.diagnostics],
+            };
+            stage = "voxel_source_ready";
+            lastMessage = `Avatar voxel source ready with ${scenario.voxelSource.operations.length} ordered operations.`;
+          }
+
           pushStageEvent("voxel_source_ready", lastMessage, "complete");
           syncDocument();
           notify();
@@ -195,6 +302,7 @@ export function createGenerationSessionController(
           });
           world = drafted.world;
           activeObjectId = objectId;
+          conversationThread = updateThreadActiveObject(conversationThread, objectId);
           objectArtifactsById[objectId] = {
             voxel_artifact: voxelArtifact,
             compiled_artifact: compiledArtifact,
@@ -209,20 +317,6 @@ export function createGenerationSessionController(
           pushStageEvent("grace", lastMessage, "complete");
           syncDocument();
           notify();
-
-          schedule(220, () => {
-            const published = releaseObject(world, {
-              objectId,
-              playerId: scenario.creatorId,
-            });
-            world = published.world;
-            stage = "released";
-            lastMessage = "Published avatar version 1 to the player profile.";
-            pushStageEvent("released", lastMessage, "complete");
-            persistArtifactsForObject(objectId);
-            syncDocument();
-            notify();
-          });
         });
       } catch (error) {
         stage = "failed";
@@ -237,17 +331,85 @@ export function createGenerationSessionController(
       const scenario = scenarios[matchedScenarioKey];
 
       if (!object) {
-        lastMessage = "Generate an avatar first before submitting a refine step.";
+        lastMessage = "Generate an avatar first before editing or submitting a refine step.";
         syncDocument();
         notify();
         return;
       }
 
       const nextStep = scenario.refineSteps.find((step) => step.actionId === actionId);
-      const expectedAction = resolveAvailableActions(object, scenario)[0];
 
-      if (!nextStep || expectedAction !== actionId) {
-        lastMessage = "That refine step is not currently available for this avatar version.";
+      if (nextStep) {
+        const expectedRefineAction = scenario.refineSteps[object.version - 1]?.actionId;
+
+        if (expectedRefineAction !== actionId || object.state !== "public") {
+          lastMessage = "That refine step is not currently available for this avatar version.";
+          pushStageEvent("failed", lastMessage, "error");
+          syncDocument();
+          notify();
+          return;
+        }
+
+        try {
+          clearEditLockTimer();
+          hydrateObjectSession(object.object_id);
+
+          const locked = requestEditLock(world, {
+            objectId: object.object_id,
+            playerId,
+            baseVersion: object.version,
+          });
+          world = locked.world;
+          stage = "edit_locked";
+          lastMessage = `Locked avatar version ${object.version} for ${nextStep.label.toLowerCase()}.`;
+          pushStageEvent("edit_locked", lastMessage, "complete");
+
+          const boundVoxel = createBoundVoxelArtifact(nextStep, object);
+          const boundCompiled = createBoundCompiledArtifact(nextStep, object);
+
+          voxelArtifact = boundVoxel;
+          compiledArtifact = boundCompiled;
+
+          const submitted = submitObjectEdit(world, {
+            objectId: object.object_id,
+            playerId,
+            baseVersion: object.version,
+            builderSpec: boundCompiled.payload,
+          });
+          world = submitted.world;
+          objectArtifactsById[object.object_id] = {
+            voxel_artifact: boundVoxel,
+            compiled_artifact: boundCompiled,
+            diagnostics: [
+              ...boundVoxel.diagnostics,
+              ...boundCompiled.diagnostics,
+            ],
+          };
+          stage = "cooldown";
+          lastMessage = `${nextStep.label} accepted as avatar version ${object.version + 1}.`;
+          pushStageEvent("cooldown", submitted.event.message, "complete");
+
+          const cooledDown = expireCooldown(world, {
+            objectId: object.object_id,
+          });
+          world = cooledDown.world;
+          stage = "released";
+          lastMessage = `Avatar version ${object.version + 1} is now public and ready for the next refine step.`;
+          pushStageEvent("released", cooledDown.event.message, "complete");
+          persistArtifactsForObject(object.object_id);
+        } catch (error) {
+          stage = "failed";
+          lastMessage = error instanceof Error ? error.message : String(error);
+          pushStageEvent("failed", lastMessage, "error");
+        }
+
+        syncDocument();
+        notify();
+        return;
+      }
+
+      if (!isTransformAction(actionId)) {
+        lastMessage = "That action is not currently available for this avatar.";
         pushStageEvent("failed", lastMessage, "error");
         syncDocument();
         notify();
@@ -255,51 +417,138 @@ export function createGenerationSessionController(
       }
 
       try {
-        hydrateObjectSession(object.object_id);
+        const editableObject = ensureEditableObject(object, actionId);
+        if (!editableObject) {
+          pushStageEvent("failed", lastMessage, "error");
+          syncDocument();
+          notify();
+          return;
+        }
 
-        const locked = requestEditLock(world, {
-          objectId: object.object_id,
-          playerId,
-          baseVersion: object.version,
-        });
-        world = locked.world;
-        stage = "edit_locked";
-        lastMessage = `Locked avatar version ${object.version} for ${nextStep.label.toLowerCase()}.`;
-        pushStageEvent("edit_locked", lastMessage, "complete");
-
-        const boundVoxel = createBoundVoxelArtifact(nextStep, object);
-        const boundCompiled = createBoundCompiledArtifact(nextStep, object);
-
-        voxelArtifact = boundVoxel;
-        compiledArtifact = boundCompiled;
-
-        const submitted = submitObjectEdit(world, {
-          objectId: object.object_id,
-          playerId,
-          baseVersion: object.version,
-          builderSpec: boundCompiled.payload,
-        });
-        world = submitted.world;
-        objectArtifactsById[object.object_id] = {
-          voxel_artifact: boundVoxel,
-          compiled_artifact: boundCompiled,
-          diagnostics: [
-            ...boundVoxel.diagnostics,
-            ...boundCompiled.diagnostics,
-          ],
-        };
-        stage = "cooldown";
-        lastMessage = `${nextStep.label} accepted as avatar version ${object.version + 1}.`;
-        pushStageEvent("cooldown", submitted.event.message, "complete");
-
-        const cooledDown = expireCooldown(world, {
-          objectId: object.object_id,
-        });
-        world = cooledDown.world;
-        stage = "released";
-        lastMessage = `Avatar version ${object.version + 1} is now public and ready for the next refine step.`;
-        pushStageEvent("released", cooledDown.event.message, "complete");
-        persistArtifactsForObject(object.object_id);
+        switch (actionId) {
+          case "nudge_draft": {
+            const patch = {
+              position: {
+                x: editableObject.transform.position[0] + 0.45,
+                z: editableObject.transform.position[2] - 0.3,
+              },
+            };
+            const result =
+              editableObject.state === "edit_locked"
+                ? updateLockedTransform(world, {
+                    objectId: editableObject.object_id,
+                    playerId,
+                    patch,
+                  })
+                : updateDraftTransform(world, {
+                    objectId: editableObject.object_id,
+                    playerId,
+                    patch,
+                  });
+            world = result.world;
+            lastMessage =
+              editableObject.state === "edit_locked"
+                ? "Moved the selected avatar during the edit lock."
+                : "Moved the draft within the grace window.";
+            pushStageEvent(
+              editableObject.state === "edit_locked" ? "edit_locked" : "grace",
+              lastMessage,
+              "complete",
+            );
+            refreshEditLock(editableObject);
+            break;
+          }
+          case "rotate_draft": {
+            const patch = {
+              rotation: {
+                y: editableObject.transform.rotation[1] + Math.PI / 8,
+              },
+            };
+            const result =
+              editableObject.state === "edit_locked"
+                ? updateLockedTransform(world, {
+                    objectId: editableObject.object_id,
+                    playerId,
+                    patch,
+                  })
+                : updateDraftTransform(world, {
+                    objectId: editableObject.object_id,
+                    playerId,
+                    patch,
+                  });
+            world = result.world;
+            lastMessage =
+              editableObject.state === "edit_locked"
+                ? "Rotated the selected avatar during the edit lock."
+                : "Rotated the draft to inspect its silhouette before release.";
+            pushStageEvent(
+              editableObject.state === "edit_locked" ? "edit_locked" : "grace",
+              lastMessage,
+              "complete",
+            );
+            refreshEditLock(editableObject);
+            break;
+          }
+          case "scale_draft": {
+            const patch = {
+              scale: {
+                x: editableObject.transform.scale[0] * 1.12,
+                y: editableObject.transform.scale[1] * 1.12,
+                z: editableObject.transform.scale[2] * 1.12,
+              },
+            };
+            const result =
+              editableObject.state === "edit_locked"
+                ? updateLockedTransform(world, {
+                    objectId: editableObject.object_id,
+                    playerId,
+                    patch,
+                  })
+                : updateDraftTransform(world, {
+                    objectId: editableObject.object_id,
+                    playerId,
+                    patch,
+                  });
+            world = result.world;
+            lastMessage =
+              editableObject.state === "edit_locked"
+                ? "Scaled the selected avatar during the edit lock."
+                : "Scaled the draft up during grace.";
+            pushStageEvent(
+              editableObject.state === "edit_locked" ? "edit_locked" : "grace",
+              lastMessage,
+              "complete",
+            );
+            refreshEditLock(editableObject);
+            break;
+          }
+          case "release_object": {
+            const result =
+              editableObject.state === "edit_locked"
+                ? releaseEditLock(world, {
+                    objectId: editableObject.object_id,
+                    playerId,
+                  })
+                : releaseObject(world, {
+                    objectId: editableObject.object_id,
+                    playerId,
+                  });
+            world = result.world;
+            stage = "released";
+            lastMessage =
+              editableObject.state === "edit_locked"
+                ? result.event.message
+                : "Published avatar version 1 to the player profile.";
+            activeObjectId = editableObject.object_id;
+            clearEditLockTimer();
+            pushStageEvent("released", lastMessage, "complete");
+            persistArtifactsForObject(editableObject.object_id);
+            break;
+          }
+          default:
+            lastMessage = "That action is not currently available for this avatar.";
+            pushStageEvent("failed", lastMessage, "error");
+        }
       } catch (error) {
         stage = "failed";
         lastMessage = error instanceof Error ? error.message : String(error);
@@ -311,19 +560,86 @@ export function createGenerationSessionController(
     },
     selectObject(objectId: string) {
       const object = world.objects.find((candidate) => candidate.object_id === objectId);
-      if (!object) return;
-      activeObjectId = object.object_id;
-      hydrateObjectSession(object.object_id);
+      const currentObject = resolveCurrentObject();
+
+      if (!object) {
+        lastMessage = `Object not found: ${objectId}`;
+        pushStageEvent("failed", lastMessage, "error");
+        syncDocument();
+        notify();
+        return;
+      }
+
+      if (
+        currentObject &&
+        currentObject.object_id !== objectId &&
+        currentObject.state !== "public" &&
+        currentObject.state !== "cooldown"
+      ) {
+        lastMessage = "Release or finish the current draft before editing another object.";
+        pushStageEvent("failed", lastMessage, "error");
+        syncDocument();
+        notify();
+        return;
+      }
+
+      try {
+        hydrateObjectSession(object.object_id);
+
+        if (object.state === "edit_locked" && object.lock_owner_id === playerId) {
+          stage = "edit_locked";
+          lastMessage = "Resumed the current edit session.";
+          activeObjectId = object.object_id;
+          refreshEditLock(object);
+        } else {
+          stage = object.state === "grace" ? "grace" : "released";
+          lastMessage =
+            object.state === "cooldown"
+              ? "Object is in cooldown and can be inspected but not edited."
+              : `Selected ${object.builder_spec.object_category} for inspection.`;
+          activeObjectId = object.object_id;
+          clearEditLockTimer();
+        }
+      } catch (error) {
+        stage = "failed";
+        lastMessage = error instanceof Error ? error.message : String(error);
+        pushStageEvent("failed", lastMessage, "error");
+      }
+
       syncDocument();
       notify();
     },
     deselectObject() {
-      activeObjectId = resolveCurrentObject()?.object_id ?? activeObjectId;
+      const object = resolveCurrentObject();
+
+      try {
+        if (object?.state === "edit_locked" && object.lock_owner_id === playerId) {
+          const result = releaseEditLock(world, {
+            objectId: object.object_id,
+            playerId,
+          });
+          world = result.world;
+          lastMessage = result.event.message;
+          pushStageEvent("released", lastMessage, "complete");
+        } else {
+          lastMessage = "Cleared object selection.";
+        }
+
+        activeObjectId = null;
+        stage = world.objects.length ? "released" : "idle";
+        clearEditLockTimer();
+      } catch (error) {
+        stage = "failed";
+        lastMessage = error instanceof Error ? error.message : String(error);
+        pushStageEvent("failed", lastMessage, "error");
+      }
+
       syncDocument();
       notify();
     },
     dispose() {
       clearTimers();
+      clearEditLockTimer();
       listeners.clear();
     },
     beginHistoryBatch(batchId: string) {
@@ -381,6 +697,12 @@ export function createGenerationSessionController(
   function clearTimers() {
     timers.forEach((timer) => window.clearTimeout(timer));
     timers = [];
+  }
+
+  function clearEditLockTimer() {
+    if (editLockTimer === null) return;
+    window.clearTimeout(editLockTimer);
+    editLockTimer = null;
   }
 
   function pushStageEvent(
@@ -511,6 +833,98 @@ export function createGenerationSessionController(
       diagnostics,
     };
   }
+
+  function ensureEditableObject(
+    object: AuthorityWorld["objects"][number],
+    actionId: GenerationActionId,
+  ) {
+    if (object.state === "grace" || object.state === "edit_locked") {
+      return object;
+    }
+
+    if (object.state === "public") {
+      if (actionId === "release_object") {
+        lastMessage = "Select Move, Rotate, or Scale to acquire an edit lock first.";
+        return null;
+      }
+
+      const locked = requestEditLock(world, {
+        objectId: object.object_id,
+        playerId,
+        baseVersion: object.version,
+      });
+      world = locked.world;
+      stage = "edit_locked";
+      lastMessage = locked.event.message;
+      pushStageEvent("edit_locked", lastMessage, "complete");
+      refreshEditLock(object);
+      return resolveCurrentObject();
+    }
+
+    lastMessage =
+      object.state === "cooldown"
+        ? "Object is in cooldown and cannot be edited yet."
+        : `Object is in ${object.state} state and cannot be edited.`;
+    return null;
+  }
+
+  /**
+   * Build a PriorSpecSummary from the most recently active object's voxel artifact.
+   * Used to give the AI context like "the previous thing was a small red barrel" so
+   * "longer" or "a bus instead" is interpreted relative to something concrete.
+   */
+  function resolvePriorSpecSummary(): PriorSpecSummary | null {
+    const recentObjectId =
+      activeObjectId ??
+      Object.keys(objectArtifactsById).at(-1) ??
+      null;
+    if (!recentObjectId) return null;
+
+    const artifacts = objectArtifactsById[recentObjectId];
+    const voxelSpec = artifacts?.voxel_artifact?.payload;
+    if (!voxelSpec) return null;
+
+    return {
+      object_category: voxelSpec.object_category,
+      size_tier: voxelSpec.size_tier,
+      style_tags: [...voxelSpec.style_tags],
+      behaviors: [...voxelSpec.behaviors],
+    };
+  }
+
+  function refreshEditLock(object: AuthorityWorld["objects"][number]) {
+    if (object.state !== "edit_locked" && object.state !== "public") {
+      return;
+    }
+
+    clearEditLockTimer();
+    editLockTimer = window.setTimeout(() => {
+      const currentObject = resolveCurrentObject();
+      if (!currentObject || currentObject.state !== "edit_locked" || currentObject.lock_owner_id !== playerId) {
+        editLockTimer = null;
+        return;
+      }
+
+      try {
+        const result = releaseEditLock(world, {
+          objectId: currentObject.object_id,
+          playerId,
+        });
+        world = result.world;
+        stage = "released";
+        lastMessage = "Edit lock expired after 5 seconds of inactivity.";
+        pushStageEvent("released", lastMessage, "complete");
+      } catch (error) {
+        stage = "failed";
+        lastMessage = error instanceof Error ? error.message : String(error);
+        pushStageEvent("failed", lastMessage, "error");
+      } finally {
+        editLockTimer = null;
+        syncDocument();
+        notify();
+      }
+    }, editLockDurationMs);
+  }
 }
 
 function buildInitialWorld(): AuthorityWorld {
@@ -529,12 +943,31 @@ function resolveAvailableActions(
   object: AuthorityWorld["objects"][number] | null,
   scenario: LifecycleScenario,
 ): GenerationActionId[] {
-  if (!object || object.state !== "public") {
+  if (!object) {
+    return [];
+  }
+
+  if (object.state === "grace" || object.state === "edit_locked") {
+    return ["nudge_draft", "rotate_draft", "scale_draft", "release_object"];
+  }
+
+  if (object.state !== "public") {
     return [];
   }
 
   const nextStep = scenario.refineSteps[object.version - 1];
-  return nextStep ? [nextStep.actionId] : [];
+  return nextStep ? [nextStep.actionId] : ["nudge_draft", "rotate_draft", "scale_draft"];
+}
+
+function isTransformAction(
+  actionId: GenerationActionId,
+): actionId is Exclude<GenerationActionId, ScenarioActionId> {
+  return (
+    actionId === "nudge_draft" ||
+    actionId === "rotate_draft" ||
+    actionId === "scale_draft" ||
+    actionId === "release_object"
+  );
 }
 
 function summarizeVoxelSource(spec: LifecycleScenario["voxelSource"]) {
