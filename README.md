@@ -4,72 +4,46 @@
 
 - <https://3dvibegame.com>
 
-```txt
-LLM raw output -> parse/validate -> normalize scene plan -> render
+Current vertical slice:
+`text prompt -> staged generation session -> compiled object -> grace edits -> released object`
+
+## Architecture
+
+The current prototype lives in `packages/scene-runtime-demo`. It keeps scene truth in `core`, tool orchestration in `editor`, and Three.js projection in `viewer`, while `@3dvibegame/scene-authority-ts` owns the authoritative object lifecycle and voxel-to-builder compilation rules.
+
+```mermaid
+flowchart LR
+  User["Player prompt + clicks"]
+
+  subgraph Demo["packages/scene-runtime-demo"]
+    Main["main.ts<br/>bootstraps app shell"]
+    Editor["editor/<br/>HUD + editor commands"]
+    Core["core/<br/>generation session<br/>SceneDocument<br/>selectors + event bus"]
+    Viewer["viewer/<br/>authority bridge<br/>object sync<br/>object registry"]
+    Three["Three.js scene<br/>camera rig<br/>render loop"]
+
+    Main --> Editor
+    Main --> Core
+    Main --> Viewer
+    Editor -->|"prompt, action, selection commands"| Core
+    Core -->|"SceneDocument snapshots + dirty ids"| Viewer
+    Viewer --> Three
+  end
+
+  Fixtures["demo fixtures/<br/>scenario recipes + voxel builder JSON"] --> Core
+  Authority["@3dvibegame/scene-authority-ts<br/>reducers + contracts + voxel compiler"] -->|"AuthorityWorld + BuilderSpec"| Core
+  User -->|"submit prompt / trigger actions"| Editor
+  User -->|"inspect rendered result"| Three
+  Three -->|"WebGL canvas"| Browser["Browser viewport"]
 ```
 
-## TODO slices
+`@3dvibegame/scene-runtime-ts` remains an adjacent workspace package for normalized planning artifacts and render-draft utilities; it is not yet the main demo loop shown above.
 
-1. `normalized scene plan -> deterministic object builder`
-   This is the biggest missing seam after the renderer. You need a benchmark that takes `ObjectIntent` and produces a constrained chunky object draft, then scores:
-   - recognizability
-   - size/material compliance
-   - edit continuity between `create` and `refine`
-   - determinism from the same input
-2. `grace period object lifecycle` prototype
-   Single-player is enough at first. Prove:
-   - prompt creates draft
-   - creator can move/scale/refine for N seconds
-   - release flips object into public state
-   - post-release edits obey lock and cooldown rules
-3. `authoritative reducer simulation` benchmark
-   This should be mostly tests, not a visual app. Feed reducer actions into a fake world and validate:
-   - public vs private permissions
-   - one-editor-at-a-time locking
-   - inactivity timeout
-   - cooldown enforcement
-   - stale version rejection
-4. `AI worker reliability` benchmark
-   The current scene-planning bench proves schema quality. Add product metrics:
-   - clarification rate
-   - refusal rate
-   - parse/validate success rate
-   - latency p50/p95
-   - cost per successful draft
-   - quality by prompt class: create, refine, remix
-5. `multiplayer room load` prototype
-   Before real polish, prove the boring part:
-   - 20 anonymous players
-   - presence sync
-   - object create/edit deltas
-   - reconnect and late-join replay
-   - no lock corruption under contention
+## Project State
 
-### After that
+[`CURRENT_STATE.md`](CURRENT_STATE.md) is the source of truth for the current slice tracker, completed work, next steps, and latest verification status.
 
-- `archive/reset` wedge: snapshot live world, freeze it, reopen as read-only exploration.
-- `remix safety` benchmark: classify and reject destructive edits in public worlds while allowing them in private worlds.
-- `client delta replay` harness: apply authoritative event logs to a fresh client and verify final state matches.
-- `prompt-to-feel` playtest slice: does rough draft + short grace period actually feel fun, or just awkward?
-
-### Recommended order
-
-1. Planning benchmark
-2. Three renderer seam
-3. Deterministic object builder
-4. Grace-period lifecycle prototype
-5. Reducer/permissions benchmark
-6. Multiplayer load + replay harness
-7. Archive/reset prototype
-8. Playtest loop with real users
-
-Maybe we need validation roadmap with repo-level packages, success metrics, and which ones should be benchmarks versus interactive prototypes.
-
-
-## What we have
-
-`scene-planning-bench` covers “planning benchmark + preview draft generation.”
-It does not yet cover “builder benchmark.”
+Keep stable setup and architecture notes in this README. Keep dated design plans in `docs/plans/`. Keep the broader product and backend direction in `/Users/gianpaj_it/github/gianpaj/ideas/vibe-world`.
 
 ## Workspace packages
 

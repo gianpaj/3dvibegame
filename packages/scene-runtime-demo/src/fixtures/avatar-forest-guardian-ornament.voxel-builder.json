@@ -1,0 +1,164 @@
+{
+  "spec_version": "0.1",
+  "request_id": "refine_avatar_ornament_001::prompt_0",
+  "intent_id": "refine_avatar_ornament_001::prompt_0::intent_0",
+  "operation": "refine",
+  "target_object_id": "player_avatar_slot",
+  "base_object_version": 2,
+  "object_category": "avatar",
+  "size_tier": "medium",
+  "style_tags": ["forest", "guardian", "ornamented", "player_avatar"],
+  "behaviors": ["glow"],
+  "grid": {
+    "unit_meters": 0.5,
+    "up_axis": "y",
+    "rotation_step_degrees": 90
+  },
+  "placement": {
+    "mode": "absolute",
+    "reference_object": null,
+    "relation": null,
+    "offset": [0, 0, 0]
+  },
+  "materials": [
+    {
+      "material_id": "wood",
+      "tags": ["natural", "armor"]
+    },
+    {
+      "material_id": "moss_stone",
+      "tags": ["body", "forest"]
+    },
+    {
+      "material_id": "cloud",
+      "tags": ["mask", "face"]
+    },
+    {
+      "material_id": "neon",
+      "tags": ["glow", "rune"]
+    }
+  ],
+  "anchors": [],
+  "operations": [
+    {
+      "op_id": "left_boot",
+      "kind": "add_box",
+      "position": [-1, 0.4, 0],
+      "size": [1.2, 0.8, 1.2],
+      "material_id": "wood",
+      "tags": ["boot", "left"]
+    },
+    {
+      "op_id": "right_boot",
+      "kind": "add_box",
+      "position": [1, 0.4, 0],
+      "size": [1.2, 0.8, 1.2],
+      "material_id": "wood",
+      "tags": ["boot", "right"]
+    },
+    {
+      "op_id": "left_leg",
+      "kind": "add_box",
+      "position": [-1, 1.6, 0],
+      "size": [1, 1.8, 1.05],
+      "material_id": "moss_stone",
+      "tags": ["leg", "left"]
+    },
+    {
+      "op_id": "right_leg",
+      "kind": "add_box",
+      "position": [1, 1.6, 0],
+      "size": [1, 1.8, 1.05],
+      "material_id": "moss_stone",
+      "tags": ["leg", "right"]
+    },
+    {
+      "op_id": "torso",
+      "kind": "add_box",
+      "position": [0, 3.3, 0],
+      "size": [3.2, 3.4, 1.9],
+      "material_id": "moss_stone",
+      "tags": ["torso", "body"]
+    },
+    {
+      "op_id": "shoulders",
+      "kind": "add_box",
+      "position": [0, 4.55, 0],
+      "size": [5.4, 1.1, 2.05],
+      "material_id": "wood",
+      "tags": ["shoulders", "armor"]
+    },
+    {
+      "op_id": "left_arm",
+      "kind": "add_box",
+      "position": [-2.45, 3.2, 0],
+      "size": [1.15, 3.1, 1.05],
+      "material_id": "wood",
+      "tags": ["arm", "left"]
+    },
+    {
+      "op_id": "right_arm",
+      "kind": "add_box",
+      "position": [2.45, 3.2, 0],
+      "size": [1.15, 3.1, 1.05],
+      "material_id": "wood",
+      "tags": ["arm", "right"]
+    },
+    {
+      "op_id": "head",
+      "kind": "add_box",
+      "position": [0, 5.9, 0],
+      "size": [2, 2, 1.8],
+      "material_id": "cloud",
+      "tags": ["head", "mask"]
+    },
+    {
+      "op_id": "left_shoulder_guard",
+      "kind": "add_box",
+      "position": [-3.05, 4.95, 0],
+      "size": [0.8, 1.1, 1.2],
+      "material_id": "moss_stone",
+      "tags": ["ornament", "left"]
+    },
+    {
+      "op_id": "right_shoulder_guard",
+      "kind": "add_box",
+      "position": [3.05, 4.95, 0],
+      "size": [0.8, 1.1, 1.2],
+      "material_id": "moss_stone",
+      "tags": ["ornament", "right"]
+    },
+    {
+      "op_id": "chest_rune",
+      "kind": "add_sphere",
+      "center": [0, 3.5, 0.95],
+      "radius": 0.5,
+      "material_id": "neon",
+      "tags": ["rune", "glow"]
+    },
+    {
+      "op_id": "left_crown",
+      "kind": "add_line",
+      "from": [-0.45, 6.6, 0],
+      "to": [-0.95, 7.4, 0],
+      "radius": 0.22,
+      "shape": "rounded",
+      "material_id": "neon",
+      "tags": ["crown", "glow", "left"]
+    },
+    {
+      "op_id": "right_crown",
+      "kind": "add_line",
+      "from": [0.45, 6.6, 0],
+      "to": [0.95, 7.4, 0],
+      "radius": 0.22,
+      "shape": "rounded",
+      "material_id": "neon",
+      "tags": ["crown", "glow", "right"]
+    }
+  ],
+  "compile_hints": {
+    "preferred_runtime": "primitive_parts"
+  },
+  "diagnostics": []
+}

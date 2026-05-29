@@ -4,14 +4,14 @@ import { createReferenceWorld } from "../objects/createReferenceWorld";
 
 export function createScene() {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color("#cfe9f0");
-  scene.fog = new THREE.Fog("#cfe9f0", 18, 38);
+  scene.background = new THREE.Color("#ebe4d7");
+  scene.fog = new THREE.Fog("#ebe4d7", 14, 26);
 
   const hemisphereLight = new THREE.HemisphereLight("#f6fcff", "#7ea1b0", 1.25);
   scene.add(hemisphereLight);
 
-  const sun = new THREE.DirectionalLight("#fffaf0", 2.1);
-  sun.position.set(10, 14, 6);
+  const sun = new THREE.DirectionalLight("#fff8ef", 2.25);
+  sun.position.set(7, 10, 8);
   sun.castShadow = true;
   sun.shadow.mapSize.setScalar(2048);
   sun.shadow.camera.near = 0.5;
@@ -22,8 +22,8 @@ export function createScene() {
   sun.shadow.camera.bottom = -15;
   scene.add(sun);
 
-  const fillLight = new THREE.DirectionalLight("#9cd3ff", 0.45);
-  fillLight.position.set(-6, 5, -10);
+  const fillLight = new THREE.DirectionalLight("#d8e6ff", 0.38);
+  fillLight.position.set(-5, 6, -8);
   scene.add(fillLight);
 
   const referenceWorld = createReferenceWorld();

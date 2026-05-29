@@ -62,12 +62,11 @@ const hud = createHud({
   onAction(actionId) {
     editorCommands.dispatchAction(actionId);
   },
-  onObjectSelect(objectId) {
-    editorCommands.selectObject(objectId);
+  onInteractionStateChange(state) {
+    cameraRig.controls.enabled = !state.controlsLocked;
   },
 });
 const unsubscribe = generation.subscribe(renderSnapshot);
-let pointerDown: { x: number; y: number } | null = null;
 
 const resize = () => {
   const { clientWidth, clientHeight } = viewport;
@@ -86,39 +85,6 @@ renderer.canvas.addEventListener("webglcontextlost", (event: Event) => {
 renderer.canvas.addEventListener("webglcontextrestored", () => {
   hud.setContextMessage("");
   resize();
-});
-
-renderer.canvas.addEventListener("pointerdown", (event: PointerEvent) => {
-  if (event.button !== 0) return;
-  pointerDown = { x: event.clientX, y: event.clientY };
-});
-
-renderer.canvas.addEventListener("pointerup", (event: PointerEvent) => {
-  if (event.button !== 0 || !pointerDown) return;
-
-  const distance = Math.hypot(
-    event.clientX - pointerDown.x,
-    event.clientY - pointerDown.y,
-  );
-  pointerDown = null;
-
-  if (distance > 6) {
-    return;
-  }
-
-  const objectId = authorityBridge.pickObject(
-    event.clientX,
-    event.clientY,
-    cameraRig.camera,
-    renderer.canvas,
-  );
-
-  if (objectId) {
-    editorCommands.selectObject(objectId);
-    return;
-  }
-
-  editorCommands.deselectObject();
 });
 
 renderSnapshot();

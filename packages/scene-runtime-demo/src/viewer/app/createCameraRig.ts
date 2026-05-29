@@ -3,13 +3,14 @@ import * as THREE from "three";
 
 export function createCameraRig(renderer: THREE.WebGLRenderer) {
   const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 150);
-  camera.position.set(10, 8, 10);
+  camera.position.set(5.2, 4.2, 6.4);
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
-  controls.maxPolarAngle = Math.PI * 0.48;
-  controls.minDistance = 4;
-  controls.maxDistance = 30;
+  controls.maxPolarAngle = Math.PI * 0.47;
+  controls.minDistance = 2.8;
+  controls.maxDistance = 18;
+  controls.target.set(0, 2.2, 0);
 
   return {
     camera,

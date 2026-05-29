@@ -9,6 +9,7 @@ export type GenerationStage =
   | "compiled_artifact_ready"
   | "grace"
   | "edit_locked"
+  | "cooldown"
   | "released"
   | "failed";
 

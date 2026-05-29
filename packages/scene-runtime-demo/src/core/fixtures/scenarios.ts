@@ -6,9 +6,19 @@ import {
   type VoxelBuilderSpec,
 } from "@3dvibegame/scene-authority-ts";
 
-import barrelTriangleVoxel from "../../fixtures/barrel-triangle.voxel-builder.json";
-import pineTreeVoxel from "../../fixtures/pine-tree.voxel-builder.json";
-import pineTreeEditVoxel from "../../fixtures/pine-tree-edit.voxel-builder.json";
+import avatarDraftVoxel from "../../fixtures/avatar-forest-guardian.voxel-builder.json";
+import avatarOrnamentVoxel from "../../fixtures/avatar-forest-guardian-ornament.voxel-builder.json";
+import avatarSilhouetteVoxel from "../../fixtures/avatar-forest-guardian-silhouette.voxel-builder.json";
+
+export type ScenarioActionId = "refine_silhouette" | "add_ornament";
+
+export interface RefineStep {
+  actionId: ScenarioActionId;
+  label: string;
+  description: string;
+  voxelSource: VoxelBuilderSpec;
+  builderSpec: BuilderSpec;
+}
 
 export interface LifecycleScenario {
   key: ScenarioKey;
@@ -23,52 +33,61 @@ export interface LifecycleScenario {
   graceSeconds: number;
   voxelSource: VoxelBuilderSpec;
   draftBuilder: BuilderSpec;
-  editBuilder?: BuilderSpec;
+  refineSteps: RefineStep[];
   plannedIntent: GenerationIntent;
 }
 
-export type ScenarioKey = "pine_lifecycle" | "barrel_grace";
+export type ScenarioKey = "avatar_forge";
+
+const avatarDraftSpec = parseVoxelBuilderSpec(avatarDraftVoxel);
+const avatarSilhouetteSpec = parseVoxelBuilderSpec(avatarSilhouetteVoxel);
+const avatarOrnamentSpec = parseVoxelBuilderSpec(avatarOrnamentVoxel);
 
 export const scenarios: Record<ScenarioKey, LifecycleScenario> = {
-  pine_lifecycle: {
-    key: "pine_lifecycle",
-    label: "Pine tree lifecycle",
+  avatar_forge: {
+    key: "avatar_forge",
+    label: "Forest guardian avatar",
     description:
-      "Queue a create request, compile a voxel-native tree draft into the current BuilderSpec runtime shape, then hand it into public/edit/cooldown flow.",
-    keywords: ["pine", "tree", "cabin", "forest"],
-    sourcePrompt: "Add a pine tree to the left of the cabin.",
+      "Prompt-driven avatar creation page for the logged-in player, with staged draft generation, fixture-backed refine submission, version bumps, and immediate cooldown return.",
+    keywords: [
+      "avatar",
+      "guardian",
+      "forest",
+      "mossy",
+      "rune",
+      "player",
+      "hero",
+      "character",
+    ],
+    sourcePrompt:
+      "Create a mossy forest guardian avatar with broad shoulders and a glowing chest rune.",
     creatorId: "player_1",
     rivalId: "player_2",
-    jobId: "job_tree_1",
-    objectId: "object_tree_1",
-    graceSeconds: 12,
-    voxelSource: parseVoxelBuilderSpec(pineTreeVoxel),
-    draftBuilder: toBuilderSpec(pineTreeVoxel),
-    editBuilder: toBuilderSpec(pineTreeEditVoxel),
+    jobId: "job_avatar_guardian_1",
+    objectId: "player_avatar_slot",
+    graceSeconds: 2,
+    voxelSource: avatarDraftSpec,
+    draftBuilder: toBuilderSpec(avatarDraftVoxel),
+    refineSteps: [
+      {
+        actionId: "refine_silhouette",
+        label: "Refine silhouette",
+        description: "Broaden the stance and shoulders to make the avatar read more heroic.",
+        voxelSource: avatarSilhouetteSpec,
+        builderSpec: toBuilderSpec(avatarSilhouetteVoxel),
+      },
+      {
+        actionId: "add_ornament",
+        label: "Add ornament",
+        description: "Add a luminous chest rune and shoulder ornaments for a stronger identity.",
+        voxelSource: avatarOrnamentSpec,
+        builderSpec: toBuilderSpec(avatarOrnamentVoxel),
+      },
+    ],
     plannedIntent: toIntent(
-      "Add a pine tree to the left of the cabin.",
-      parseVoxelBuilderSpec(pineTreeVoxel),
-      "Tree-sized foliage object anchored relative to the cabin for quick world dressing.",
-    ),
-  },
-  barrel_grace: {
-    key: "barrel_grace",
-    label: "Barrel group grace",
-    description:
-      "Grouped create flow compiled from a voxel source fixture, including radial clone layout around the campfire anchor.",
-    keywords: ["barrel", "barrels", "campfire", "fire"],
-    sourcePrompt: "Place three red barrels around the campfire.",
-    creatorId: "player_1",
-    rivalId: "player_2",
-    jobId: "job_barrel_1",
-    objectId: "object_barrels_1",
-    graceSeconds: 8,
-    voxelSource: parseVoxelBuilderSpec(barrelTriangleVoxel),
-    draftBuilder: toBuilderSpec(barrelTriangleVoxel),
-    plannedIntent: toIntent(
-      "Place three red barrels around the campfire.",
-      parseVoxelBuilderSpec(barrelTriangleVoxel),
-      "Small prop cluster placed around an existing world anchor using a repeat layout.",
+      "Create a mossy forest guardian avatar with broad shoulders and a glowing chest rune.",
+      avatarDraftSpec,
+      "Player-owned avatar draft built for an isolated editor preview rather than a world placement flow.",
     ),
   },
 };
@@ -116,5 +135,5 @@ export function resolveScenarioFromPrompt(prompt: string) {
   }));
 
   ranked.sort((left, right) => right.score - left.score);
-  return ranked[0]?.score ? ranked[0].scenario : scenarios.pine_lifecycle;
+  return ranked[0]?.score ? ranked[0].scenario : scenarios.avatar_forge;
 }

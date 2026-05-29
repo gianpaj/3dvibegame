@@ -44,11 +44,15 @@ export function createAuthorityObject({
     group.add(instanceGroup);
     focusAccumulator.add(instanceGroup.position);
   });
-
+  const bounds = new THREE.Box3().setFromObject(group);
   const focusPoint =
-    object.builder_spec.instances.length > 0
-      ? focusAccumulator.multiplyScalar(1 / object.builder_spec.instances.length)
-      : new THREE.Vector3();
+    !bounds.isEmpty()
+      ? bounds.getCenter(new THREE.Vector3()).setY(
+          THREE.MathUtils.lerp(bounds.min.y, bounds.max.y, 0.58),
+        )
+      : object.builder_spec.instances.length > 0
+        ? focusAccumulator.multiplyScalar(1 / object.builder_spec.instances.length)
+        : new THREE.Vector3();
   const ringMetrics = measureRingMetrics(group);
 
   if (selected && object.state === "public") {

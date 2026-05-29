@@ -149,7 +149,8 @@ export function createLifecycleController(initialScenarioKey: ScenarioKey) {
           }
           case "submit_object_edit": {
             const object = requireObject(world);
-            if (!scenario.editBuilder) {
+            const editBuilder = scenario.refineSteps[0]?.builderSpec;
+            if (!editBuilder) {
               throw new Error("selected scenario does not provide an edit builder fixture");
             }
             const result = submitObjectEdit(world, {
@@ -157,7 +158,7 @@ export function createLifecycleController(initialScenarioKey: ScenarioKey) {
               playerId: scenario.rivalId,
               baseVersion: object.version,
               builderSpec: {
-                ...scenario.editBuilder,
+                ...editBuilder,
                 base_object_version: object.version,
                 target_object_id: scenario.objectId,
               },
