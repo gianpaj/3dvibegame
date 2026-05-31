@@ -33,6 +33,15 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Reducer API surface defined
 - SpacetimeDB V1 schema proposed
 
+### Phase 1.5 — Authority Lifecycle Test Harness ✅
+- Reducer tests added for create → draft/grace → release
+- Edit lock acquisition, lock ownership, and lock release covered
+- Stale version rejection covered for edit locks and edit submits
+- Submit edit → cooldown → public return covered
+- Public vs. private destructive delete permissions covered
+- Malformed / out-of-bounds builder spec rejection covered
+- Tests now serve as the executable contract for future SpacetimeDB reducers
+
 ### Phase 2 — Contracts & Backend Definition
 - Finalize `prompt-ir-spec` (constrained prompt IR)
 - Finalize `reducer-api-spec` (authoritative backend surface)

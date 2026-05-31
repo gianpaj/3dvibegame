@@ -65,6 +65,8 @@ export function submitAIDraft(
     graceSeconds?: number;
   },
 ): AuthorityActionResult {
+  assertValidBuilderSpec(input.builderSpec);
+
   const job = world.jobs.find((candidate) => candidate.job_id === input.jobId);
   if (!job) {
     throw new Error(`job not found: ${input.jobId}`);
@@ -191,6 +193,36 @@ export function discardDraft(
   });
 }
 
+export function deleteObject(
+  world: AuthorityWorld,
+  input: {
+    objectId: string;
+    playerId: string;
+  },
+): AuthorityActionResult {
+  const nextWorld = cloneWorld(world);
+  const object = getMutableObject(nextWorld, input.objectId);
+  assertState(object, "public");
+
+  const canDelete =
+    nextWorld.settings.visibility === "private" &&
+    nextWorld.settings.destructive_edits_enabled;
+
+  if (!canDelete) {
+    throw new Error("cannot delete released objects in this world");
+  }
+
+  object.state = "deleted";
+  nextWorld.objects = nextWorld.objects.filter((o) => o.object_id !== input.objectId);
+
+  return commitEvent(nextWorld, {
+    kind: "delete_object",
+    object_id: input.objectId,
+    player_id: input.playerId,
+    message: `deleted released object ${input.objectId}`,
+  });
+}
+
 export function updateLockedTransform(
   world: AuthorityWorld,
   input: {
@@ -278,6 +310,8 @@ export function submitObjectEdit(
     builderSpec: BuilderSpec;
   },
 ): AuthorityActionResult {
+  assertValidBuilderSpec(input.builderSpec);
+
   const nextWorld = cloneWorld(world);
   const object = getMutableObject(nextWorld, input.objectId);
   assertState(object, "edit_locked");
@@ -423,6 +457,85 @@ function assertState(object: AuthorityObject, expectedState: AuthorityObject["st
     throw new Error(
       `invalid object state, expected ${expectedState} but got ${object.state}`,
     );
+  }
+}
+
+function assertValidBuilderSpec(spec: BuilderSpec) {
+  if (!spec.parts.length) {
+    throw new Error("invalid builder spec: parts must not be empty");
+  }
+
+  if (spec.complexity.part_count !== spec.parts.length) {
+    throw new Error("invalid builder spec: part count does not match parts");
+  }
+
+  if (spec.complexity.instance_count !== spec.instances.length) {
+    throw new Error("invalid builder spec: instance count does not match instances");
+  }
+
+  spec.parts.forEach((part) => {
+    assertBoundedVector(
+      `part ${part.part_id} dimensions`,
+      part.dimensions,
+      0,
+      64,
+      false,
+    );
+
+    if (part.local_position) {
+      assertBoundedVector(
+        `part ${part.part_id} local_position`,
+        part.local_position,
+        -512,
+        512,
+        true,
+      );
+    }
+    if (part.local_rotation) {
+      assertBoundedVector(
+        `part ${part.part_id} local_rotation`,
+        part.local_rotation,
+        -Math.PI * 2,
+        Math.PI * 2,
+        true,
+      );
+    }
+    if (part.local_scale) {
+      assertBoundedVector(
+        `part ${part.part_id} local_scale`,
+        part.local_scale,
+        0,
+        64,
+        false,
+      );
+    }
+  });
+
+  spec.instances.forEach((instance) => {
+    assertBoundedVector(
+      `instance ${instance.instance_id} offset`,
+      instance.offset,
+      -512,
+      512,
+      true,
+    );
+  });
+}
+
+function assertBoundedVector(
+  label: string,
+  values: [number, number, number],
+  min: number,
+  max: number,
+  allowMin: boolean,
+) {
+  const isValid = values.every((value) => {
+    if (!Number.isFinite(value)) return false;
+    return allowMin ? value >= min && value <= max : value > min && value <= max;
+  });
+
+  if (!isValid) {
+    throw new Error(`invalid builder spec: ${label} must be within ${min} and ${max}`);
   }
 }
 
