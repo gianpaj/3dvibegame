@@ -26,6 +26,7 @@ import SubmitAiDraftReducer from "../submit_ai_draft_reducer";
 import SubmitObjectEditReducer from "../submit_object_edit_reducer";
 import UpdateDraftTransformReducer from "../update_draft_transform_reducer";
 import UpdateLockedTransformReducer from "../update_locked_transform_reducer";
+import UpdateWorldSettingsReducer from "../update_world_settings_reducer";
 
 export type CancelEditParams = __Infer<typeof CancelEditReducer>;
 export type CreateSnapshotParams = __Infer<typeof CreateSnapshotReducer>;
@@ -47,3 +48,4 @@ export type SubmitAiDraftParams = __Infer<typeof SubmitAiDraftReducer>;
 export type SubmitObjectEditParams = __Infer<typeof SubmitObjectEditReducer>;
 export type UpdateDraftTransformParams = __Infer<typeof UpdateDraftTransformReducer>;
 export type UpdateLockedTransformParams = __Infer<typeof UpdateLockedTransformReducer>;
+export type UpdateWorldSettingsParams = __Infer<typeof UpdateWorldSettingsReducer>;

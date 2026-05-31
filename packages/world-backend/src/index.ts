@@ -10,6 +10,12 @@ const defaultGracePeriodSeconds = 12;
 const defaultMaxLiveObjectsPerPublicWorld = 120;
 const defaultMaxLiveObjectsPerPublicPlayer = 12;
 const defaultMaxPendingCreateJobsPerPublicPlayer = 1;
+const maxAllowedPlayers = 32;
+const maxAllowedLiveObjects = 500;
+const maxAllowedObjectsPerPlayer = 100;
+const maxAllowedPendingCreateJobsPerPlayer = 5;
+const maxAllowedObjectCooldownSeconds = 300;
+const maxAllowedGracePeriodSeconds = 120;
 const maxNicknameLength = 24;
 const maxIdLength = 80;
 const maxSnapshotObjectIdLength = 180;
@@ -131,6 +137,74 @@ export const move_player = spacetimedb.reducer(
       rotationYaw: normalizeAngle(rotationYaw),
       rotationPitch,
       lastSeenAt: ctx.timestamp,
+    });
+  },
+);
+
+export const update_world_settings = spacetimedb.reducer(
+  {
+    visibility: t.string(),
+    maxPlayers: t.u32(),
+    maxLiveObjects: t.u32(),
+    maxObjectsPerPlayer: t.u32(),
+    maxPendingCreateJobsPerPlayer: t.u32(),
+    destructiveEditsEnabled: t.bool(),
+    objectCooldownSeconds: t.u32(),
+    gracePeriodSeconds: t.u32(),
+  },
+  (ctx, input) => {
+    const player = requireActivePlayer(ctx);
+    assertCanManageWorldLifecycle(player);
+    const world = requireWorld(ctx, player.worldId);
+    const visibility = normalizeWorldVisibility(input.visibility);
+
+    if (visibility === "public" && input.destructiveEditsEnabled) {
+      throw new SenderError("public worlds cannot enable destructive edits");
+    }
+    assertU32Range("maxPlayers", input.maxPlayers, 1, maxAllowedPlayers);
+    assertU32Range("maxLiveObjects", input.maxLiveObjects, 1, maxAllowedLiveObjects);
+    assertU32Range(
+      "maxObjectsPerPlayer",
+      input.maxObjectsPerPlayer,
+      1,
+      maxAllowedObjectsPerPlayer,
+    );
+    assertU32Range(
+      "maxPendingCreateJobsPerPlayer",
+      input.maxPendingCreateJobsPerPlayer,
+      1,
+      maxAllowedPendingCreateJobsPerPlayer,
+    );
+    assertU32Range(
+      "objectCooldownSeconds",
+      input.objectCooldownSeconds,
+      0,
+      maxAllowedObjectCooldownSeconds,
+    );
+    assertU32Range(
+      "gracePeriodSeconds",
+      input.gracePeriodSeconds,
+      0,
+      maxAllowedGracePeriodSeconds,
+    );
+    if (input.maxObjectsPerPlayer > input.maxLiveObjects) {
+      throw new SenderError("maxObjectsPerPlayer cannot exceed maxLiveObjects");
+    }
+    if (input.maxPlayers < activePlayersInWorld(ctx, world.worldId)) {
+      throw new SenderError("maxPlayers cannot be lower than current active players");
+    }
+
+    ctx.db.world.worldId.update({
+      ...world,
+      visibility,
+      maxPlayers: input.maxPlayers,
+      maxLiveObjects: input.maxLiveObjects,
+      maxObjectsPerPlayer: input.maxObjectsPerPlayer,
+      maxPendingCreateJobsPerPlayer: input.maxPendingCreateJobsPerPlayer,
+      destructiveEditsEnabled: input.destructiveEditsEnabled,
+      objectCooldownSeconds: input.objectCooldownSeconds,
+      gracePeriodSeconds: input.gracePeriodSeconds,
+      updatedAt: ctx.timestamp,
     });
   },
 );
@@ -603,6 +677,9 @@ function ensureDefaultWorld(ctx: BackendCtx) {
     name: defaultWorldName,
     visibility: defaultWorldVisibility,
     maxPlayers: defaultMaxPlayers,
+    maxLiveObjects: defaultMaxLiveObjectsPerPublicWorld,
+    maxObjectsPerPlayer: defaultMaxLiveObjectsPerPublicPlayer,
+    maxPendingCreateJobsPerPlayer: defaultMaxPendingCreateJobsPerPublicPlayer,
     destructiveEditsEnabled: false,
     objectCooldownSeconds: defaultObjectCooldownSeconds,
     gracePeriodSeconds: defaultGracePeriodSeconds,
@@ -645,18 +722,18 @@ function assertPublicCreationGuardrails(
   if (
     includePendingJobs &&
     pendingCreateJobsForPlayer(ctx, world.worldId, playerIdentity) >=
-      defaultMaxPendingCreateJobsPerPublicPlayer
+      world.maxPendingCreateJobsPerPlayer
   ) {
     throw new SenderError("player has too many pending creation jobs");
   }
 
-  if (liveObjectsInWorld(ctx, world.worldId) >= defaultMaxLiveObjectsPerPublicWorld) {
+  if (liveObjectsInWorld(ctx, world.worldId) >= world.maxLiveObjects) {
     throw new SenderError("public world object cap reached");
   }
 
   if (
     liveObjectsCreatedByPlayer(ctx, world.worldId, playerIdentity) >=
-    defaultMaxLiveObjectsPerPublicPlayer
+    world.maxObjectsPerPlayer
   ) {
     throw new SenderError("player public object cap reached");
   }
@@ -1070,6 +1147,20 @@ function normalizeSnapshotReason(reason: string) {
     throw new SenderError("snapshot reason must be manual_reset or scheduled_reset");
   }
   return normalized;
+}
+
+function normalizeWorldVisibility(visibility: string) {
+  const normalized = visibility.trim();
+  if (normalized !== "public" && normalized !== "private") {
+    throw new SenderError("world visibility must be public or private");
+  }
+  return normalized;
+}
+
+function assertU32Range(label: string, value: number, min: number, max: number) {
+  if (!Number.isInteger(value) || value < min || value > max) {
+    throw new SenderError(`${label} must be between ${min} and ${max}`);
+  }
 }
 
 function normalizeAiJobErrorCode(errorCode: string) {

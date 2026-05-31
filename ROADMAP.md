@@ -198,6 +198,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Stale worker draft submissions against failed jobs are rejected by the existing pending-job check
 - AI-job failure smoke verifies failed/expired jobs unblock public creation guardrails
 
+### Phase 2.22 — World Settings Guardrail Tuning ✅
+- World rows now store configurable live-object, per-player object, and pending-create caps
+- Added `update_world_settings` for host/moderator/platform-admin updates to visibility, player cap, guardrail caps, cooldown, grace period, and destructive editing
+- Public worlds reject destructive edit settings, and max-player changes cannot strand currently active players
+- Public creation guardrails now read cap values from the world row instead of hard-coded constants
+- World-settings smoke verifies public guardrail tuning and private destructive delete behavior
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 

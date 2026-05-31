@@ -54,6 +54,7 @@ import SubmitAiDraftReducer from "./submit_ai_draft_reducer";
 import SubmitObjectEditReducer from "./submit_object_edit_reducer";
 import UpdateDraftTransformReducer from "./update_draft_transform_reducer";
 import UpdateLockedTransformReducer from "./update_locked_transform_reducer";
+import UpdateWorldSettingsReducer from "./update_world_settings_reducer";
 
 // Import all procedure arg schemas
 
@@ -198,6 +199,7 @@ const reducersSchema = __reducers(
   __reducerSchema("submit_object_edit", SubmitObjectEditReducer),
   __reducerSchema("update_draft_transform", UpdateDraftTransformReducer),
   __reducerSchema("update_locked_transform", UpdateLockedTransformReducer),
+  __reducerSchema("update_world_settings", UpdateWorldSettingsReducer),
 );
 
 /** The schema information for all procedures in this module. This is defined the same way as the procedures would have been defined in the server. */
