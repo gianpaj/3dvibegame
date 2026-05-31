@@ -177,6 +177,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Private rooms remain more permissive while exact V1 public rate-limit numbers stay open for tuning
 - The two-client backend smoke now also covers pending-create rejection before the lock-contention flow continues
 
+### Phase 2.19 — Multiplayer Replay Smoke Coverage ✅
+- Extracted a shared SpacetimeDB smoke harness for isolated in-memory backend runs with server-issued identities
+- Added a multiplayer replay smoke with configurable player count through `VIBE_WORLD_SMOKE_PLAYERS`
+- Replay coverage now exercises multi-player join, movement presence rows, reconnect/nickname refresh, object create/release deltas, and lock contention
+- Reducer calls use an explicit CLI option separator so negative movement coordinates are covered correctly
+- Existing lock-contention smoke now reuses the same harness for consistent local backend verification
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 
