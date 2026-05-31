@@ -589,6 +589,24 @@ button[aria-pressed="true"] {
   padding: 0;
 }
 
+.world-lifecycle-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.danger-button {
+  color: #ffffff;
+  border-color: rgba(216, 95, 77, 0.42);
+  background: var(--hud-red);
+}
+
+.danger-button:hover {
+  color: #ffffff;
+  border-color: rgba(216, 95, 77, 0.62);
+  background: #c64f3f;
+}
+
 .presence-strip {
   position: absolute;
   left: 1rem;
@@ -927,6 +945,7 @@ button[aria-pressed="true"] {
 
   .metric-grid,
   .settings-field-grid,
+  .world-lifecycle-actions,
   .dock-card {
     grid-template-columns: 1fr;
   }

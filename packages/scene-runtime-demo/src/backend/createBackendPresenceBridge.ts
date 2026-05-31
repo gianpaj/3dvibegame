@@ -124,6 +124,8 @@ export interface BackendPresenceBridge {
   failAiJob(input: BackendFailAiJobInput): Promise<void>;
   expireAiJob(input: BackendAiJobIdInput): Promise<void>;
   updateWorldSettings(input: BackendUpdateWorldSettingsInput): Promise<void>;
+  createSnapshot(input: BackendWorldSnapshotInput): Promise<void>;
+  resetWorld(input: BackendWorldSnapshotInput): Promise<void>;
   dispose(): void;
 }
 
@@ -160,6 +162,11 @@ export interface BackendUpdateWorldSettingsInput {
   destructiveEditsEnabled: boolean;
   objectCooldownSeconds: number;
   gracePeriodSeconds: number;
+}
+
+export interface BackendWorldSnapshotInput {
+  snapshotId: string;
+  reason: string;
 }
 
 export interface BackendRequestEditLockInput extends BackendObjectIdInput {
@@ -216,6 +223,8 @@ export function createBackendPresenceBridge({
       failAiJob: rejectDisabledBackend,
       expireAiJob: rejectDisabledBackend,
       updateWorldSettings: rejectDisabledBackend,
+      createSnapshot: rejectDisabledBackend,
+      resetWorld: rejectDisabledBackend,
       dispose() {},
     };
   }
@@ -423,6 +432,16 @@ export function createBackendPresenceBridge({
     updateWorldSettings(input) {
       return callLiveReducer("World settings update rejected", (conn) =>
         conn.reducers.updateWorldSettings(input),
+      );
+    },
+    createSnapshot(input) {
+      return callLiveReducer("World snapshot rejected", (conn) =>
+        conn.reducers.createSnapshot(input),
+      );
+    },
+    resetWorld(input) {
+      return callLiveReducer("World reset rejected", (conn) =>
+        conn.reducers.resetWorld(input),
       );
     },
   };

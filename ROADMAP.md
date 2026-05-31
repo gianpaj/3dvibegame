@@ -226,6 +226,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Reducer failures surface in the existing context toast, including role checks and public-world destructive edit rejection
 - Demo typecheck/build verifies settings controls stay compatible with local fixture mode and optional backend mode
 
+### Phase 2.26 — Demo Snapshot & Reset Controls ✅
+- Backend bridge exposes `create_snapshot` and `reset_world` to the runtime demo command boundary
+- HUD Settings panel adds host-facing world lifecycle controls for manual snapshots and reset-triggered snapshots
+- Reset actions require browser confirmation before calling the authoritative reducer
+- Lifecycle status metrics reuse subscribed archive rows so hosts can see live objects, snapshot count, frozen objects, and latest cycle
+- Demo typecheck/build verifies snapshot/reset controls stay compatible with local fixture mode and optional backend mode
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 

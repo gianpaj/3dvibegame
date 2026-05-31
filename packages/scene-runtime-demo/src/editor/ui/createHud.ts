@@ -56,12 +56,18 @@ export interface HudWorldSettingsInput {
   gracePeriodSeconds: number;
 }
 
+export interface HudWorldLifecycleInput {
+  action: "snapshot" | "reset";
+  reason: "manual_reset";
+}
+
 interface HudConfig {
   root: HTMLElement;
   scenarios: ScenarioOption[];
   onPromptSubmit(prompt: string): void;
   onAction(actionId: GenerationActionId): void;
   onWorldSettingsSubmit?(input: HudWorldSettingsInput): void;
+  onWorldLifecycleAction?(input: HudWorldLifecycleInput): void;
   onInteractionStateChange?(state: HudInteractionState): void;
 }
 
@@ -112,6 +118,7 @@ export function createHud({
   onPromptSubmit,
   onAction,
   onWorldSettingsSubmit,
+  onWorldLifecycleAction,
   onInteractionStateChange,
 }: HudConfig) {
   const initialPrompt = scenarios[0]?.sourcePrompt ?? "";
@@ -252,6 +259,9 @@ export function createHud({
     const action = button.dataset.action;
     const prompt = button.dataset.prompt;
     const refineAction = button.dataset.refine as GenerationActionId | undefined;
+    const worldLifecycle = button.dataset.worldLifecycle as
+      | HudWorldLifecycleInput["action"]
+      | undefined;
     const vote = button.dataset.vote as Exclude<FeedbackVote, null> | undefined;
 
     if (panel) {
@@ -270,6 +280,17 @@ export function createHud({
 
     if (refineAction) {
       onAction(refineAction);
+      return;
+    }
+
+    if (worldLifecycle) {
+      if (
+        worldLifecycle === "reset" &&
+        !window.confirm("Reset this world? Live objects will be archived and cleared.")
+      ) {
+        return;
+      }
+      onWorldLifecycleAction?.({ action: worldLifecycle, reason: "manual_reset" });
       return;
     }
 
@@ -550,6 +571,7 @@ export function createHud({
       </section>
 
       ${renderWorldSettingsControls(latestBackendPresence)}
+      ${renderWorldLifecycleControls(latestBackendPresence)}
 
       <section class="sheet-section settings-actions">
         <button type="button" data-action="mute">${muted ? "Unmute room" : "Mute room"}</button>
@@ -1273,6 +1295,31 @@ function renderWorldSettingsControls(
         </div>
         <button type="submit">Apply world settings</button>
       </form>
+    </section>
+  `;
+}
+
+function renderWorldLifecycleControls(
+  backendPresence: BackendPresenceSnapshot | null,
+) {
+  if (!backendPresence?.enabled || !backendPresence.world) return "";
+
+  const liveObjects = backendPresence.authorityWorld?.objects.length ?? 0;
+  const latestSnapshot = backendPresence.worldSnapshots[0] ?? null;
+
+  return `
+    <section class="sheet-section">
+      <h2>World lifecycle</h2>
+      <div class="metric-grid">
+        ${metric("Live objects", String(liveObjects))}
+        ${metric("Snapshots", String(backendPresence.worldSnapshots.length))}
+        ${metric("Frozen objects", String(backendPresence.snapshotObjects.length))}
+        ${metric("Latest cycle", latestSnapshot ? `#${latestSnapshot.cycleNumber}` : "none")}
+      </div>
+      <div class="world-lifecycle-actions">
+        <button type="button" data-world-lifecycle="snapshot">Snapshot world</button>
+        <button type="button" class="danger-button" data-world-lifecycle="reset">Reset world</button>
+      </div>
     </section>
   `;
 }

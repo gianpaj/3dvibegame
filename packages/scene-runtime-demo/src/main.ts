@@ -115,6 +115,29 @@ const hud = createHud({
         hud.setContextMessage(errorMessage(error, "World settings update failed"));
       });
   },
+  onWorldLifecycleAction(input) {
+    if (!backendCommands?.canHandle()) {
+      hud.setContextMessage("World lifecycle controls are only available in a live room.");
+      return;
+    }
+
+    hud.setContextMessage(
+      input.action === "reset" ? "Resetting world." : "Creating world snapshot.",
+    );
+    const operation =
+      input.action === "reset"
+        ? backendCommands.resetWorld(input.reason)
+        : backendCommands.createSnapshot(input.reason);
+    void operation
+      .then(() => {
+        hud.setContextMessage(
+          input.action === "reset" ? "World reset complete." : "World snapshot created.",
+        );
+      })
+      .catch((error: unknown) => {
+        hud.setContextMessage(errorMessage(error, "World lifecycle action failed"));
+      });
+  },
   onInteractionStateChange(state) {
     cameraRig.controls.enabled = !state.controlsLocked;
   },

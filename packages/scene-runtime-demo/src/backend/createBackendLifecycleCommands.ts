@@ -27,6 +27,8 @@ export interface BackendLifecycleCommands {
   submitPrompt(prompt: string): Promise<void>;
   dispatchAction(actionId: GenerationActionId): Promise<void>;
   updateWorldSettings(input: BackendUpdateWorldSettingsInput): Promise<void>;
+  createSnapshot(reason?: string): Promise<void>;
+  resetWorld(reason?: string): Promise<void>;
 }
 
 export function createBackendLifecycleCommands(
@@ -45,6 +47,26 @@ export function createBackendLifecycleCommands(
       }
 
       return bridge.updateWorldSettings(input);
+    },
+    createSnapshot(reason = "manual_reset") {
+      if (!isBackendReady(bridge)) {
+        throw new Error("Backend room is not ready yet.");
+      }
+
+      return bridge.createSnapshot({
+        snapshotId: nextSnapshotId("snapshot", sequence++),
+        reason,
+      });
+    },
+    resetWorld(reason = "manual_reset") {
+      if (!isBackendReady(bridge)) {
+        throw new Error("Backend room is not ready yet.");
+      }
+
+      return bridge.resetWorld({
+        snapshotId: nextSnapshotId("reset", sequence++),
+        reason,
+      });
     },
     async submitPrompt(prompt: string) {
       const trimmed = prompt.trim();
@@ -165,6 +187,10 @@ export function createBackendLifecycleCommands(
       await bridge.expireCooldown({ objectId: object.object_id });
     },
   };
+}
+
+function nextSnapshotId(prefix: string, sequence: number) {
+  return `${prefix}_${Date.now().toString(36)}_${sequence}`;
 }
 
 async function failCreateJobForWorkerError(
