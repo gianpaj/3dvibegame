@@ -39,6 +39,7 @@ export interface HudInteractionState {
   workflowState: HudWorkflowState;
   multiplayerMode: HudMultiplayerMode;
   feedbackVote: FeedbackVote;
+  feedbackNote: string;
   muted: boolean;
   shareState: ShareState;
   controlsLocked: boolean;
@@ -103,6 +104,8 @@ export function createHud({
   const initialPrompt = scenarios[0]?.sourcePrompt ?? "";
   let activePanel: HudPanel | null = null;
   let feedbackVote: FeedbackVote = null;
+  let feedbackNote = "";
+  let feedbackTargetKey: string | null = null;
   let muted = false;
   let shareState: ShareState = "idle";
   let latestSnapshot: GenerationSnapshot | null = null;
@@ -280,6 +283,19 @@ export function createHud({
     }
   });
 
+  root.addEventListener("input", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (target.dataset.role !== "feedback-note") return;
+
+    feedbackNote = target.value;
+    const summary = target.closest(".feedback-card")?.querySelector("small");
+    if (summary) {
+      summary.textContent = feedbackSummary();
+    }
+    emitInteractionState();
+  });
+
   root.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && activePanel) {
       activePanel = null;
@@ -291,6 +307,7 @@ export function createHud({
     setSnapshot(snapshot: GenerationSnapshot) {
       latestSnapshot = snapshot;
       syncChatTranscript(snapshot);
+      resetFeedbackForNewTarget(snapshot);
 
       if (document.activeElement !== promptInput) {
         promptInput.value = snapshot.sourcePrompt;
@@ -492,6 +509,7 @@ export function createHud({
           ${metric("Panel", state.activePanel)}
           ${metric("Flow", workflowLabels[state.workflowState])}
           ${metric("Multiplayer", state.multiplayerMode)}
+          ${metric("Feedback", feedbackSummary())}
           ${metric("Camera", state.controlsLocked ? "locked" : "free")}
           ${metric("Audio", muted ? "muted" : "on")}
           ${metric("Backend", backendStatusLabel(latestBackendPresence))}
@@ -600,7 +618,14 @@ export function createHud({
           <button type="button" data-vote="up" aria-pressed="${feedbackVote === "up"}">Good</button>
           <button type="button" data-vote="down" aria-pressed="${feedbackVote === "down"}">Needs work</button>
         </div>
-        <input type="text" aria-label="Feedback note" placeholder="Add a short note for the next pass" />
+        <input
+          type="text"
+          aria-label="Feedback note"
+          data-role="feedback-note"
+          value="${escapeHtml(feedbackNote)}"
+          placeholder="Add a short note for the next pass"
+        />
+        <small>${escapeHtml(feedbackSummary())}</small>
       </div>
     `;
   }
@@ -706,10 +731,33 @@ export function createHud({
       workflowState: latestSnapshot ? resolveWorkflowState(latestSnapshot) : "idle",
       multiplayerMode: resolveMultiplayerMode(latestBackendPresence),
       feedbackVote,
+      feedbackNote,
       muted,
       shareState,
       controlsLocked: inputMode !== "play",
     };
+  }
+
+  function resetFeedbackForNewTarget(snapshot: GenerationSnapshot) {
+    const nextTargetKey = snapshot.object
+      ? `${snapshot.object.object_id}:${snapshot.object.version}`
+      : null;
+    if (nextTargetKey === feedbackTargetKey) return;
+
+    feedbackTargetKey = nextTargetKey;
+    feedbackVote = null;
+    feedbackNote = "";
+  }
+
+  function feedbackSummary() {
+    const voteLabel =
+      feedbackVote === "up"
+        ? "good"
+        : feedbackVote === "down"
+          ? "needs work"
+          : "none";
+    const note = feedbackNote.trim();
+    return note ? `${voteLabel} - ${note}` : voteLabel;
   }
 
   function emitInteractionState() {

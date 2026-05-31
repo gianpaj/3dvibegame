@@ -690,6 +690,12 @@ button[aria-pressed="true"] {
   color: inherit;
 }
 
+.feedback-card small {
+  color: var(--hud-soft);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .prompt-dock {
   position: absolute;
   left: 50%;

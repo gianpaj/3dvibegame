@@ -93,6 +93,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Error stage events render distinctly in the local transcript
 - Backend multiplayer chat reducers remain deferred until object lifecycle networking starts
 
+### Phase 2.7 — Local Generation Feedback State ✅
+- Feedback thumbs up/down state is paired with a persistent note field
+- Feedback note is included in HUD interaction state for future telemetry or backend submission
+- Feedback resets when the selected object/version changes
+- Settings panel summarizes the current local feedback state
+- Feedback remains local until AI worker quality metrics and backend persistence are introduced
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 
