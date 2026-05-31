@@ -13,5 +13,6 @@ import {
 export default {
   jobId: __t.string(),
   objectId: __t.string(),
+  sourceSpecJson: __t.string(),
   builderSpecJson: __t.string(),
 };

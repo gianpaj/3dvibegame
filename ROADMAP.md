@@ -128,6 +128,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Draft move/rotate/scale, draft release, public refine lock/submit, edit cancel, and demo cooldown expiry are wired to backend reducers
 - Browser smoke covered HUD prompt → backend draft → release → public → refine → version 2 public
 
+### Phase 2.12 — Backend Object Artifact Boundary ✅
+- Backend object rows now store `source_spec_json` as the canonical editable `VoxelBuilderSpec`
+- Existing `builder_spec_json` is retained as the derived current Three.js runtime artifact for renderer compatibility
+- Draft and edit submit reducers require both source spec JSON and builder artifact JSON
+- Reducers validate source/artifact category, size tier, and operation alignment before mutating object rows
+- Generated client bindings were refreshed for the expanded submit reducer payloads and object row shape
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 

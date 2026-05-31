@@ -73,6 +73,7 @@ export interface BackendRequestCreateObjectInput {
 export interface BackendSubmitAiDraftInput {
   jobId: string;
   objectId: string;
+  sourceSpecJson: string;
   builderSpecJson: string;
 }
 
@@ -85,6 +86,7 @@ export interface BackendRequestEditLockInput extends BackendObjectIdInput {
 }
 
 export interface BackendSubmitObjectEditInput extends BackendRequestEditLockInput {
+  sourceSpecJson: string;
   builderSpecJson: string;
 }
 

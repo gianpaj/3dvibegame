@@ -40,6 +40,7 @@ export function createBackendLifecycleCommands(
       await bridge.submitAiDraft({
         jobId,
         objectId,
+        sourceSpecJson: JSON.stringify(scenario.voxelSource),
         builderSpecJson: JSON.stringify(scenario.draftBuilder),
       });
     },
@@ -107,6 +108,7 @@ export function createBackendLifecycleCommands(
       await bridge.submitObjectEdit({
         objectId: object.object_id,
         baseVersion: object.version,
+        sourceSpecJson: JSON.stringify(refineStep.voxelSource),
         builderSpecJson: JSON.stringify(refineStep.builderSpec),
       });
       await bridge.expireCooldown({ objectId: object.object_id });

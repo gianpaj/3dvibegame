@@ -111,6 +111,7 @@ export const WorldObject = table(
     lockOwner: t.identity().optional(),
     category: t.string(),
     sizeTier: t.string(),
+    sourceSpecJson: t.string(),
     builderSpecJson: t.string(),
     positionX: t.f64(),
     positionY: t.f64(),

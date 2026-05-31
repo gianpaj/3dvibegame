@@ -23,6 +23,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Optional runtime demo bridge for backend subscriptions, anonymous join/leave, heartbeat, and live/local HUD status.
 - Throttled demo `move_player` publishing from the camera rig plus simple remote player scene markers.
 - Backend object lifecycle networking now has `ai_job`, `world_object`, and `object_lock` rows plus create, draft submit, transform, release, lock, edit submit, cancel, expiry, and gated delete reducers.
+- Backend `world_object` rows now distinguish canonical `source_spec_json` (`VoxelBuilderSpec`) from derived `builder_spec_json` (current renderer artifact).
 - Runtime demo live mode now subscribes to backend `world_object` rows and maps renderable rows into the existing Three.js authority-world renderer.
 - Runtime demo live mode now routes HUD prompt, draft transform, release, and public refine actions through backend lifecycle reducers using fixture-backed builder specs as the demo AI-worker stand-in.
 - HUD workflow states now map idle, queued, generating, grace, refining, released, failed, and local-vs-live multiplayer modes.
@@ -42,9 +43,9 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 ## Next Slices
 
-1. Decide where canonical `VoxelBuilderSpec` source and compiled runtime artifacts live in backend object rows.
-2. Add live-mode client affordances for grace timers, edit locks, cooldowns, stale-version rejection, and reducer error recovery.
-3. Replace the fixture-backed demo AI-worker stand-in with an explicit worker boundary adapter.
+1. Add live-mode client affordances for grace timers, edit locks, cooldowns, stale-version rejection, and reducer error recovery.
+2. Replace the fixture-backed demo AI-worker stand-in with an explicit worker boundary adapter.
+3. Add backend/source artifact debug visibility in the HUD without making renderer artifacts authoritative.
 
 ## Later
 
@@ -62,6 +63,8 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - `pnpm --filter @3dvibegame/world-backend build`: passing as of 2026-05-31.
 - `pnpm --filter @3dvibegame/scene-runtime-demo typecheck`: passing as of 2026-05-31.
 - `pnpm demo:build`: passing as of 2026-05-31.
+- Backend object artifact boundary typecheck/build: passing as of 2026-05-31.
+- Temporary backend artifact-boundary smoke: `submit_ai_draft` accepted paired `source_spec_json` and `builder_spec_json` and created a grace object as of 2026-05-31.
 - Backend object delta rendering adapter typecheck/build: passing as of 2026-05-31.
 - Temporary live backend render smoke: seeded one `world_object` row and browser HUD showed `public room - 1/20 online - 1 object` as of 2026-05-31.
 - Temporary live backend control smoke: browser HUD prompt created a backend draft, release moved it to public, and refine moved it to version 2 public as of 2026-05-31.

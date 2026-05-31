@@ -75,6 +75,7 @@ export const WorldObject = __t.object("WorldObject", {
   lockOwner: __t.option(__t.identity()),
   category: __t.string(),
   sizeTier: __t.string(),
+  sourceSpecJson: __t.string(),
   builderSpecJson: __t.string(),
   positionX: __t.f64(),
   positionY: __t.f64(),

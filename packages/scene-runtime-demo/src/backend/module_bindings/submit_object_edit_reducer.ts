@@ -13,5 +13,6 @@ import {
 export default {
   objectId: __t.string(),
   baseVersion: __t.u32(),
+  sourceSpecJson: __t.string(),
   builderSpecJson: __t.string(),
 };

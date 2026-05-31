@@ -10,6 +10,7 @@ const defaultGracePeriodSeconds = 12;
 const maxNicknameLength = 24;
 const maxIdLength = 80;
 const maxPromptLength = 500;
+const maxSourceSpecJsonLength = 300_000;
 const maxBuilderSpecJsonLength = 200_000;
 const maxHorizontalDistance = 256;
 const minPlayerY = -8;
@@ -163,9 +164,10 @@ export const submit_ai_draft = spacetimedb.reducer(
   {
     jobId: t.string(),
     objectId: t.string(),
+    sourceSpecJson: t.string(),
     builderSpecJson: t.string(),
   },
-  (ctx, { jobId, objectId, builderSpecJson }) => {
+  (ctx, { jobId, objectId, sourceSpecJson, builderSpecJson }) => {
     const player = requireActivePlayer(ctx);
     const normalizedJobId = normalizeId("jobId", jobId);
     const normalizedObjectId = normalizeId("objectId", objectId);
@@ -184,7 +186,9 @@ export const submit_ai_draft = spacetimedb.reducer(
       throw new SenderError("object already exists");
     }
 
+    const sourceSpec = parseSourceSpecJson(sourceSpecJson);
     const builderSpec = parseBuilderSpecJson(builderSpecJson);
+    assertArtifactMatchesSource(sourceSpec, builderSpec);
     const world = requireWorld(ctx, player.worldId);
 
     ctx.db.worldObject.insert({
@@ -196,8 +200,9 @@ export const submit_ai_draft = spacetimedb.reducer(
       latestEditor: job.playerIdentity,
       graceOwner: job.playerIdentity,
       lockOwner: undefined,
-      category: builderSpec.category,
-      sizeTier: builderSpec.sizeTier,
+      category: sourceSpec.category,
+      sizeTier: sourceSpec.sizeTier,
+      sourceSpecJson: sourceSpec.normalizedJson,
       builderSpecJson: builderSpec.normalizedJson,
       positionX: 0,
       positionY: 0,
@@ -367,9 +372,10 @@ export const submit_object_edit = spacetimedb.reducer(
   {
     objectId: t.string(),
     baseVersion: t.u32(),
+    sourceSpecJson: t.string(),
     builderSpecJson: t.string(),
   },
-  (ctx, { objectId, baseVersion, builderSpecJson }) => {
+  (ctx, { objectId, baseVersion, sourceSpecJson, builderSpecJson }) => {
     const player = requireActivePlayer(ctx);
     const object = requireWorldObject(ctx, normalizeId("objectId", objectId));
     assertSameWorld(player.worldId, object.worldId);
@@ -381,7 +387,9 @@ export const submit_object_edit = spacetimedb.reducer(
       throw new SenderError("stale object version for edit submit");
     }
 
+    const sourceSpec = parseSourceSpecJson(sourceSpecJson);
     const builderSpec = parseBuilderSpecJson(builderSpecJson);
+    assertArtifactMatchesSource(sourceSpec, builderSpec);
     const world = requireWorld(ctx, object.worldId);
 
     ctx.db.worldObject.objectId.update({
@@ -390,8 +398,9 @@ export const submit_object_edit = spacetimedb.reducer(
       version: object.version + 1,
       latestEditor: ctx.sender,
       lockOwner: undefined,
-      category: builderSpec.category,
-      sizeTier: builderSpec.sizeTier,
+      category: sourceSpec.category,
+      sizeTier: sourceSpec.sizeTier,
+      sourceSpecJson: sourceSpec.normalizedJson,
       builderSpecJson: builderSpec.normalizedJson,
       cooldownRemainingSeconds: world.objectCooldownSeconds,
       updatedAt: ctx.timestamp,
@@ -750,6 +759,50 @@ function sameIdentity(
   return left?.toHexString() === right.toHexString();
 }
 
+function parseSourceSpecJson(sourceSpecJson: string) {
+  const normalizedJson = sourceSpecJson.trim();
+  if (!normalizedJson) {
+    throw new SenderError("source spec JSON is required");
+  }
+  if (normalizedJson.length > maxSourceSpecJsonLength) {
+    throw new SenderError(
+      `source spec JSON must be ${maxSourceSpecJsonLength} characters or fewer`,
+    );
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(normalizedJson);
+  } catch {
+    throw new SenderError("source spec JSON is malformed");
+  }
+
+  if (!isRecord(parsed)) {
+    throw new SenderError("source spec must be an object");
+  }
+
+  const operations = readSourceArrayField(parsed, "operations");
+  if (!operations.length) {
+    throw new SenderError("source spec operations must not be empty");
+  }
+
+  const placement = readSourceRecordField(parsed, "placement");
+  assertBoundedNumberVector(
+    "source spec placement offset",
+    readSourceNumberArrayField(placement, "offset"),
+    -512,
+    512,
+    true,
+  );
+
+  return {
+    operation: readSourceStringField(parsed, "operation"),
+    category: readSourceStringField(parsed, "object_category"),
+    sizeTier: readSourceStringField(parsed, "size_tier"),
+    normalizedJson,
+  };
+}
+
 function parseBuilderSpecJson(builderSpecJson: string) {
   const normalizedJson = builderSpecJson.trim();
   if (!normalizedJson) {
@@ -815,10 +868,34 @@ function parseBuilderSpecJson(builderSpecJson: string) {
   });
 
   return {
+    operation: readStringField(parsed, "operation"),
     category: readStringField(parsed, "object_category"),
     sizeTier: readStringField(parsed, "size_tier"),
     normalizedJson,
   };
+}
+
+function assertArtifactMatchesSource(
+  sourceSpec: {
+    operation: string;
+    category: string;
+    sizeTier: string;
+  },
+  builderSpec: {
+    operation: string;
+    category: string;
+    sizeTier: string;
+  },
+) {
+  if (sourceSpec.operation !== builderSpec.operation) {
+    throw new SenderError("builder artifact operation does not match source spec");
+  }
+  if (sourceSpec.category !== builderSpec.category) {
+    throw new SenderError("builder artifact category does not match source spec");
+  }
+  if (sourceSpec.sizeTier !== builderSpec.sizeTier) {
+    throw new SenderError("builder artifact size tier does not match source spec");
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -833,6 +910,14 @@ function readRecordField(value: Record<string, unknown>, field: string) {
   return fieldValue;
 }
 
+function readSourceRecordField(value: Record<string, unknown>, field: string) {
+  const fieldValue = value[field];
+  if (!isRecord(fieldValue)) {
+    throw new SenderError(`source spec ${field} must be an object`);
+  }
+  return fieldValue;
+}
+
 function readArrayField(value: Record<string, unknown>, field: string) {
   const fieldValue = value[field];
   if (!Array.isArray(fieldValue)) {
@@ -841,10 +926,26 @@ function readArrayField(value: Record<string, unknown>, field: string) {
   return fieldValue;
 }
 
+function readSourceArrayField(value: Record<string, unknown>, field: string) {
+  const fieldValue = value[field];
+  if (!Array.isArray(fieldValue)) {
+    throw new SenderError(`source spec ${field} must be an array`);
+  }
+  return fieldValue;
+}
+
 function readStringField(value: Record<string, unknown>, field: string) {
   const fieldValue = value[field];
   if (typeof fieldValue !== "string" || !fieldValue.trim()) {
     throw new SenderError(`builder spec ${field} must be a non-empty string`);
+  }
+  return fieldValue;
+}
+
+function readSourceStringField(value: Record<string, unknown>, field: string) {
+  const fieldValue = value[field];
+  if (typeof fieldValue !== "string" || !fieldValue.trim()) {
+    throw new SenderError(`source spec ${field} must be a non-empty string`);
   }
   return fieldValue;
 }
@@ -861,6 +962,14 @@ function readNumberArrayField(value: Record<string, unknown>, field: string) {
   const fieldValue = value[field];
   if (!Array.isArray(fieldValue) || fieldValue.length !== 3) {
     throw new SenderError(`builder spec ${field} must be a vector3`);
+  }
+  return fieldValue;
+}
+
+function readSourceNumberArrayField(value: Record<string, unknown>, field: string) {
+  const fieldValue = value[field];
+  if (!Array.isArray(fieldValue) || fieldValue.length !== 3) {
+    throw new SenderError(`source spec ${field} must be a vector3`);
   }
   return fieldValue;
 }

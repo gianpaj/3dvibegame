@@ -21,6 +21,7 @@ export default __t.row({
   lockOwner: __t.option(__t.identity()).name("lock_owner"),
   category: __t.string(),
   sizeTier: __t.string().name("size_tier"),
+  sourceSpecJson: __t.string().name("source_spec_json"),
   builderSpecJson: __t.string().name("builder_spec_json"),
   positionX: __t.f64().name("position_x"),
   positionY: __t.f64().name("position_y"),
