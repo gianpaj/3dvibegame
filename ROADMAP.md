@@ -114,6 +114,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Generated TypeScript client bindings were refreshed for the expanded backend schema and reducer surface
 - Local SpacetimeDB smoke covered join → job → draft → release → lock → edit → cooldown expiry → public, plus public delete rejection
 
+### Phase 2.10 — Backend Object Delta Rendering ✅
+- Runtime demo live mode now subscribes to public `world_object` rows alongside world and presence rows
+- Backend object rows are adapted into the existing `AuthorityWorld` shape used by the Three.js renderer
+- Connected backend scenes render live object rows when any renderable objects exist, with local fixture generation retained as the fallback
+- Deleted rows and malformed builder specs are skipped by the client-side adapter instead of crashing the scene
+- HUD room status now includes the subscribed backend object count
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 

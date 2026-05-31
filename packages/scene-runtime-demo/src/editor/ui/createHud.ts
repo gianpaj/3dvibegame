@@ -836,7 +836,9 @@ function roomSubtitleLabel(
   backendPresence: BackendPresenceSnapshot | null,
 ) {
   if (backendPresence?.enabled && backendPresence.world) {
-    return `${backendPresence.world.visibility} room - ${backendPresence.onlineCount}/${backendPresence.world.maxPlayers} online`;
+    const objectCount = backendPresence.authorityWorld?.objects.length ?? 0;
+    const objectLabel = objectCount === 1 ? "1 object" : `${objectCount} objects`;
+    return `${backendPresence.world.visibility} room - ${backendPresence.onlineCount}/${backendPresence.world.maxPlayers} online - ${objectLabel}`;
   }
 
   if (backendPresence?.enabled) {

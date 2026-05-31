@@ -1,5 +1,8 @@
+import type { AuthorityWorld } from "@3dvibegame/scene-authority-ts";
+
 import { DbConnection, type SubscriptionHandle } from "./module_bindings";
 import type { PlayerSession, World } from "./module_bindings/types";
+import { mapBackendAuthorityWorld } from "./mapBackendAuthorityWorld";
 
 export type BackendPresenceStatus =
   | "disabled"
@@ -40,6 +43,7 @@ export interface BackendPresenceSnapshot {
   onlineCount: number;
   world: BackendWorldPresence | null;
   players: BackendPlayerPresence[];
+  authorityWorld: AuthorityWorld | null;
 }
 
 interface BackendPresenceBridgeConfig {
@@ -152,7 +156,11 @@ export function createBackendPresenceBridge({
             message = errorMessage(ctx.event, "Room subscription failed");
             emitCurrent();
           })
-          .subscribe(["SELECT * FROM world", "SELECT * FROM player_session"]);
+          .subscribe([
+            "SELECT * FROM world",
+            "SELECT * FROM player_session",
+            "SELECT * FROM world_object",
+          ]);
       })
       .onConnectError((_ctx, error) => {
         if (disposed) return;
@@ -264,6 +272,13 @@ function installTableListeners(connection: DbConnection, onChange: () => void) {
   const onWorldUpdate: NonNullable<
     Parameters<NonNullable<typeof connection.db.world.onUpdate>>[0]
   > = () => onChange();
+  const onWorldObjectInsert: Parameters<typeof connection.db.worldObject.onInsert>[0] =
+    () => onChange();
+  const onWorldObjectDelete: Parameters<typeof connection.db.worldObject.onDelete>[0] =
+    () => onChange();
+  const onWorldObjectUpdate: NonNullable<
+    Parameters<NonNullable<typeof connection.db.worldObject.onUpdate>>[0]
+  > = () => onChange();
 
   connection.db.playerSession.onInsert(onPlayerInsert);
   connection.db.playerSession.onDelete(onPlayerDelete);
@@ -271,6 +286,9 @@ function installTableListeners(connection: DbConnection, onChange: () => void) {
   connection.db.world.onInsert(onWorldInsert);
   connection.db.world.onDelete(onWorldDelete);
   connection.db.world.onUpdate(onWorldUpdate);
+  connection.db.worldObject.onInsert(onWorldObjectInsert);
+  connection.db.worldObject.onDelete(onWorldObjectDelete);
+  connection.db.worldObject.onUpdate(onWorldObjectUpdate);
 
   return () => {
     connection.db.playerSession.removeOnInsert(onPlayerInsert);
@@ -279,6 +297,9 @@ function installTableListeners(connection: DbConnection, onChange: () => void) {
     connection.db.world.removeOnInsert(onWorldInsert);
     connection.db.world.removeOnDelete(onWorldDelete);
     connection.db.world.removeOnUpdate(onWorldUpdate);
+    connection.db.worldObject.removeOnInsert(onWorldObjectInsert);
+    connection.db.worldObject.removeOnDelete(onWorldObjectDelete);
+    connection.db.worldObject.removeOnUpdate(onWorldObjectUpdate);
   };
 }
 
@@ -306,6 +327,9 @@ function readSnapshotFromConnection({
     .filter((player) => !world || player.worldId === world.worldId)
     .sort(comparePlayers)
     .map((player) => mapPlayer(player, localIdentityHex));
+  const authorityWorld = world
+    ? mapBackendAuthorityWorld(world, connection.db.worldObject.iter())
+    : null;
 
   return {
     enabled,
@@ -315,6 +339,7 @@ function readSnapshotFromConnection({
     onlineCount: players.filter((player) => player.presenceState === "active").length,
     world: world ? mapWorld(world) : null,
     players,
+    authorityWorld,
   };
 }
 
@@ -337,6 +362,7 @@ function createBaseSnapshot({
     onlineCount: 0,
     world: null,
     players: [],
+    authorityWorld: null,
   };
 }
 

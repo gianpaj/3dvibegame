@@ -9,7 +9,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - `vibe-world` is the product and architecture source of truth: multiplayer rooms, prompt-first creation, object lifecycle, SpacetimeDB authority, and AI worker boundaries.
 - `3dvibegame` is the active TypeScript app: Three.js playfield, fixture-backed generation, authority reducers, voxel builder compilation, and the current HUD prototype.
 - The current playable wedge is `prompt -> staged generation -> compiled avatar/object -> grace/refine/release -> released object`.
-- Multiplayer UI is still prototype state. Presence can read the backend, publish local movement, and render remote player markers when Vite SpacetimeDB env vars are configured; HUD workflow, local chat transcript, and local generation feedback are explicit, while invite and most room actions remain local/static.
+- Multiplayer UI is still prototype state. Presence can read the backend, publish local movement, render remote player markers, and render subscribed backend object rows when Vite SpacetimeDB env vars are configured; HUD workflow, local chat transcript, and local generation feedback are explicit, while invite and most room actions remain local/static.
 
 ## Completed
 
@@ -23,6 +23,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Optional runtime demo bridge for backend subscriptions, anonymous join/leave, heartbeat, and live/local HUD status.
 - Throttled demo `move_player` publishing from the camera rig plus simple remote player scene markers.
 - Backend object lifecycle networking now has `ai_job`, `world_object`, and `object_lock` rows plus create, draft submit, transform, release, lock, edit submit, cancel, expiry, and gated delete reducers.
+- Runtime demo live mode now subscribes to backend `world_object` rows and maps renderable rows into the existing Three.js authority-world renderer.
 - HUD workflow states now map idle, queued, generating, grace, refining, released, failed, and local-vs-live multiplayer modes.
 - HUD chat panel now keeps a local transcript of player prompts and generation stage events; backend chat reducers are deferred.
 - HUD generation feedback now stores thumbs up/down plus a note per object version in local state.
@@ -40,9 +41,9 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 ## Next Slices
 
-1. Choose the next major rendering branch: canonical voxel dirty recompilation or backend object delta rendering.
-2. Wire the runtime demo to backend object lifecycle rows/reducers instead of keeping live mode presence-only.
-3. Decide where canonical `VoxelBuilderSpec` source and compiled runtime artifacts live in backend object rows.
+1. Wire runtime demo prompt/create/release/edit controls to backend lifecycle reducers instead of keeping live mode read-only for objects.
+2. Decide where canonical `VoxelBuilderSpec` source and compiled runtime artifacts live in backend object rows.
+3. Add live-mode client affordances for grace, lock, cooldown, and stale-version rejection.
 
 ## Later
 
@@ -60,6 +61,8 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - `pnpm --filter @3dvibegame/world-backend build`: passing as of 2026-05-31.
 - `pnpm --filter @3dvibegame/scene-runtime-demo typecheck`: passing as of 2026-05-31.
 - `pnpm demo:build`: passing as of 2026-05-31.
+- Backend object delta rendering adapter typecheck/build: passing as of 2026-05-31.
+- Temporary live backend render smoke: seeded one `world_object` row and browser HUD showed `public room - 1/20 online - 1 object` as of 2026-05-31.
 - Temporary local SpacetimeDB object lifecycle smoke: join, job, draft, release, edit lock, submit edit, cooldown expiry, and public delete rejection passing as of 2026-05-31.
 - Browser smoke of `pnpm demo:dev` local fixture mode: passing as of 2026-05-31.
 - Browser HUD workflow smoke covered local idle, queued, generating, grace, refining, and released states as of 2026-05-31.

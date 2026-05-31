@@ -1,6 +1,6 @@
 import "./styles.css";
 
-import type { BackendPlayerTransform } from "./backend";
+import type { BackendPlayerTransform, BackendPresenceSnapshot } from "./backend";
 import { createGenerationSessionController, scenarioCatalog } from "./core";
 import { createEditorCommands, createHud } from "./editor";
 import {
@@ -39,6 +39,7 @@ cameraRig.focus(sceneState.defaultFocus);
 const playerPresenceRenderer = createPlayerPresenceRenderer(sceneState.presenceRoot);
 let disposeBackendPresence = () => {};
 let publishBackendTransform = (_transform: BackendPlayerTransform) => {};
+let backendSceneWorld: BackendPresenceSnapshot["authorityWorld"] = null;
 
 const authorityBridge = createAuthorityBridge({
   draftRoot: sceneState.draftRoot,
@@ -79,6 +80,9 @@ if (hasBackendConfig()) {
         onSnapshot(snapshot) {
           hud.setBackendPresence(snapshot);
           playerPresenceRenderer.sync(snapshot);
+          backendSceneWorld =
+            snapshot.status === "connected" ? snapshot.authorityWorld : null;
+          renderSnapshot();
         },
       });
       disposeBackendPresence = () => backendPresence.dispose();
@@ -116,7 +120,11 @@ renderSnapshot();
 
 function renderSnapshot() {
   const snapshot = generation.getSnapshot();
-  const focusPoint = authorityBridge.renderDocument(snapshot.document);
+  const backendWorld =
+    backendSceneWorld && backendSceneWorld.objects.length > 0 ? backendSceneWorld : null;
+  const focusPoint = backendWorld
+    ? authorityBridge.renderWorld(backendWorld)
+    : authorityBridge.renderDocument(snapshot.document);
   cameraRig.focus(focusPoint);
   publishBackendTransform(cameraRig.getPresenceTransform());
   hud.setSnapshot(snapshot);
