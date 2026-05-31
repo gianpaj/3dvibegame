@@ -34,6 +34,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - World backend now has a configurable multiplayer replay smoke for joins, movement presence, reconnect, object deltas, and lock contention.
 - Public-room object creation now rejects duplicate pending create jobs and enforces prototype live-object caps per world and per creator.
 - Backend archive/reset reducers now snapshot live objects into immutable archive rows, wipe live objects on reset, clear locks, and fail pending AI jobs.
+- Runtime demo live mode now surfaces backend archive/reset rows in bridge snapshots and the HUD Debug panel.
 - Backend AI jobs can now be explicitly failed or expired so stale worker responses are rejected and pending-job guardrails unblock.
 - Host-level world settings can now tune visibility, player caps, live-object caps, pending-create caps, cooldowns, grace periods, and destructive edits.
 - HUD workflow states now map idle, queued, generating, grace, refining, released, failed, and local-vs-live multiplayer modes.
@@ -53,9 +54,8 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 ## Next Slices
 
-1. Surface archive/reset state in the demo bridge and HUD debug views.
-2. Add client-facing AI job failure affordances for HTTP worker errors and timeouts.
-3. Add host-facing world settings controls in the demo HUD.
+1. Add client-facing AI job failure affordances for HTTP worker errors and timeouts.
+2. Add host-facing world settings controls in the demo HUD.
 
 ## Later
 
@@ -84,6 +84,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Backend archive/reset smoke: `pnpm --filter @3dvibegame/world-backend smoke:archive-reset` passing as of 2026-05-31.
 - Backend AI job failure smoke: `pnpm --filter @3dvibegame/world-backend smoke:ai-job-failure` passing as of 2026-05-31.
 - Backend world settings smoke: `pnpm --filter @3dvibegame/world-backend smoke:world-settings` passing as of 2026-05-31.
+- Demo archive state visibility typecheck/build: passing as of 2026-05-31.
 - Public creation guardrail smoke coverage: pending duplicate create rejection passing as of 2026-05-31.
 - Backend object delta rendering adapter typecheck/build: passing as of 2026-05-31.
 - Temporary live backend render smoke: seeded one `world_object` row and browser HUD showed `public room - 1/20 online - 1 object` as of 2026-05-31.

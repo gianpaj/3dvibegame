@@ -205,6 +205,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Public creation guardrails now read cap values from the world row instead of hard-coded constants
 - World-settings smoke verifies public guardrail tuning and private destructive delete behavior
 
+### Phase 2.23 — Demo Archive State Visibility ✅
+- Runtime demo live mode now subscribes to `world_snapshot` and `snapshot_object` rows
+- Backend presence snapshots expose compact archive/reset metadata alongside live object artifacts
+- HUD Debug panel shows snapshot count, frozen-object count, deleted live rows, latest reset cycle, and latest reset reason
+- Collapsed debug details expose snapshot rows and frozen object rows without feeding archive records into render authority state
+- Demo typecheck/build verifies archive state visibility stays compatible with local fixture mode
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 

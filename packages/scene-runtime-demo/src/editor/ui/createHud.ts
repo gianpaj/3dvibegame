@@ -489,6 +489,8 @@ export function createHud({
         </ol>
       </section>
 
+      ${renderBackendArchiveDebug(latestBackendPresence)}
+
       <section class="sheet-section">
         <h2>Artifacts</h2>
         <p>${escapeHtml(snapshot.voxelArtifact?.summary ?? "Voxel source not ready.")}</p>
@@ -1153,6 +1155,40 @@ function backendArtifactForSnapshot(
     backendPresence.objectArtifacts.find((artifact) => artifact.objectId === objectId) ??
     null
   );
+}
+
+function renderBackendArchiveDebug(backendPresence: BackendPresenceSnapshot | null) {
+  if (!backendPresence?.enabled) return "";
+
+  const latestSnapshot = backendPresence.worldSnapshots[0] ?? null;
+  const deletedRows = backendPresence.objectArtifacts.filter(
+    (artifact) => artifact.state === "deleted",
+  ).length;
+  const archivedRows = backendPresence.objectArtifacts.filter(
+    (artifact) => artifact.state === "archived",
+  ).length;
+
+  return `
+    <section class="sheet-section">
+      <h2>Archive state</h2>
+      <div class="metric-grid">
+        ${metric("Snapshots", String(backendPresence.worldSnapshots.length))}
+        ${metric("Frozen objects", String(backendPresence.snapshotObjects.length))}
+        ${metric("Deleted live rows", String(deletedRows))}
+        ${metric("Archived live rows", String(archivedRows))}
+        ${metric("Latest cycle", latestSnapshot ? `#${latestSnapshot.cycleNumber}` : "none")}
+        ${metric("Latest reason", latestSnapshot?.reason ?? "none")}
+      </div>
+      <details class="json-card">
+        <summary>World snapshot rows</summary>
+        <pre>${escapeHtml(prettyJson(backendPresence.worldSnapshots))}</pre>
+      </details>
+      <details class="json-card">
+        <summary>Frozen object rows</summary>
+        <pre>${escapeHtml(prettyJson(backendPresence.snapshotObjects))}</pre>
+      </details>
+    </section>
+  `;
 }
 
 function renderBackendArtifactDebug(

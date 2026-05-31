@@ -1,7 +1,13 @@
 import type { AuthorityWorld } from "@3dvibegame/scene-authority-ts";
 
 import { DbConnection, type SubscriptionHandle } from "./module_bindings";
-import type { PlayerSession, World, WorldObject } from "./module_bindings/types";
+import type {
+  PlayerSession,
+  SnapshotObject,
+  World,
+  WorldObject,
+  WorldSnapshot,
+} from "./module_bindings/types";
 import { mapBackendAuthorityWorld } from "./mapBackendAuthorityWorld";
 
 export type BackendPresenceStatus =
@@ -33,6 +39,12 @@ export interface BackendWorldPresence {
   name: string;
   visibility: string;
   maxPlayers: number;
+  maxLiveObjects: number;
+  maxObjectsPerPlayer: number;
+  maxPendingCreateJobsPerPlayer: number;
+  destructiveEditsEnabled: boolean;
+  objectCooldownSeconds: number;
+  gracePeriodSeconds: number;
 }
 
 export interface BackendObjectArtifactDebug {
@@ -41,6 +53,27 @@ export interface BackendObjectArtifactDebug {
   version: number;
   sourceSpecJson: string;
   builderSpecJson: string;
+}
+
+export interface BackendWorldSnapshotDebug {
+  snapshotId: string;
+  worldId: string;
+  cycleNumber: number;
+  reason: string;
+  createdAt: string;
+}
+
+export interface BackendSnapshotObjectDebug {
+  snapshotObjectId: string;
+  snapshotId: string;
+  sourceObjectId: string;
+  worldId: string;
+  state: string;
+  capturedState: string;
+  version: number;
+  category: string;
+  sizeTier: string;
+  capturedAt: string;
 }
 
 export interface BackendPresenceSnapshot {
@@ -53,6 +86,8 @@ export interface BackendPresenceSnapshot {
   players: BackendPlayerPresence[];
   authorityWorld: AuthorityWorld | null;
   objectArtifacts: BackendObjectArtifactDebug[];
+  worldSnapshots: BackendWorldSnapshotDebug[];
+  snapshotObjects: BackendSnapshotObjectDebug[];
 }
 
 interface BackendPresenceBridgeConfig {
@@ -224,6 +259,8 @@ export function createBackendPresenceBridge({
             "SELECT * FROM world",
             "SELECT * FROM player_session",
             "SELECT * FROM world_object",
+            "SELECT * FROM world_snapshot",
+            "SELECT * FROM snapshot_object",
           ]);
       })
       .onConnectError((_ctx, error) => {
@@ -405,6 +442,24 @@ function installTableListeners(connection: DbConnection, onChange: () => void) {
   const onWorldObjectUpdate: NonNullable<
     Parameters<NonNullable<typeof connection.db.worldObject.onUpdate>>[0]
   > = () => onChange();
+  const onWorldSnapshotInsert: Parameters<
+    typeof connection.db.worldSnapshot.onInsert
+  >[0] = () => onChange();
+  const onWorldSnapshotDelete: Parameters<
+    typeof connection.db.worldSnapshot.onDelete
+  >[0] = () => onChange();
+  const onWorldSnapshotUpdate: NonNullable<
+    Parameters<NonNullable<typeof connection.db.worldSnapshot.onUpdate>>[0]
+  > = () => onChange();
+  const onSnapshotObjectInsert: Parameters<
+    typeof connection.db.snapshotObject.onInsert
+  >[0] = () => onChange();
+  const onSnapshotObjectDelete: Parameters<
+    typeof connection.db.snapshotObject.onDelete
+  >[0] = () => onChange();
+  const onSnapshotObjectUpdate: NonNullable<
+    Parameters<NonNullable<typeof connection.db.snapshotObject.onUpdate>>[0]
+  > = () => onChange();
 
   connection.db.playerSession.onInsert(onPlayerInsert);
   connection.db.playerSession.onDelete(onPlayerDelete);
@@ -415,6 +470,12 @@ function installTableListeners(connection: DbConnection, onChange: () => void) {
   connection.db.worldObject.onInsert(onWorldObjectInsert);
   connection.db.worldObject.onDelete(onWorldObjectDelete);
   connection.db.worldObject.onUpdate(onWorldObjectUpdate);
+  connection.db.worldSnapshot.onInsert(onWorldSnapshotInsert);
+  connection.db.worldSnapshot.onDelete(onWorldSnapshotDelete);
+  connection.db.worldSnapshot.onUpdate(onWorldSnapshotUpdate);
+  connection.db.snapshotObject.onInsert(onSnapshotObjectInsert);
+  connection.db.snapshotObject.onDelete(onSnapshotObjectDelete);
+  connection.db.snapshotObject.onUpdate(onSnapshotObjectUpdate);
 
   return () => {
     connection.db.playerSession.removeOnInsert(onPlayerInsert);
@@ -426,6 +487,12 @@ function installTableListeners(connection: DbConnection, onChange: () => void) {
     connection.db.worldObject.removeOnInsert(onWorldObjectInsert);
     connection.db.worldObject.removeOnDelete(onWorldObjectDelete);
     connection.db.worldObject.removeOnUpdate(onWorldObjectUpdate);
+    connection.db.worldSnapshot.removeOnInsert(onWorldSnapshotInsert);
+    connection.db.worldSnapshot.removeOnDelete(onWorldSnapshotDelete);
+    connection.db.worldSnapshot.removeOnUpdate(onWorldSnapshotUpdate);
+    connection.db.snapshotObject.removeOnInsert(onSnapshotObjectInsert);
+    connection.db.snapshotObject.removeOnDelete(onSnapshotObjectDelete);
+    connection.db.snapshotObject.removeOnUpdate(onSnapshotObjectUpdate);
   };
 }
 
@@ -454,6 +521,16 @@ function readSnapshotFromConnection({
         (object) => object.worldId === world.worldId,
       )
     : [];
+  const worldSnapshots = world
+    ? Array.from(connection.db.worldSnapshot.iter())
+        .filter((snapshot) => snapshot.worldId === world.worldId)
+        .sort(compareWorldSnapshots)
+    : [];
+  const snapshotObjects = world
+    ? Array.from(connection.db.snapshotObject.iter())
+        .filter((object) => object.worldId === world.worldId)
+        .sort(compareSnapshotObjects)
+    : [];
   const players = Array.from(connection.db.playerSession.iter())
     .filter((player) => !world || player.worldId === world.worldId)
     .sort(comparePlayers)
@@ -470,6 +547,8 @@ function readSnapshotFromConnection({
     players,
     authorityWorld,
     objectArtifacts: worldObjects.map(mapObjectArtifactDebug),
+    worldSnapshots: worldSnapshots.map(mapWorldSnapshotDebug),
+    snapshotObjects: snapshotObjects.map(mapSnapshotObjectDebug),
   };
 }
 
@@ -494,6 +573,8 @@ function createBaseSnapshot({
     players: [],
     authorityWorld: null,
     objectArtifacts: [],
+    worldSnapshots: [],
+    snapshotObjects: [],
   };
 }
 
@@ -551,6 +632,12 @@ function mapWorld(world: World): BackendWorldPresence {
     name: world.name,
     visibility: world.visibility,
     maxPlayers: world.maxPlayers,
+    maxLiveObjects: world.maxLiveObjects,
+    maxObjectsPerPlayer: world.maxObjectsPerPlayer,
+    maxPendingCreateJobsPerPlayer: world.maxPendingCreateJobsPerPlayer,
+    destructiveEditsEnabled: world.destructiveEditsEnabled,
+    objectCooldownSeconds: world.objectCooldownSeconds,
+    gracePeriodSeconds: world.gracePeriodSeconds,
   };
 }
 
@@ -585,6 +672,35 @@ function mapObjectArtifactDebug(object: WorldObject): BackendObjectArtifactDebug
   };
 }
 
+function mapWorldSnapshotDebug(
+  snapshot: WorldSnapshot,
+): BackendWorldSnapshotDebug {
+  return {
+    snapshotId: snapshot.snapshotId,
+    worldId: snapshot.worldId.toString(),
+    cycleNumber: snapshot.cycleNumber,
+    reason: snapshot.reason,
+    createdAt: snapshot.createdAt.toString(),
+  };
+}
+
+function mapSnapshotObjectDebug(
+  object: SnapshotObject,
+): BackendSnapshotObjectDebug {
+  return {
+    snapshotObjectId: object.snapshotObjectId,
+    snapshotId: object.snapshotId,
+    sourceObjectId: object.sourceObjectId,
+    worldId: object.worldId.toString(),
+    state: object.state,
+    capturedState: object.capturedState,
+    version: object.version,
+    category: object.category,
+    sizeTier: object.sizeTier,
+    capturedAt: object.capturedAt.toString(),
+  };
+}
+
 function shouldQueueTransform(
   next: BackendPlayerTransform,
   previous: BackendPlayerTransform | null,
@@ -608,6 +724,17 @@ function comparePlayers(a: PlayerSession, b: PlayerSession) {
   const stateDelta = playerStateWeight(a) - playerStateWeight(b);
   if (stateDelta !== 0) return stateDelta;
   return a.nickname.localeCompare(b.nickname);
+}
+
+function compareWorldSnapshots(a: WorldSnapshot, b: WorldSnapshot) {
+  return b.cycleNumber - a.cycleNumber || b.snapshotId.localeCompare(a.snapshotId);
+}
+
+function compareSnapshotObjects(a: SnapshotObject, b: SnapshotObject) {
+  return (
+    b.snapshotId.localeCompare(a.snapshotId) ||
+    a.sourceObjectId.localeCompare(b.sourceObjectId)
+  );
 }
 
 function playerStateWeight(player: PlayerSession) {
