@@ -1,3 +1,4 @@
+export * from "./aiWorker";
 export * from "./fixtures/scenarios";
 export * from "./session/generationSession";
 export * from "./events/bus";

@@ -1,5 +1,5 @@
-import type { GenerationActionId } from "../core";
-import { resolveScenarioFromPrompt, scenarios } from "../core";
+import type { AiWorkerClient, GenerationActionId, ScenarioActionId } from "../core";
+import { createFixtureAiWorkerClient } from "../core";
 import type { BackendPresenceBridge } from "./createBackendPresenceBridge";
 import {
   backendAvailableActions,
@@ -15,6 +15,7 @@ export interface BackendLifecycleCommands {
 
 export function createBackendLifecycleCommands(
   bridge: BackendPresenceBridge,
+  aiWorker: AiWorkerClient = createFixtureAiWorkerClient(),
 ): BackendLifecycleCommands {
   let sequence = 0;
 
@@ -28,10 +29,10 @@ export function createBackendLifecycleCommands(
         throw new Error("Type a message before sending it to Savi.");
       }
 
-      const scenario = resolveScenarioFromPrompt(trimmed);
+      const draft = await aiWorker.createDraft({ prompt: trimmed });
       const idSuffix = `${Date.now().toString(36)}_${sequence++}`;
-      const jobId = `${scenario.jobId}_${idSuffix}`;
-      const objectId = `${scenario.objectId}_${idSuffix}`;
+      const jobId = `${draft.jobIdBase}_${idSuffix}`;
+      const objectId = `${draft.objectIdBase}_${idSuffix}`;
 
       await bridge.requestCreateObject({
         jobId,
@@ -40,8 +41,8 @@ export function createBackendLifecycleCommands(
       await bridge.submitAiDraft({
         jobId,
         objectId,
-        sourceSpecJson: JSON.stringify(scenario.voxelSource),
-        builderSpecJson: JSON.stringify(scenario.draftBuilder),
+        sourceSpecJson: draft.sourceSpecJson,
+        builderSpecJson: draft.builderSpecJson,
       });
     },
     async dispatchAction(actionId: GenerationActionId) {
@@ -94,12 +95,15 @@ export function createBackendLifecycleCommands(
         }
       }
 
-      const refineStep = scenarios.avatar_forge.refineSteps.find(
-        (step) => step.actionId === actionId,
-      );
-      if (!refineStep) {
-        throw new Error("Backend refine recipe not found.");
+      if (!isScenarioAction(actionId)) {
+        throw new Error("Backend refine action is not supported by the AI worker.");
       }
+
+      const edit = await aiWorker.createEdit({
+        actionId,
+        baseObjectId: object.object_id,
+        baseVersion: object.version,
+      });
 
       await bridge.requestEditLock({
         objectId: object.object_id,
@@ -108,12 +112,16 @@ export function createBackendLifecycleCommands(
       await bridge.submitObjectEdit({
         objectId: object.object_id,
         baseVersion: object.version,
-        sourceSpecJson: JSON.stringify(refineStep.voxelSource),
-        builderSpecJson: JSON.stringify(refineStep.builderSpec),
+        sourceSpecJson: edit.sourceSpecJson,
+        builderSpecJson: edit.builderSpecJson,
       });
       await bridge.expireCooldown({ objectId: object.object_id });
     },
   };
+}
+
+function isScenarioAction(actionId: GenerationActionId): actionId is ScenarioActionId {
+  return actionId === "refine_silhouette" || actionId === "add_ornament";
 }
 
 function isBackendReady(bridge: BackendPresenceBridge) {

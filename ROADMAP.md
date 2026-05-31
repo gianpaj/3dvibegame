@@ -142,6 +142,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Backend prompt/action attempts clear stale error toasts before issuing reducer calls and surface reducer failures in the context toast
 - Demo typecheck/build verifies the live affordance projection stays compatible with local fixture mode
 
+### Phase 2.14 — Demo AI Worker Boundary ✅
+- Added an explicit `AiWorkerClient` interface for draft and edit artifact generation
+- Added a fixture-backed AI worker implementation that returns canonical source specs plus derived builder artifacts
+- Backend lifecycle commands now consume worker results instead of importing scenario artifacts directly
+- Live reducer calls still pass validated source/artifact JSON to SpacetimeDB; generation remains outside reducers
+- Demo typecheck/build verifies the fixture worker boundary stays swappable
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 

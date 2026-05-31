@@ -27,6 +27,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Runtime demo live mode now subscribes to backend `world_object` rows and maps renderable rows into the existing Three.js authority-world renderer.
 - Runtime demo live mode now routes HUD prompt, draft transform, release, and public refine actions through backend lifecycle reducers using fixture-backed builder specs as the demo AI-worker stand-in.
 - Runtime demo live HUD now shows backend lifecycle status for grace windows, edit locks, cooldowns, archived/deleted rows, and reducer errors.
+- Runtime demo now has an explicit fixture-backed `AiWorkerClient` boundary that returns canonical source specs plus derived builder artifacts before reducer submission.
 - HUD workflow states now map idle, queued, generating, grace, refining, released, failed, and local-vs-live multiplayer modes.
 - HUD chat panel now keeps a local transcript of player prompts and generation stage events; backend chat reducers are deferred.
 - HUD generation feedback now stores thumbs up/down plus a note per object version in local state.
@@ -44,9 +45,9 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 ## Next Slices
 
-1. Replace the fixture-backed demo AI-worker stand-in with an explicit worker boundary adapter.
-2. Add backend/source artifact debug visibility in the HUD without making renderer artifacts authoritative.
-3. Add multiplayer lock-contention smoke coverage with two anonymous clients.
+1. Add backend/source artifact debug visibility in the HUD without making renderer artifacts authoritative.
+2. Add multiplayer lock-contention smoke coverage with two anonymous clients.
+3. Introduce an HTTP worker client shape behind `AiWorkerClient` while keeping fixtures as offline fallback.
 
 ## Later
 
@@ -67,6 +68,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Backend object artifact boundary typecheck/build: passing as of 2026-05-31.
 - Temporary backend artifact-boundary smoke: `submit_ai_draft` accepted paired `source_spec_json` and `builder_spec_json` and created a grace object as of 2026-05-31.
 - Live lifecycle HUD affordance typecheck/build: passing as of 2026-05-31.
+- Fixture AI worker boundary typecheck/build: passing as of 2026-05-31.
 - Backend object delta rendering adapter typecheck/build: passing as of 2026-05-31.
 - Temporary live backend render smoke: seeded one `world_object` row and browser HUD showed `public room - 1/20 online - 1 object` as of 2026-05-31.
 - Temporary live backend control smoke: browser HUD prompt created a backend draft, release moved it to public, and refine moved it to version 2 public as of 2026-05-31.
