@@ -34,26 +34,75 @@ import {
 } from "spacetimedb";
 
 // Import all reducer arg schemas
+import CancelEditReducer from "./cancel_edit_reducer";
+import DeleteObjectReducer from "./delete_object_reducer";
+import ExpireCooldownReducer from "./expire_cooldown_reducer";
+import ExpireEditLockReducer from "./expire_edit_lock_reducer";
+import ExpireGracePeriodReducer from "./expire_grace_period_reducer";
 import HeartbeatPlayerReducer from "./heartbeat_player_reducer";
 import JoinWorldReducer from "./join_world_reducer";
 import LeaveWorldReducer from "./leave_world_reducer";
 import MovePlayerReducer from "./move_player_reducer";
+import ReleaseObjectReducer from "./release_object_reducer";
+import RequestCreateObjectReducer from "./request_create_object_reducer";
+import RequestEditLockReducer from "./request_edit_lock_reducer";
+import SubmitAiDraftReducer from "./submit_ai_draft_reducer";
+import SubmitObjectEditReducer from "./submit_object_edit_reducer";
+import UpdateDraftTransformReducer from "./update_draft_transform_reducer";
+import UpdateLockedTransformReducer from "./update_locked_transform_reducer";
 
 // Import all procedure arg schemas
 
 // Import all table schema definitions
+import AiJobRow from "./ai_job_table";
+import ObjectLockRow from "./object_lock_table";
 import PlayerSessionRow from "./player_session_table";
 import WorldRow from "./world_table";
+import WorldObjectRow from "./world_object_table";
 
 /** Type-only namespace exports for generated type groups. */
 
 /** The schema information for all tables in this module. This is defined the same was as the tables would have been defined in the server. */
 const tablesSchema = __schema({
+  aiJob: __table({
+    name: 'ai_job',
+    indexes: [
+      { name: 'jobId', algorithm: 'btree', columns: [
+        'jobId',
+      ] },
+      { name: 'byPlayerIdentity', algorithm: 'btree', columns: [
+        'playerIdentity',
+      ] },
+      { name: 'byWorldId', algorithm: 'btree', columns: [
+        'worldId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_job_job_id_key', constraint: 'unique', columns: ['jobId'] },
+    ],
+  }, AiJobRow),
+  objectLock: __table({
+    name: 'object_lock',
+    indexes: [
+      { name: 'objectId', algorithm: 'btree', columns: [
+        'objectId',
+      ] },
+      { name: 'byPlayerIdentity', algorithm: 'btree', columns: [
+        'playerIdentity',
+      ] },
+    ],
+    constraints: [
+      { name: 'object_lock_object_id_key', constraint: 'unique', columns: ['objectId'] },
+    ],
+  }, ObjectLockRow),
   playerSession: __table({
     name: 'player_session',
     indexes: [
       { name: 'identity', algorithm: 'btree', columns: [
         'identity',
+      ] },
+      { name: 'byWorldId', algorithm: 'btree', columns: [
+        'worldId',
       ] },
     ],
     constraints: [
@@ -71,14 +120,43 @@ const tablesSchema = __schema({
       { name: 'world_world_id_key', constraint: 'unique', columns: ['worldId'] },
     ],
   }, WorldRow),
+  worldObject: __table({
+    name: 'world_object',
+    indexes: [
+      { name: 'objectId', algorithm: 'btree', columns: [
+        'objectId',
+      ] },
+      { name: 'byState', algorithm: 'btree', columns: [
+        'state',
+      ] },
+      { name: 'byWorldId', algorithm: 'btree', columns: [
+        'worldId',
+      ] },
+    ],
+    constraints: [
+      { name: 'world_object_object_id_key', constraint: 'unique', columns: ['objectId'] },
+    ],
+  }, WorldObjectRow),
 });
 
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
+  __reducerSchema("cancel_edit", CancelEditReducer),
+  __reducerSchema("delete_object", DeleteObjectReducer),
+  __reducerSchema("expire_cooldown", ExpireCooldownReducer),
+  __reducerSchema("expire_edit_lock", ExpireEditLockReducer),
+  __reducerSchema("expire_grace_period", ExpireGracePeriodReducer),
   __reducerSchema("heartbeat_player", HeartbeatPlayerReducer),
   __reducerSchema("join_world", JoinWorldReducer),
   __reducerSchema("leave_world", LeaveWorldReducer),
   __reducerSchema("move_player", MovePlayerReducer),
+  __reducerSchema("release_object", ReleaseObjectReducer),
+  __reducerSchema("request_create_object", RequestCreateObjectReducer),
+  __reducerSchema("request_edit_lock", RequestEditLockReducer),
+  __reducerSchema("submit_ai_draft", SubmitAiDraftReducer),
+  __reducerSchema("submit_object_edit", SubmitObjectEditReducer),
+  __reducerSchema("update_draft_transform", UpdateDraftTransformReducer),
+  __reducerSchema("update_locked_transform", UpdateLockedTransformReducer),
 );
 
 /** The schema information for all procedures in this module. This is defined the same way as the procedures would have been defined in the server. */

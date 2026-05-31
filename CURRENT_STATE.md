@@ -22,6 +22,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Generated SpacetimeDB TypeScript client bindings in the runtime demo.
 - Optional runtime demo bridge for backend subscriptions, anonymous join/leave, heartbeat, and live/local HUD status.
 - Throttled demo `move_player` publishing from the camera rig plus simple remote player scene markers.
+- Backend object lifecycle networking now has `ai_job`, `world_object`, and `object_lock` rows plus create, draft submit, transform, release, lock, edit submit, cancel, expiry, and gated delete reducers.
 - HUD workflow states now map idle, queued, generating, grace, refining, released, failed, and local-vs-live multiplayer modes.
 - HUD chat panel now keeps a local transcript of player prompts and generation stage events; backend chat reducers are deferred.
 - HUD generation feedback now stores thumbs up/down plus a note per object version in local state.
@@ -39,8 +40,8 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 ## Next Slices
 
-1. Start object lifecycle networking: create draft object rows, release, lock, remix, and delete reducers.
-2. Choose the next major rendering branch: canonical voxel dirty recompilation or backend object delta rendering.
+1. Choose the next major rendering branch: canonical voxel dirty recompilation or backend object delta rendering.
+2. Wire the runtime demo to backend object lifecycle rows/reducers instead of keeping live mode presence-only.
 3. Decide where canonical `VoxelBuilderSpec` source and compiled runtime artifacts live in backend object rows.
 
 ## Later
@@ -59,10 +60,11 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - `pnpm --filter @3dvibegame/world-backend build`: passing as of 2026-05-31.
 - `pnpm --filter @3dvibegame/scene-runtime-demo typecheck`: passing as of 2026-05-31.
 - `pnpm demo:build`: passing as of 2026-05-31.
+- Temporary local SpacetimeDB object lifecycle smoke: join, job, draft, release, edit lock, submit edit, cooldown expiry, and public delete rejection passing as of 2026-05-31.
 - Browser smoke of `pnpm demo:dev` local fixture mode: passing as of 2026-05-31.
 - Browser HUD workflow smoke covered local idle, queued, generating, grace, refining, and released states as of 2026-05-31.
 - Browser chat transcript smoke confirmed local player and event messages persist and scroll to latest as of 2026-05-31.
 - Browser feedback smoke confirmed vote and note state stay paired in the released-object feedback card as of 2026-05-31.
-- Temporary local SpacetimeDB smoke: demo joined `vibe-world-dev`, showed `Backend live`, and SQL confirmed `move_player` updated position as of 2026-05-31.
+- Temporary local SpacetimeDB presence smoke: demo joined `vibe-world-dev`, showed `Backend live`, and SQL confirmed `move_player` updated position as of 2026-05-31.
 - `vibe-world/prototype/scene-builder-bench`: `uv run pytest` passing as of 2026-05-28.
 - `vibe-world/prototype/scene-planning-bench`: `uv run pytest` passing as of 2026-05-28.

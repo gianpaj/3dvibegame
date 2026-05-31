@@ -10,6 +10,30 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+export const AiJob = __t.object("AiJob", {
+  jobId: __t.string(),
+  worldId: __t.u64(),
+  playerIdentity: __t.identity(),
+  targetObjectId: __t.option(__t.string()),
+  jobType: __t.string(),
+  status: __t.string(),
+  sourcePrompt: __t.string(),
+  requestedAt: __t.timestamp(),
+  completedAt: __t.option(__t.timestamp()),
+  errorCode: __t.option(__t.string()),
+});
+export type AiJob = __Infer<typeof AiJob>;
+
+export const ObjectLock = __t.object("ObjectLock", {
+  objectId: __t.string(),
+  worldId: __t.u64(),
+  playerIdentity: __t.identity(),
+  lockType: __t.string(),
+  grantedAt: __t.timestamp(),
+  expiresAtMicros: __t.option(__t.i64()),
+});
+export type ObjectLock = __Infer<typeof ObjectLock>;
+
 export const PlayerSession = __t.object("PlayerSession", {
   identity: __t.identity(),
   worldId: __t.u64(),
@@ -32,7 +56,38 @@ export const World = __t.object("World", {
   name: __t.string(),
   visibility: __t.string(),
   maxPlayers: __t.u32(),
+  destructiveEditsEnabled: __t.bool(),
+  objectCooldownSeconds: __t.u32(),
+  gracePeriodSeconds: __t.u32(),
   createdAt: __t.timestamp(),
   updatedAt: __t.timestamp(),
 });
 export type World = __Infer<typeof World>;
+
+export const WorldObject = __t.object("WorldObject", {
+  objectId: __t.string(),
+  worldId: __t.u64(),
+  state: __t.string(),
+  version: __t.u32(),
+  createdBy: __t.identity(),
+  latestEditor: __t.identity(),
+  graceOwner: __t.option(__t.identity()),
+  lockOwner: __t.option(__t.identity()),
+  category: __t.string(),
+  sizeTier: __t.string(),
+  builderSpecJson: __t.string(),
+  positionX: __t.f64(),
+  positionY: __t.f64(),
+  positionZ: __t.f64(),
+  rotationX: __t.f64(),
+  rotationY: __t.f64(),
+  rotationZ: __t.f64(),
+  scaleX: __t.f64(),
+  scaleY: __t.f64(),
+  scaleZ: __t.f64(),
+  graceRemainingSeconds: __t.u32(),
+  cooldownRemainingSeconds: __t.u32(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+});
+export type WorldObject = __Infer<typeof WorldObject>;

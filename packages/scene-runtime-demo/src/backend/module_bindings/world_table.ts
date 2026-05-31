@@ -15,6 +15,9 @@ export default __t.row({
   name: __t.string(),
   visibility: __t.string(),
   maxPlayers: __t.u32().name("max_players"),
+  destructiveEditsEnabled: __t.bool().name("destructive_edits_enabled"),
+  objectCooldownSeconds: __t.u32().name("object_cooldown_seconds"),
+  gracePeriodSeconds: __t.u32().name("grace_period_seconds"),
   createdAt: __t.timestamp().name("created_at"),
   updatedAt: __t.timestamp().name("updated_at"),
 });

@@ -106,6 +106,14 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Whole-object `clone_region` layouts compile into repeated `BuilderSpec.instances` when the source can be represented that way
 - Compiled `BuilderSpec` artifacts stay on the benchmark `builder_version: "0.1"` contract while preserving voxel-enriched local part metadata
 
+### Phase 2.9 — Backend Object Lifecycle Networking ✅
+- SpacetimeDB now exposes public `ai_job`, `world_object`, and `object_lock` rows for subscribed clients
+- `request_create_object` and `submit_ai_draft` create pending jobs and grace-period object rows from validated `BuilderSpec` JSON
+- Draft/locked transform updates, release, edit lock, edit submit, cancel, grace expiry, edit-lock expiry, and cooldown expiry reducers are wired
+- Public-world destructive delete remains rejected by default; the delete reducer is gated on private worlds with destructive edits enabled
+- Generated TypeScript client bindings were refreshed for the expanded backend schema and reducer surface
+- Local SpacetimeDB smoke covered join → job → draft → release → lock → edit → cooldown expiry → public, plus public delete rejection
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 
