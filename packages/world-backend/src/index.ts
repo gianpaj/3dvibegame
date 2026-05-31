@@ -246,6 +246,47 @@ export const submit_ai_draft = spacetimedb.reducer(
   },
 );
 
+export const fail_ai_job = spacetimedb.reducer(
+  {
+    jobId: t.string(),
+    errorCode: t.string(),
+  },
+  (ctx, { jobId, errorCode }) => {
+    const player = requireActivePlayer(ctx);
+    const normalizedJobId = normalizeId("jobId", jobId);
+    const job = requireAiJob(ctx, normalizedJobId);
+    assertCanFailAiJob(player, job, ctx.sender);
+    assertPendingAiJob(job);
+
+    ctx.db.aiJob.jobId.update({
+      ...job,
+      status: "failed",
+      completedAt: ctx.timestamp,
+      errorCode: normalizeAiJobErrorCode(errorCode),
+    });
+  },
+);
+
+export const expire_ai_job = spacetimedb.reducer(
+  {
+    jobId: t.string(),
+  },
+  (ctx, { jobId }) => {
+    const player = requireActivePlayer(ctx);
+    const normalizedJobId = normalizeId("jobId", jobId);
+    const job = requireAiJob(ctx, normalizedJobId);
+    assertCanFailAiJob(player, job, ctx.sender);
+    assertPendingAiJob(job);
+
+    ctx.db.aiJob.jobId.update({
+      ...job,
+      status: "failed",
+      completedAt: ctx.timestamp,
+      errorCode: "timeout",
+    });
+  },
+);
+
 export const update_draft_transform = spacetimedb.reducer(
   {
     objectId: t.string(),
@@ -679,12 +720,35 @@ function isLiveObjectState(state: string) {
 }
 
 function assertCanManageWorldLifecycle(player: ReturnType<typeof requireActivePlayer>) {
-  if (
-    player.role !== "host" &&
-    player.role !== "moderator" &&
-    player.role !== "platform_admin"
-  ) {
+  if (!canManageWorldLifecycle(player)) {
     throw new SenderError("only a host or moderator can snapshot or reset this world");
+  }
+}
+
+function canManageWorldLifecycle(player: ReturnType<typeof requireActivePlayer>) {
+  return (
+    player.role === "host" ||
+    player.role === "moderator" ||
+    player.role === "platform_admin"
+  );
+}
+
+function assertCanFailAiJob(
+  player: ReturnType<typeof requireActivePlayer>,
+  job: ReturnType<typeof requireAiJob>,
+  sender: BackendCtx["sender"],
+) {
+  if (job.worldId !== player.worldId) {
+    throw new SenderError("AI job is not in the active player world");
+  }
+  if (!sameIdentity(job.playerIdentity, sender) && !canManageWorldLifecycle(player)) {
+    throw new SenderError("only the job owner or world staff can fail this AI job");
+  }
+}
+
+function assertPendingAiJob(job: ReturnType<typeof requireAiJob>) {
+  if (job.status !== "pending") {
+    throw new SenderError("AI job is not pending");
   }
 }
 
@@ -1006,6 +1070,23 @@ function normalizeSnapshotReason(reason: string) {
     throw new SenderError("snapshot reason must be manual_reset or scheduled_reset");
   }
   return normalized;
+}
+
+function normalizeAiJobErrorCode(errorCode: string) {
+  const normalized = errorCode.trim();
+  switch (normalized) {
+    case "invalid_prompt":
+    case "unsupported_request":
+    case "unsafe_request":
+    case "context_stale":
+    case "generation_failed":
+    case "validation_failed":
+    case "timeout":
+    case "world_reset":
+      return normalized;
+    default:
+      throw new SenderError("AI job error code is not supported");
+  }
 }
 
 function normalizeNickname(nickname: string) {

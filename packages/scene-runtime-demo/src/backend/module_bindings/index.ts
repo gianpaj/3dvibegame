@@ -37,9 +37,11 @@ import {
 import CancelEditReducer from "./cancel_edit_reducer";
 import CreateSnapshotReducer from "./create_snapshot_reducer";
 import DeleteObjectReducer from "./delete_object_reducer";
+import ExpireAiJobReducer from "./expire_ai_job_reducer";
 import ExpireCooldownReducer from "./expire_cooldown_reducer";
 import ExpireEditLockReducer from "./expire_edit_lock_reducer";
 import ExpireGracePeriodReducer from "./expire_grace_period_reducer";
+import FailAiJobReducer from "./fail_ai_job_reducer";
 import HeartbeatPlayerReducer from "./heartbeat_player_reducer";
 import JoinWorldReducer from "./join_world_reducer";
 import LeaveWorldReducer from "./leave_world_reducer";
@@ -179,9 +181,11 @@ const reducersSchema = __reducers(
   __reducerSchema("cancel_edit", CancelEditReducer),
   __reducerSchema("create_snapshot", CreateSnapshotReducer),
   __reducerSchema("delete_object", DeleteObjectReducer),
+  __reducerSchema("expire_ai_job", ExpireAiJobReducer),
   __reducerSchema("expire_cooldown", ExpireCooldownReducer),
   __reducerSchema("expire_edit_lock", ExpireEditLockReducer),
   __reducerSchema("expire_grace_period", ExpireGracePeriodReducer),
+  __reducerSchema("fail_ai_job", FailAiJobReducer),
   __reducerSchema("heartbeat_player", HeartbeatPlayerReducer),
   __reducerSchema("join_world", JoinWorldReducer),
   __reducerSchema("leave_world", LeaveWorldReducer),

@@ -191,6 +191,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - World reset snapshots first, marks live objects deleted, clears locks, and fails pending AI jobs with `world_reset`
 - Generated TypeScript bindings and archive/reset smoke coverage verify read-only snapshot records and live-world wipe behavior
 
+### Phase 2.21 — AI Job Failure & Timeout Reducers ✅
+- Added `fail_ai_job` and `expire_ai_job` reducers for pending worker failures and timeouts
+- Job owners can fail their own pending jobs, while host/moderator/platform-admin roles can fail jobs in their active world
+- Failed jobs preserve structured error codes such as `generation_failed`, `validation_failed`, and `timeout`
+- Stale worker draft submissions against failed jobs are rejected by the existing pending-job check
+- AI-job failure smoke verifies failed/expired jobs unblock public creation guardrails
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 
