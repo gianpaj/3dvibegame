@@ -9,7 +9,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - `vibe-world` is the product and architecture source of truth: multiplayer rooms, prompt-first creation, object lifecycle, SpacetimeDB authority, and AI worker boundaries.
 - `3dvibegame` is the active TypeScript app: Three.js playfield, fixture-backed generation, authority reducers, voxel builder compilation, and the current HUD prototype.
 - The current playable wedge is `prompt -> staged generation -> compiled avatar/object -> grace/refine/release -> released object`.
-- Multiplayer UI is still prototype state. Presence, chat, invite, and room status are local/static until the client binding slice lands.
+- Multiplayer UI is still prototype state. Presence can read the backend when Vite SpacetimeDB env vars are configured; chat, invite, and most room actions remain local/static.
 
 ## Completed
 
@@ -19,6 +19,8 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Authority reducer lifecycle test harness covering create, grace, release, locks, stale versions, cooldown, permissions, and builder-spec validation.
 - `@3dvibegame/world-backend` SpacetimeDB TypeScript module with default world seeding and anonymous join/leave/heartbeat reducers.
 - Backend player sessions now include connection identity, transform state, and a validated `move_player` reducer for presence updates.
+- Generated SpacetimeDB TypeScript client bindings in the runtime demo.
+- Optional runtime demo bridge for backend subscriptions, anonymous join/leave, heartbeat, and live/local HUD status.
 - Fixture-backed avatar/object generation and refinement flow.
 - Spawn HUD and interaction research captured in `docs/spawn-reverse-engineering.md`.
 - `scene-builder-bench` in `vibe-world` passes its current pytest suite.
@@ -32,7 +34,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 ## Next Slices
 
-1. Generate TypeScript client bindings and connect the demo to the backend join flow.
+1. Publish camera/player transform updates through `move_player` and render subscribed remote players as simple avatars.
 2. Finish HUD interaction states: idle, queued, generating, grace, refining, released, failed, and static-vs-live multiplayer status.
 3. Add real chat behavior or mark chat as prototype-only until multiplayer backend work starts.
 4. Wire feedback note text alongside thumbs up/down state.
@@ -52,6 +54,8 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - `pnpm typecheck`: passing as of 2026-05-31.
 - `pnpm --filter @3dvibegame/scene-authority-ts test`: passing as of 2026-05-31.
 - `pnpm --filter @3dvibegame/world-backend build`: passing as of 2026-05-31.
-- `pnpm demo:build`: passing as of 2026-05-28.
+- `pnpm --filter @3dvibegame/scene-runtime-demo typecheck`: passing as of 2026-05-31.
+- `pnpm demo:build`: passing as of 2026-05-31.
+- Browser smoke of `pnpm demo:dev` local fixture mode: passing as of 2026-05-31.
 - `vibe-world/prototype/scene-builder-bench`: `uv run pytest` passing as of 2026-05-28.
 - `vibe-world/prototype/scene-planning-bench`: `uv run pytest` passing as of 2026-05-28.

@@ -1,5 +1,6 @@
 import type { GenerationActionId, GenerationSnapshot } from "../../core";
 import type { ScenarioKey } from "../../core";
+import type { BackendPresenceSnapshot } from "../../backend";
 
 interface ScenarioOption {
   key: ScenarioKey;
@@ -74,6 +75,7 @@ export function createHud({
   let muted = false;
   let shareState: ShareState = "idle";
   let latestSnapshot: GenerationSnapshot | null = null;
+  let latestBackendPresence: BackendPresenceSnapshot | null = null;
   let promptFocused = false;
 
   root.innerHTML = `
@@ -90,7 +92,7 @@ export function createHud({
         <div class="status-strip" aria-live="polite">
           <span class="status-pill" data-role="stage-pill" data-state="idle">Ready</span>
           <span class="status-pill status-pill--sync" data-role="sync-pill">Scene synced</span>
-          <span class="status-pill">3 online</span>
+          <span class="status-pill" data-role="presence-pill">Local room</span>
         </div>
 
         <div class="top-actions" aria-label="Room actions">
@@ -142,6 +144,7 @@ export function createHud({
   const feedbackDock = required<HTMLElement>(root, '[data-role="feedback-dock"]');
   const stagePill = required<HTMLElement>(root, '[data-role="stage-pill"]');
   const syncPill = required<HTMLElement>(root, '[data-role="sync-pill"]');
+  const presencePill = required<HTMLElement>(root, '[data-role="presence-pill"]');
   const roomSubtitle = required<HTMLElement>(root, '[data-role="room-subtitle"]');
   const contextMessage = required<HTMLElement>(root, '[data-role="context-message"]');
 
@@ -255,6 +258,10 @@ export function createHud({
 
       render();
     },
+    setBackendPresence(snapshot: BackendPresenceSnapshot) {
+      latestBackendPresence = snapshot;
+      render();
+    },
     setContextMessage,
   };
 
@@ -268,13 +275,14 @@ export function createHud({
     const snapshot = latestSnapshot;
     const stageState = resolveStageState(snapshot);
 
-    roomSubtitle.textContent = snapshot.object
-      ? `Private room - avatar v${snapshot.object.version} - ${snapshot.object.state}`
-      : "Private multiplayer room - local authority";
+    roomSubtitle.textContent = roomSubtitleLabel(snapshot, latestBackendPresence);
 
     stagePill.textContent = stageLabels[snapshot.stage];
     stagePill.dataset.state = stageState;
-    syncPill.textContent = syncLabel(snapshot);
+    syncPill.textContent = syncLabel(snapshot, latestBackendPresence);
+    syncPill.dataset.state = syncState(snapshot, latestBackendPresence);
+    presencePill.textContent = presenceLabel(latestBackendPresence);
+    presencePill.dataset.state = presenceState(latestBackendPresence);
 
     presenceStrip.innerHTML = renderPresence(snapshot);
     companionCard.innerHTML = renderCompanion(snapshot);
@@ -382,7 +390,7 @@ export function createHud({
       <section class="sheet-section">
         <h2>Room crew</h2>
         <div class="player-list">
-          ${roomPlayers(snapshot)
+          ${roomPlayers(snapshot, latestBackendPresence)
             .map(
               (player) => `
                 <div class="player-row" data-state="${player.state}">
@@ -449,6 +457,7 @@ export function createHud({
           ${metric("Panel", state.activePanel)}
           ${metric("Camera", state.controlsLocked ? "locked" : "free")}
           ${metric("Audio", muted ? "muted" : "on")}
+          ${metric("Backend", backendStatusLabel(latestBackendPresence))}
         </div>
       </section>
 
@@ -537,7 +546,7 @@ export function createHud({
   }
 
   function renderPresence(snapshot: GenerationSnapshot) {
-    return roomPlayers(snapshot)
+    return roomPlayers(snapshot, latestBackendPresence)
       .map(
         (player) => `
           <div class="presence-pill" data-state="${player.state}">
@@ -610,7 +619,20 @@ export function createHud({
   }
 }
 
-function roomPlayers(snapshot: GenerationSnapshot) {
+function roomPlayers(
+  snapshot: GenerationSnapshot,
+  backendPresence: BackendPresenceSnapshot | null,
+) {
+  if (backendPresence?.enabled && backendPresence.players.length) {
+    return backendPresence.players.map((player) => ({
+      initials: playerInitials(player.nickname),
+      name: player.isLocal ? `${player.nickname} (you)` : player.nickname,
+      detail: player.role,
+      status: player.presenceState,
+      state: player.presenceState === "active" ? "active" : "idle",
+    }));
+  }
+
   return [
     {
       initials: "YOU",
@@ -634,6 +656,30 @@ function roomPlayers(snapshot: GenerationSnapshot) {
       state: isBusy(snapshot) ? "busy" : "active",
     },
   ];
+}
+
+function playerInitials(nickname: string) {
+  const parts = nickname.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "??";
+  if (parts.length === 1) return parts[0]!.slice(0, 3).toUpperCase();
+  return `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase();
+}
+
+function roomSubtitleLabel(
+  snapshot: GenerationSnapshot,
+  backendPresence: BackendPresenceSnapshot | null,
+) {
+  if (backendPresence?.enabled && backendPresence.world) {
+    return `${backendPresence.world.visibility} room - ${backendPresence.onlineCount}/${backendPresence.world.maxPlayers} online`;
+  }
+
+  if (backendPresence?.enabled) {
+    return backendStatusLabel(backendPresence);
+  }
+
+  return snapshot.object
+    ? `Private room - avatar v${snapshot.object.version} - ${snapshot.object.state}`
+    : "Private multiplayer room - local authority";
 }
 
 function sheetSubtitle(panel: HudPanel, snapshot: GenerationSnapshot) {
@@ -670,10 +716,62 @@ function resolveStageState(snapshot: GenerationSnapshot) {
   return "idle";
 }
 
-function syncLabel(snapshot: GenerationSnapshot) {
+function syncLabel(
+  snapshot: GenerationSnapshot,
+  backendPresence: BackendPresenceSnapshot | null,
+) {
+  if (backendPresence?.enabled) {
+    if (backendPresence.status === "connected") return "Backend live";
+    if (backendPresence.status === "connecting") return "Connecting";
+    if (backendPresence.status === "disconnected") return "Disconnected";
+    return "Backend error";
+  }
+
   if (snapshot.stage === "failed") return "Action needed";
   if (isBusy(snapshot)) return "Turn in progress";
   return snapshot.object ? "Scene synced" : "Local room";
+}
+
+function syncState(
+  snapshot: GenerationSnapshot,
+  backendPresence: BackendPresenceSnapshot | null,
+) {
+  if (backendPresence?.status === "connected") return "ready";
+  if (
+    backendPresence?.status === "connecting" ||
+    backendPresence?.status === "disconnected"
+  ) {
+    return "busy";
+  }
+  if (backendPresence?.status === "error") return "error";
+  return resolveStageState(snapshot);
+}
+
+function presenceLabel(backendPresence: BackendPresenceSnapshot | null) {
+  if (!backendPresence?.enabled) return "Local room";
+  if (backendPresence.status === "connected") {
+    return `${backendPresence.onlineCount} online`;
+  }
+  if (backendPresence.status === "connecting") return "Joining";
+  if (backendPresence.status === "disconnected") return "Offline";
+  return "Offline";
+}
+
+function presenceState(backendPresence: BackendPresenceSnapshot | null) {
+  if (backendPresence?.status === "connected") return "ready";
+  if (
+    backendPresence?.status === "connecting" ||
+    backendPresence?.status === "disconnected"
+  ) {
+    return "busy";
+  }
+  if (backendPresence?.status === "error") return "error";
+  return "idle";
+}
+
+function backendStatusLabel(backendPresence: BackendPresenceSnapshot | null) {
+  if (!backendPresence?.enabled) return "local";
+  return backendPresence.status;
 }
 
 function isBusy(snapshot: GenerationSnapshot) {

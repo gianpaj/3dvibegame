@@ -24,7 +24,7 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Technical architecture selected (SpacetimeDB + external AI worker)
 - Open questions documented and triaged
 
-### Phase 1 — Scene Bench Prototyping 🔄 *(current)*
+### Phase 1 — Scene Bench Prototyping ✅
 - `prototype/scene-planning-bench/` — LLM scene-planning capability assessment
 - Scene-builder benchmark plan and implementation
 - Prompt intermediate representation (IR) spec drafted
@@ -42,7 +42,7 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Malformed / out-of-bounds builder spec rejection covered
 - Tests now serve as the executable contract for future SpacetimeDB reducers
 
-### Phase 2 — Contracts & Backend Definition
+### Phase 2 — Contracts & Backend Definition 🔄 *(current)*
 - Finalize `prompt-ir-spec` (constrained prompt IR)
 - Finalize `reducer-api-spec` (authoritative backend surface)
 - Finalize `spacetimedb-v1-schema` (multiplayer schema)
@@ -62,7 +62,15 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - `move_player` reducer added for approximate authoritative movement updates
 - Movement bounds and pitch validation added server-side
 - Public `player_session` rows are ready for world-scoped presence subscriptions
-- Client binding generation and demo connection remain the next slice
+- Client movement publishing and remote avatar rendering remain out of scope
+
+### Phase 2.3 — Generated Client Bindings & Optional Demo Join ✅
+- TypeScript client bindings generated from the SpacetimeDB module
+- Demo package now depends on the SpacetimeDB TypeScript SDK
+- Runtime demo can optionally connect with `VITE_SPACETIMEDB_URI` and `VITE_SPACETIMEDB_DATABASE`
+- Optional bridge subscribes to public `world` and `player_session` tables
+- Anonymous `join_world`, `leave_world`, and heartbeat calls are wired from the demo
+- HUD distinguishes local fixture mode from live backend presence
 
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.

@@ -66,6 +66,21 @@ const hud = createHud({
     cameraRig.controls.enabled = !state.controlsLocked;
   },
 });
+let disposeBackendPresence = () => {};
+if (hasBackendConfig()) {
+  void import("./backend")
+    .then(({ createBackendPresenceBridge }) => {
+      const backendPresence = createBackendPresenceBridge({
+        onSnapshot(snapshot) {
+          hud.setBackendPresence(snapshot);
+        },
+      });
+      disposeBackendPresence = () => backendPresence.dispose();
+    })
+    .catch((error: unknown) => {
+      hud.setContextMessage(errorMessage(error, "Backend bridge failed to load"));
+    });
+}
 const unsubscribe = generation.subscribe(renderSnapshot);
 
 const resize = () => {
@@ -97,7 +112,21 @@ function renderSnapshot() {
 }
 
 window.addEventListener("beforeunload", () => {
+  disposeBackendPresence();
   unsubscribe();
   generation.dispose();
   authorityBridge.dispose();
 });
+
+function hasBackendConfig() {
+  return Boolean(
+    import.meta.env.VITE_SPACETIMEDB_URI && import.meta.env.VITE_SPACETIMEDB_DATABASE,
+  );
+}
+
+function errorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) {
+    return `${fallback}: ${error.message}`;
+  }
+  return fallback;
+}

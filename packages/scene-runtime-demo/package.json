@@ -12,6 +12,7 @@
   "dependencies": {
     "@3dvibegame/scene-authority-ts": "workspace:*",
     "@3dvibegame/scene-runtime-ts": "workspace:*",
+    "spacetimedb": "2.0.3",
     "three": "^0.180.0"
   },
   "devDependencies": {

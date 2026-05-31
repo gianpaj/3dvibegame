@@ -26,6 +26,9 @@ importers:
       '@3dvibegame/scene-runtime-ts':
         specifier: workspace:*
         version: link:../scene-runtime-ts
+      spacetimedb:
+        specifier: 2.0.3
+        version: 2.0.3
       three:
         specifier: ^0.180.0
         version: 0.180.0
