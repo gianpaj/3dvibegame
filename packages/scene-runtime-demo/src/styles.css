@@ -407,12 +407,22 @@ button[aria-pressed="true"] {
   line-height: 1.42;
 }
 
+.chat-message time {
+  color: var(--hud-soft);
+  font-size: 0.72rem;
+}
+
 .chat-message--player {
   border-color: rgba(47, 143, 161, 0.26);
 }
 
 .chat-message--system {
   border-color: rgba(47, 113, 69, 0.28);
+}
+
+.chat-message[data-status="error"] {
+  border-color: rgba(216, 95, 77, 0.42);
+  background: rgba(252, 230, 226, 0.78);
 }
 
 .player-list {

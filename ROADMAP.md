@@ -86,6 +86,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Action dock now has explicit queued/generating, cooldown/refining, released, and failed presentations
 - Local fixture mode and optional live backend mode stay visually distinct
 
+### Phase 2.6 — Local Chat Transcript Boundary ✅
+- Prompt submissions append persistent local player messages to the HUD chat panel
+- Generation stage events append ordered Savi/event messages with timestamps
+- Chat panel scrolls to the latest message during active conversation
+- Error stage events render distinctly in the local transcript
+- Backend multiplayer chat reducers remain deferred until object lifecycle networking starts
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 

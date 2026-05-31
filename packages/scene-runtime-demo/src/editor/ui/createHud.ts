@@ -22,6 +22,16 @@ type HudWorkflowState =
   | "released"
   | "failed";
 type HudMultiplayerMode = "local" | "connecting" | "live" | "offline" | "error";
+type ChatMessageRole = "player" | "system" | "event";
+
+interface ChatTranscriptMessage {
+  id: string;
+  role: ChatMessageRole;
+  label: string;
+  text: string;
+  status?: "pending" | "complete" | "error";
+  timestamp?: string;
+}
 
 export interface HudInteractionState {
   activePanel: HudPanel | "none";
@@ -97,6 +107,9 @@ export function createHud({
   let shareState: ShareState = "idle";
   let latestSnapshot: GenerationSnapshot | null = null;
   let latestBackendPresence: BackendPresenceSnapshot | null = null;
+  let chatSequence = 0;
+  let chatMessages: ChatTranscriptMessage[] = [];
+  const seenStageEventIds = new Set<string>();
   let promptFocused = false;
 
   root.innerHTML = `
@@ -180,6 +193,11 @@ export function createHud({
     }
 
     activePanel = "chat";
+    appendChatMessage({
+      role: "player",
+      label: "You",
+      text: prompt,
+    });
     render();
     onPromptSubmit(prompt);
   });
@@ -272,6 +290,7 @@ export function createHud({
   return {
     setSnapshot(snapshot: GenerationSnapshot) {
       latestSnapshot = snapshot;
+      syncChatTranscript(snapshot);
 
       if (document.activeElement !== promptInput) {
         promptInput.value = snapshot.sourcePrompt;
@@ -311,6 +330,9 @@ export function createHud({
     actionDock.innerHTML = renderActionDock(snapshot);
     feedbackDock.innerHTML = renderFeedback(snapshot);
     sidePanel.innerHTML = activePanel ? renderSidePanel(activePanel, snapshot) : "";
+    if (activePanel === "chat") {
+      scrollChatToLatest();
+    }
 
     updateInteractionAttributes();
     updatePressedStates();
@@ -380,32 +402,20 @@ export function createHud({
   }
 
   function renderChatPanel(snapshot: GenerationSnapshot) {
-    const events = snapshot.stageEvents.slice(-4);
+    const messages = chatMessages.length
+      ? chatMessages
+      : [
+          {
+            id: "chat_initial",
+            role: "system",
+            label: "Savi",
+            text: snapshot.lastMessage,
+          } satisfies ChatTranscriptMessage,
+        ];
 
     return `
       <section class="sheet-section chat-log">
-        <div class="chat-message chat-message--system">
-          <strong>Savi</strong>
-          <p>${escapeHtml(snapshot.lastMessage)}</p>
-        </div>
-        <div class="chat-message chat-message--player">
-          <strong>You</strong>
-          <p>${escapeHtml(snapshot.sourcePrompt || "Waiting for your first prompt.")}</p>
-        </div>
-        ${
-          events.length
-            ? events
-                .map(
-                  (event) => `
-                    <div class="chat-message chat-message--event">
-                      <strong>${escapeHtml(stageLabels[event.stage])}</strong>
-                      <p>${escapeHtml(event.message)}</p>
-                    </div>
-                  `,
-                )
-                .join("")
-            : ""
-        }
+        ${messages.map(renderChatMessage).join("")}
       </section>
     `;
   }
@@ -609,6 +619,60 @@ export function createHud({
         `,
       )
       .join("");
+  }
+
+  function renderChatMessage(message: ChatTranscriptMessage) {
+    return `
+      <div class="chat-message chat-message--${message.role}" data-status="${message.status ?? "complete"}">
+        <strong>${escapeHtml(message.label)}</strong>
+        <p>${escapeHtml(message.text)}</p>
+        ${message.timestamp ? `<time>${escapeHtml(formatTimestamp(message.timestamp))}</time>` : ""}
+      </div>
+    `;
+  }
+
+  function syncChatTranscript(snapshot: GenerationSnapshot) {
+    if (!chatMessages.length) {
+      appendChatMessage({
+        id: "chat_initial",
+        role: "system",
+        label: "Savi",
+        text: snapshot.lastMessage,
+      });
+    }
+
+    snapshot.stageEvents.forEach((event) => {
+      if (seenStageEventIds.has(event.id)) return;
+      seenStageEventIds.add(event.id);
+      appendChatMessage({
+        id: `event_${event.id}`,
+        role: "event",
+        label: stageLabels[event.stage],
+        text: event.message,
+        status: event.status,
+        timestamp: event.timestamp,
+      });
+    });
+  }
+
+  function appendChatMessage(message: Omit<ChatTranscriptMessage, "id"> & { id?: string }) {
+    chatSequence += 1;
+    chatMessages = [
+      ...chatMessages,
+      {
+        ...message,
+        id: message.id ?? `chat_${chatSequence}`,
+      },
+    ].slice(-32);
+  }
+
+  function scrollChatToLatest() {
+    window.requestAnimationFrame(() => {
+      const chatLog = sidePanel.querySelector<HTMLElement>(".chat-log");
+      if (chatLog) {
+        chatLog.scrollTop = chatLog.scrollHeight;
+      }
+    });
   }
 
   async function copyInviteLink() {

@@ -9,7 +9,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - `vibe-world` is the product and architecture source of truth: multiplayer rooms, prompt-first creation, object lifecycle, SpacetimeDB authority, and AI worker boundaries.
 - `3dvibegame` is the active TypeScript app: Three.js playfield, fixture-backed generation, authority reducers, voxel builder compilation, and the current HUD prototype.
 - The current playable wedge is `prompt -> staged generation -> compiled avatar/object -> grace/refine/release -> released object`.
-- Multiplayer UI is still prototype state. Presence can read the backend, publish local movement, and render remote player markers when Vite SpacetimeDB env vars are configured; HUD workflow state is explicit, while chat, invite, and most room actions remain local/static.
+- Multiplayer UI is still prototype state. Presence can read the backend, publish local movement, and render remote player markers when Vite SpacetimeDB env vars are configured; HUD workflow state and local chat transcript are explicit, while invite and most room actions remain local/static.
 
 ## Completed
 
@@ -23,6 +23,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Optional runtime demo bridge for backend subscriptions, anonymous join/leave, heartbeat, and live/local HUD status.
 - Throttled demo `move_player` publishing from the camera rig plus simple remote player scene markers.
 - HUD workflow states now map idle, queued, generating, grace, refining, released, failed, and local-vs-live multiplayer modes.
+- HUD chat panel now keeps a local transcript of player prompts and generation stage events; backend chat reducers are deferred.
 - Fixture-backed avatar/object generation and refinement flow.
 - Spawn HUD and interaction research captured in `docs/spawn-reverse-engineering.md`.
 - `scene-builder-bench` in `vibe-world` passes its current pytest suite.
@@ -36,11 +37,10 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 ## Next Slices
 
-1. Add real chat behavior or mark chat as prototype-only until multiplayer backend work starts.
-2. Wire feedback note text alongside thumbs up/down state.
-3. Add TypeScript builder parity tests against the `vibe-world` builder benchmark expectations.
-4. Start object lifecycle networking: create draft object rows, release, lock, remix, and delete reducers.
-5. Choose the next major rendering branch: canonical voxel dirty recompilation or backend object delta rendering.
+1. Wire feedback note text alongside thumbs up/down state.
+2. Add TypeScript builder parity tests against the `vibe-world` builder benchmark expectations.
+3. Start object lifecycle networking: create draft object rows, release, lock, remix, and delete reducers.
+4. Choose the next major rendering branch: canonical voxel dirty recompilation or backend object delta rendering.
 
 ## Later
 
@@ -59,6 +59,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - `pnpm demo:build`: passing as of 2026-05-31.
 - Browser smoke of `pnpm demo:dev` local fixture mode: passing as of 2026-05-31.
 - Browser HUD workflow smoke covered local idle, queued, generating, grace, refining, and released states as of 2026-05-31.
+- Browser chat transcript smoke confirmed local player and event messages persist and scroll to latest as of 2026-05-31.
 - Temporary local SpacetimeDB smoke: demo joined `vibe-world-dev`, showed `Backend live`, and SQL confirmed `move_player` updated position as of 2026-05-31.
 - `vibe-world/prototype/scene-builder-bench`: `uv run pytest` passing as of 2026-05-28.
 - `vibe-world/prototype/scene-planning-bench`: `uv run pytest` passing as of 2026-05-28.
