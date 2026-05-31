@@ -79,6 +79,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Presence rendering skips the local player and removes stale/disconnected players
 - Object lifecycle networking remains out of scope for the next branch
 
+### Phase 2.5 — HUD Interaction State Coverage ✅
+- Runtime HUD maps exact generation stages into player-facing workflow states: idle, queued, generating, grace, refining, released, and failed
+- HUD shell exposes workflow and multiplayer mode data attributes for future controls and tests
+- Settings panel reports input, panel, workflow, multiplayer, camera, audio, and backend state
+- Action dock now has explicit queued/generating, cooldown/refining, released, and failed presentations
+- Local fixture mode and optional live backend mode stay visually distinct
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 

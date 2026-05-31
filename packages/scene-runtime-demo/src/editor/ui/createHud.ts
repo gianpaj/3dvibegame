@@ -13,10 +13,21 @@ type HudPanel = "build" | "chat" | "players" | "debug" | "settings";
 type FeedbackVote = "up" | "down" | null;
 type ShareState = "idle" | "copied";
 type InputMode = "play" | "panel" | "prompt";
+type HudWorkflowState =
+  | "idle"
+  | "queued"
+  | "generating"
+  | "grace"
+  | "refining"
+  | "released"
+  | "failed";
+type HudMultiplayerMode = "local" | "connecting" | "live" | "offline" | "error";
 
 export interface HudInteractionState {
   activePanel: HudPanel | "none";
   inputMode: InputMode;
+  workflowState: HudWorkflowState;
+  multiplayerMode: HudMultiplayerMode;
   feedbackVote: FeedbackVote;
   muted: boolean;
   shareState: ShareState;
@@ -61,6 +72,16 @@ const stageLabels = {
   released: "Synced",
   failed: "Needs attention",
 } as const;
+
+const workflowLabels: Record<HudWorkflowState, string> = {
+  idle: "Idle",
+  queued: "Queued",
+  generating: "Generating",
+  grace: "Grace",
+  refining: "Refining",
+  released: "Released",
+  failed: "Failed",
+};
 
 export function createHud({
   root,
@@ -273,12 +294,13 @@ export function createHud({
     }
 
     const snapshot = latestSnapshot;
-    const stageState = resolveStageState(snapshot);
+    const workflowState = resolveWorkflowState(snapshot);
 
     roomSubtitle.textContent = roomSubtitleLabel(snapshot, latestBackendPresence);
 
-    stagePill.textContent = stageLabels[snapshot.stage];
-    stagePill.dataset.state = stageState;
+    stagePill.textContent = workflowLabels[workflowState];
+    stagePill.dataset.state = resolveWorkflowPillState(workflowState);
+    stagePill.dataset.workflow = workflowState;
     syncPill.textContent = syncLabel(snapshot, latestBackendPresence);
     syncPill.dataset.state = syncState(snapshot, latestBackendPresence);
     presencePill.textContent = presenceLabel(latestBackendPresence);
@@ -321,6 +343,8 @@ export function createHud({
   }
 
   function renderBuildPanel(snapshot: GenerationSnapshot) {
+    const workflowState = resolveWorkflowState(snapshot);
+
     return `
       <section class="sheet-section">
         <h2>Quick prompts</h2>
@@ -345,6 +369,7 @@ export function createHud({
       <section class="sheet-section">
         <h2>Generation status</h2>
         <div class="metric-grid">
+          ${metric("State", workflowLabels[workflowState])}
           ${metric("Stage", stageLabels[snapshot.stage])}
           ${metric("Recipe", snapshot.matchedScenarioLabel)}
           ${metric("Version", snapshot.object ? `v${snapshot.object.version}` : "none")}
@@ -455,6 +480,8 @@ export function createHud({
         <div class="metric-grid">
           ${metric("Input", state.inputMode)}
           ${metric("Panel", state.activePanel)}
+          ${metric("Flow", workflowLabels[state.workflowState])}
+          ${metric("Multiplayer", state.multiplayerMode)}
           ${metric("Camera", state.controlsLocked ? "locked" : "free")}
           ${metric("Audio", muted ? "muted" : "on")}
           ${metric("Backend", backendStatusLabel(latestBackendPresence))}
@@ -470,24 +497,47 @@ export function createHud({
   }
 
   function renderCompanion(snapshot: GenerationSnapshot) {
-    const busy = isBusy(snapshot);
+    const workflowState = resolveWorkflowState(snapshot);
+    const busy = workflowState === "queued" || workflowState === "generating";
     const latestEvent = snapshot.stageEvents[snapshot.stageEvents.length - 1];
 
     return `
       <div class="companion-card__header">
         <span class="companion-dot" data-state="${busy ? "busy" : "ready"}"></span>
         <strong>Savi</strong>
-        <small>${busy ? "working" : "ready"}</small>
+        <small>${escapeHtml(companionStateLabel(workflowState))}</small>
       </div>
       <p>${escapeHtml(latestEvent?.message ?? snapshot.lastMessage)}</p>
     `;
   }
 
   function renderActionDock(snapshot: GenerationSnapshot) {
-    if (isBusy(snapshot)) {
+    const workflowState = resolveWorkflowState(snapshot);
+
+    if (workflowState === "failed") {
+      return `
+        <div class="dock-card dock-card--failed">
+          <span>Action needed</span>
+          <strong>${escapeHtml(stageLabels[snapshot.stage])}</strong>
+          <p>${escapeHtml(snapshot.lastMessage)}</p>
+        </div>
+      `;
+    }
+
+    if (workflowState === "queued" || workflowState === "generating") {
       return `
         <div class="dock-card dock-card--busy">
           <span>AI turn</span>
+          <strong>${escapeHtml(workflowLabels[workflowState])}</strong>
+          <p>${escapeHtml(snapshot.lastMessage)}</p>
+        </div>
+      `;
+    }
+
+    if (workflowState === "refining" && snapshot.stage === "cooldown") {
+      return `
+        <div class="dock-card dock-card--busy">
+          <span>Refinement cooldown</span>
           <strong>${escapeHtml(stageLabels[snapshot.stage])}</strong>
           <p>${escapeHtml(snapshot.lastMessage)}</p>
         </div>
@@ -589,6 +639,8 @@ export function createHud({
     return {
       activePanel: activePanel ?? "none",
       inputMode,
+      workflowState: latestSnapshot ? resolveWorkflowState(latestSnapshot) : "idle",
+      multiplayerMode: resolveMultiplayerMode(latestBackendPresence),
       feedbackVote,
       muted,
       shareState,
@@ -604,6 +656,8 @@ export function createHud({
     const state = currentInteractionState();
     shell.dataset.panel = state.activePanel;
     shell.dataset.mode = state.inputMode;
+    shell.dataset.workflow = state.workflowState;
+    shell.dataset.multiplayer = state.multiplayerMode;
     sidePanel.setAttribute("aria-hidden", activePanel ? "false" : "true");
   }
 
@@ -714,6 +768,94 @@ function resolveStageState(snapshot: GenerationSnapshot) {
   if (isBusy(snapshot)) return "busy";
   if (snapshot.stage === "released") return "ready";
   return "idle";
+}
+
+function resolveWorkflowState(snapshot: GenerationSnapshot): HudWorkflowState {
+  switch (snapshot.stage) {
+    case "idle":
+      return "idle";
+    case "queued":
+      return "queued";
+    case "planning":
+    case "voxel_source_ready":
+    case "compiled_artifact_ready":
+      return "generating";
+    case "grace":
+      return "grace";
+    case "edit_locked":
+    case "cooldown":
+      return "refining";
+    case "released":
+      return "released";
+    case "failed":
+      return "failed";
+    default:
+      snapshot.stage satisfies never;
+      return "failed";
+  }
+}
+
+function resolveWorkflowPillState(workflowState: HudWorkflowState) {
+  switch (workflowState) {
+    case "released":
+      return "ready";
+    case "queued":
+    case "generating":
+    case "grace":
+    case "refining":
+      return "busy";
+    case "failed":
+      return "error";
+    case "idle":
+      return "idle";
+    default:
+      workflowState satisfies never;
+      return "idle";
+  }
+}
+
+function resolveMultiplayerMode(
+  backendPresence: BackendPresenceSnapshot | null,
+): HudMultiplayerMode {
+  if (!backendPresence?.enabled) return "local";
+
+  switch (backendPresence.status) {
+    case "connected":
+      return "live";
+    case "connecting":
+      return "connecting";
+    case "disconnected":
+      return "offline";
+    case "error":
+      return "error";
+    case "disabled":
+      return "local";
+    default:
+      backendPresence.status satisfies never;
+      return "error";
+  }
+}
+
+function companionStateLabel(workflowState: HudWorkflowState) {
+  switch (workflowState) {
+    case "idle":
+      return "ready";
+    case "queued":
+      return "queued";
+    case "generating":
+      return "working";
+    case "grace":
+      return "draft";
+    case "refining":
+      return "refining";
+    case "released":
+      return "synced";
+    case "failed":
+      return "blocked";
+    default:
+      workflowState satisfies never;
+      return "ready";
+  }
 }
 
 function syncLabel(

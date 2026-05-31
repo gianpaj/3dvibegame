@@ -242,6 +242,11 @@ button[aria-pressed="true"] {
   background: var(--hud-red);
 }
 
+.status-pill[data-workflow="grace"] {
+  color: #ffffff;
+  background: var(--hud-cyan);
+}
+
 .status-pill--sync {
   min-width: 7.4rem;
 }
@@ -636,6 +641,11 @@ button[aria-pressed="true"] {
 
 .dock-card--busy {
   border-color: rgba(228, 182, 63, 0.48);
+}
+
+.dock-card--failed {
+  border-color: rgba(216, 95, 77, 0.52);
+  background: rgba(252, 230, 226, 0.9);
 }
 
 .feedback-dock {
