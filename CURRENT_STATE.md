@@ -40,6 +40,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Host-level world settings can now tune visibility, player caps, live-object caps, pending-create caps, cooldowns, grace periods, and destructive edits.
 - Runtime demo Settings panel now submits host-facing world settings updates through the backend reducer.
 - Runtime demo Settings panel now exposes host-facing world snapshot and reset actions through backend reducers.
+- Live backend browser smoke now verifies backend HUD settings controls, snapshot controls, archive metrics, and failed AI job debug state.
 - HUD workflow states now map idle, queued, generating, grace, refining, released, failed, and local-vs-live multiplayer modes.
 - HUD chat panel now keeps a local transcript of player prompts and generation stage events; backend chat reducers are deferred.
 - HUD generation feedback now stores thumbs up/down plus a note per object version in local state.
@@ -57,7 +58,8 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 ## Next Slices
 
-1. Add a live backend browser smoke for archive/reset visibility, AI job failures, world settings controls, and reset controls.
+1. Automate live backend HUD smoke coverage when a repeatable browser harness is available.
+2. Start Phase 3 archive read-only presentation after reset.
 
 ## Later
 
@@ -91,6 +93,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Demo world settings controls typecheck/build: passing as of 2026-05-31.
 - Demo snapshot/reset controls typecheck/build: passing as of 2026-05-31.
 - Browser settings-panel smoke in local fixture mode: passing as of 2026-05-31.
+- Live backend HUD smoke verified backend connection, settings controls, failed AI job debug, and snapshot cycle `#1` as of 2026-05-31.
 - Public creation guardrail smoke coverage: pending duplicate create rejection passing as of 2026-05-31.
 - Backend object delta rendering adapter typecheck/build: passing as of 2026-05-31.
 - Temporary live backend render smoke: seeded one `world_object` row and browser HUD showed `public room - 1/20 online - 1 object` as of 2026-05-31.

@@ -233,6 +233,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Lifecycle status metrics reuse subscribed archive rows so hosts can see live objects, snapshot count, frozen objects, and latest cycle
 - Demo typecheck/build verifies snapshot/reset controls stay compatible with local fixture mode and optional backend mode
 
+### Phase 2.27 — Live Backend HUD Smoke ✅
+- Published the current backend module to an ephemeral local SpacetimeDB instance
+- Runtime demo joined the live backend with generated client bindings and showed `Backend live`
+- HUD Settings panel rendered backend world settings plus snapshot/reset lifecycle controls from the subscribed world row
+- HUD Debug panel surfaced a failed backend `ai_job` row with `generation_failed`
+- Browser smoke used `Snapshot world` and verified snapshot metrics advanced to cycle `#1` without console errors
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 
