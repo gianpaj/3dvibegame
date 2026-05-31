@@ -29,6 +29,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Runtime demo live HUD now shows backend lifecycle status for grace windows, edit locks, cooldowns, archived/deleted rows, and reducer errors.
 - Runtime demo now has an explicit fixture-backed `AiWorkerClient` boundary that returns canonical source specs plus derived builder artifacts before reducer submission.
 - Runtime demo Debug panel now exposes backend canonical source specs and derived renderer artifacts for the selected live object without feeding them back into render authority state.
+- World backend now has a repeatable two-client lock-contention smoke that uses separate server-issued anonymous identities for Alice and Bob.
 - HUD workflow states now map idle, queued, generating, grace, refining, released, failed, and local-vs-live multiplayer modes.
 - HUD chat panel now keeps a local transcript of player prompts and generation stage events; backend chat reducers are deferred.
 - HUD generation feedback now stores thumbs up/down plus a note per object version in local state.
@@ -46,9 +47,9 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 ## Next Slices
 
-1. Add multiplayer lock-contention smoke coverage with two anonymous clients.
-2. Introduce an HTTP worker client shape behind `AiWorkerClient` while keeping fixtures as offline fallback.
-3. Add backend rate-limit/object-cap guardrails for public-room creation.
+1. Introduce an HTTP worker client shape behind `AiWorkerClient` while keeping fixtures as offline fallback.
+2. Add backend rate-limit/object-cap guardrails for public-room creation.
+3. Add multiplayer load/replay coverage around presence, object deltas, reconnect, and lock contention.
 
 ## Later
 
@@ -71,6 +72,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Live lifecycle HUD affordance typecheck/build: passing as of 2026-05-31.
 - Fixture AI worker boundary typecheck/build: passing as of 2026-05-31.
 - Backend artifact debug visibility typecheck/build: passing as of 2026-05-31.
+- Two-client backend lock-contention smoke: `pnpm --filter @3dvibegame/world-backend smoke:lock-contention` passing as of 2026-05-31.
 - Backend object delta rendering adapter typecheck/build: passing as of 2026-05-31.
 - Temporary live backend render smoke: seeded one `world_object` row and browser HUD showed `public room - 1/20 online - 1 object` as of 2026-05-31.
 - Temporary live backend control smoke: browser HUD prompt created a backend draft, release moved it to public, and refine moved it to version 2 public as of 2026-05-31.

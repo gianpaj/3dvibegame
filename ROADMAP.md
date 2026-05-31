@@ -156,6 +156,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Local fixture debug output remains unchanged when no backend is connected
 - Demo typecheck/build verifies backend artifact debug data does not affect rendering
 
+### Phase 2.16 — Multiplayer Lock Contention Smoke ✅
+- Added a repeatable `@3dvibegame/world-backend` smoke script that starts an isolated in-memory SpacetimeDB server and publishes the backend module
+- The smoke creates two server-issued anonymous CLI identities so Alice and Bob exercise real reducer sender checks
+- Alice creates, submits, releases, locks, and publishes an object edit through the backend reducers
+- Bob is rejected when trying to acquire a second edit lock, mutate Alice's locked object, or submit Alice's locked edit
+- Final assertions confirm the object advances to version 2 cooldown and the active `object_lock` row is cleared
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 
