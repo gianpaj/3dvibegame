@@ -35,6 +35,7 @@ import {
 
 // Import all reducer arg schemas
 import CancelEditReducer from "./cancel_edit_reducer";
+import CreateSnapshotReducer from "./create_snapshot_reducer";
 import DeleteObjectReducer from "./delete_object_reducer";
 import ExpireCooldownReducer from "./expire_cooldown_reducer";
 import ExpireEditLockReducer from "./expire_edit_lock_reducer";
@@ -46,6 +47,7 @@ import MovePlayerReducer from "./move_player_reducer";
 import ReleaseObjectReducer from "./release_object_reducer";
 import RequestCreateObjectReducer from "./request_create_object_reducer";
 import RequestEditLockReducer from "./request_edit_lock_reducer";
+import ResetWorldReducer from "./reset_world_reducer";
 import SubmitAiDraftReducer from "./submit_ai_draft_reducer";
 import SubmitObjectEditReducer from "./submit_object_edit_reducer";
 import UpdateDraftTransformReducer from "./update_draft_transform_reducer";
@@ -57,8 +59,10 @@ import UpdateLockedTransformReducer from "./update_locked_transform_reducer";
 import AiJobRow from "./ai_job_table";
 import ObjectLockRow from "./object_lock_table";
 import PlayerSessionRow from "./player_session_table";
+import SnapshotObjectRow from "./snapshot_object_table";
 import WorldRow from "./world_table";
 import WorldObjectRow from "./world_object_table";
+import WorldSnapshotRow from "./world_snapshot_table";
 
 /** Type-only namespace exports for generated type groups. */
 
@@ -109,6 +113,23 @@ const tablesSchema = __schema({
       { name: 'player_session_identity_key', constraint: 'unique', columns: ['identity'] },
     ],
   }, PlayerSessionRow),
+  snapshotObject: __table({
+    name: 'snapshot_object',
+    indexes: [
+      { name: 'bySnapshotId', algorithm: 'btree', columns: [
+        'snapshotId',
+      ] },
+      { name: 'snapshotObjectId', algorithm: 'btree', columns: [
+        'snapshotObjectId',
+      ] },
+      { name: 'byWorldId', algorithm: 'btree', columns: [
+        'worldId',
+      ] },
+    ],
+    constraints: [
+      { name: 'snapshot_object_snapshot_object_id_key', constraint: 'unique', columns: ['snapshotObjectId'] },
+    ],
+  }, SnapshotObjectRow),
   world: __table({
     name: 'world',
     indexes: [
@@ -137,11 +158,26 @@ const tablesSchema = __schema({
       { name: 'world_object_object_id_key', constraint: 'unique', columns: ['objectId'] },
     ],
   }, WorldObjectRow),
+  worldSnapshot: __table({
+    name: 'world_snapshot',
+    indexes: [
+      { name: 'snapshotId', algorithm: 'btree', columns: [
+        'snapshotId',
+      ] },
+      { name: 'byWorldId', algorithm: 'btree', columns: [
+        'worldId',
+      ] },
+    ],
+    constraints: [
+      { name: 'world_snapshot_snapshot_id_key', constraint: 'unique', columns: ['snapshotId'] },
+    ],
+  }, WorldSnapshotRow),
 });
 
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
   __reducerSchema("cancel_edit", CancelEditReducer),
+  __reducerSchema("create_snapshot", CreateSnapshotReducer),
   __reducerSchema("delete_object", DeleteObjectReducer),
   __reducerSchema("expire_cooldown", ExpireCooldownReducer),
   __reducerSchema("expire_edit_lock", ExpireEditLockReducer),
@@ -153,6 +189,7 @@ const reducersSchema = __reducers(
   __reducerSchema("release_object", ReleaseObjectReducer),
   __reducerSchema("request_create_object", RequestCreateObjectReducer),
   __reducerSchema("request_edit_lock", RequestEditLockReducer),
+  __reducerSchema("reset_world", ResetWorldReducer),
   __reducerSchema("submit_ai_draft", SubmitAiDraftReducer),
   __reducerSchema("submit_object_edit", SubmitObjectEditReducer),
   __reducerSchema("update_draft_transform", UpdateDraftTransformReducer),

@@ -33,6 +33,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - World backend now has a repeatable two-client lock-contention smoke that uses separate server-issued anonymous identities for Alice and Bob.
 - World backend now has a configurable multiplayer replay smoke for joins, movement presence, reconnect, object deltas, and lock contention.
 - Public-room object creation now rejects duplicate pending create jobs and enforces prototype live-object caps per world and per creator.
+- Backend archive/reset reducers now snapshot live objects into immutable archive rows, wipe live objects on reset, clear locks, and fail pending AI jobs.
 - HUD workflow states now map idle, queued, generating, grace, refining, released, failed, and local-vs-live multiplayer modes.
 - HUD chat panel now keeps a local transcript of player prompts and generation stage events; backend chat reducers are deferred.
 - HUD generation feedback now stores thumbs up/down plus a note per object version in local state.
@@ -50,9 +51,9 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 ## Next Slices
 
-1. Add archive/reset reducer coverage for read-only historical worlds.
-2. Add backend AI job failure/timeout reducers so stale worker responses do not leave pending jobs around.
-3. Add world settings reducers for host-controlled public/private presets and guardrail tuning.
+1. Add backend AI job failure/timeout reducers so stale worker responses do not leave pending jobs around.
+2. Add world settings reducers for host-controlled public/private presets and guardrail tuning.
+3. Surface archive/reset state in the demo bridge and HUD debug views.
 
 ## Later
 
@@ -78,6 +79,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Backend artifact debug visibility typecheck/build: passing as of 2026-05-31.
 - Two-client backend lock-contention smoke: `pnpm --filter @3dvibegame/world-backend smoke:lock-contention` passing as of 2026-05-31.
 - Multiplayer backend replay smoke: `pnpm --filter @3dvibegame/world-backend smoke:multiplayer-replay` passing as of 2026-05-31.
+- Backend archive/reset smoke: `pnpm --filter @3dvibegame/world-backend smoke:archive-reset` passing as of 2026-05-31.
 - Public creation guardrail smoke coverage: pending duplicate create rejection passing as of 2026-05-31.
 - Backend object delta rendering adapter typecheck/build: passing as of 2026-05-31.
 - Temporary live backend render smoke: seeded one `world_object` row and browser HUD showed `public room - 1/20 online - 1 object` as of 2026-05-31.

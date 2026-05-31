@@ -152,12 +152,82 @@ export const ObjectLock = table(
   },
 );
 
+export const WorldSnapshot = table(
+  {
+    name: "world_snapshot",
+    public: true,
+    indexes: [
+      {
+        name: "world_snapshot_world_id",
+        accessor: "byWorldId",
+        algorithm: "btree",
+        columns: ["worldId"],
+      },
+    ],
+  },
+  {
+    snapshotId: t.string().primaryKey(),
+    worldId: t.u64(),
+    cycleNumber: t.u32(),
+    reason: t.string(),
+    createdAt: t.timestamp(),
+  },
+);
+
+export const SnapshotObject = table(
+  {
+    name: "snapshot_object",
+    public: true,
+    indexes: [
+      {
+        name: "snapshot_object_snapshot_id",
+        accessor: "bySnapshotId",
+        algorithm: "btree",
+        columns: ["snapshotId"],
+      },
+      {
+        name: "snapshot_object_world_id",
+        accessor: "byWorldId",
+        algorithm: "btree",
+        columns: ["worldId"],
+      },
+    ],
+  },
+  {
+    snapshotObjectId: t.string().primaryKey(),
+    snapshotId: t.string(),
+    sourceObjectId: t.string(),
+    worldId: t.u64(),
+    state: t.string(),
+    capturedState: t.string(),
+    version: t.u32(),
+    createdBy: t.identity(),
+    latestEditor: t.identity(),
+    category: t.string(),
+    sizeTier: t.string(),
+    sourceSpecJson: t.string(),
+    builderSpecJson: t.string(),
+    positionX: t.f64(),
+    positionY: t.f64(),
+    positionZ: t.f64(),
+    rotationX: t.f64(),
+    rotationY: t.f64(),
+    rotationZ: t.f64(),
+    scaleX: t.f64(),
+    scaleY: t.f64(),
+    scaleZ: t.f64(),
+    capturedAt: t.timestamp(),
+  },
+);
+
 const spacetimedb = schema({
   world: World,
   playerSession: PlayerSession,
   aiJob: AiJob,
   worldObject: WorldObject,
   objectLock: ObjectLock,
+  worldSnapshot: WorldSnapshot,
+  snapshotObject: SnapshotObject,
 });
 
 export default spacetimedb;

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "spacetime build --module-path .",
+    "smoke:archive-reset": "node scripts/smoke-archive-reset.mjs",
     "smoke:lock-contention": "node scripts/smoke-lock-contention.mjs",
     "smoke:multiplayer-replay": "node scripts/smoke-multiplayer-replay.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"

@@ -12,6 +12,7 @@ const defaultMaxLiveObjectsPerPublicPlayer = 12;
 const defaultMaxPendingCreateJobsPerPublicPlayer = 1;
 const maxNicknameLength = 24;
 const maxIdLength = 80;
+const maxSnapshotObjectIdLength = 180;
 const maxPromptLength = 500;
 const maxSourceSpecJsonLength = 300_000;
 const maxBuilderSpecJsonLength = 200_000;
@@ -512,6 +513,44 @@ export const expire_cooldown = spacetimedb.reducer(
   },
 );
 
+export const create_snapshot = spacetimedb.reducer(
+  {
+    snapshotId: t.string(),
+    reason: t.string(),
+  },
+  (ctx, { snapshotId, reason }) => {
+    const player = requireActivePlayer(ctx);
+    assertCanManageWorldLifecycle(player);
+    const world = requireWorld(ctx, player.worldId);
+
+    createWorldSnapshot(ctx, {
+      world,
+      snapshotId,
+      reason,
+    });
+  },
+);
+
+export const reset_world = spacetimedb.reducer(
+  {
+    snapshotId: t.string(),
+    reason: t.string(),
+  },
+  (ctx, { snapshotId, reason }) => {
+    const player = requireActivePlayer(ctx);
+    assertCanManageWorldLifecycle(player);
+    const world = requireWorld(ctx, player.worldId);
+
+    createWorldSnapshot(ctx, {
+      world,
+      snapshotId,
+      reason,
+    });
+    deleteLiveWorldObjects(ctx, world.worldId);
+    failPendingWorldJobs(ctx, world.worldId);
+  },
+);
+
 function ensureDefaultWorld(ctx: BackendCtx) {
   const existing = firstWorld(ctx);
   if (existing) {
@@ -637,6 +676,123 @@ function isLiveObjectState(state: string) {
     state === "edit_locked" ||
     state === "cooldown"
   );
+}
+
+function assertCanManageWorldLifecycle(player: ReturnType<typeof requireActivePlayer>) {
+  if (
+    player.role !== "host" &&
+    player.role !== "moderator" &&
+    player.role !== "platform_admin"
+  ) {
+    throw new SenderError("only a host or moderator can snapshot or reset this world");
+  }
+}
+
+function createWorldSnapshot(
+  ctx: BackendCtx,
+  {
+    world,
+    snapshotId,
+    reason,
+  }: {
+    world: ReturnType<typeof requireWorld>;
+    snapshotId: string;
+    reason: string;
+  },
+) {
+  const normalizedSnapshotId = normalizeId("snapshotId", snapshotId);
+  const normalizedReason = normalizeSnapshotReason(reason);
+
+  if (ctx.db.worldSnapshot.snapshotId.find(normalizedSnapshotId)) {
+    throw new SenderError("world snapshot already exists");
+  }
+
+  const cycleNumber = nextSnapshotCycleNumber(ctx, world.worldId);
+  ctx.db.worldSnapshot.insert({
+    snapshotId: normalizedSnapshotId,
+    worldId: world.worldId,
+    cycleNumber,
+    reason: normalizedReason,
+    createdAt: ctx.timestamp,
+  });
+
+  const liveObjects = Array.from(ctx.db.worldObject.iter()).filter(
+    (object) => object.worldId === world.worldId && isLiveObjectState(object.state),
+  );
+  liveObjects.forEach((object, index) => {
+    const snapshotObjectId = normalizeSnapshotObjectId(
+      `${normalizedSnapshotId}:object:${index + 1}`,
+    );
+    ctx.db.snapshotObject.insert({
+      snapshotObjectId,
+      snapshotId: normalizedSnapshotId,
+      sourceObjectId: object.objectId,
+      worldId: object.worldId,
+      state: "archived",
+      capturedState: object.state,
+      version: object.version,
+      createdBy: object.createdBy,
+      latestEditor: object.latestEditor,
+      category: object.category,
+      sizeTier: object.sizeTier,
+      sourceSpecJson: object.sourceSpecJson,
+      builderSpecJson: object.builderSpecJson,
+      positionX: object.positionX,
+      positionY: object.positionY,
+      positionZ: object.positionZ,
+      rotationX: object.rotationX,
+      rotationY: object.rotationY,
+      rotationZ: object.rotationZ,
+      scaleX: object.scaleX,
+      scaleY: object.scaleY,
+      scaleZ: object.scaleZ,
+      capturedAt: ctx.timestamp,
+    });
+  });
+}
+
+function nextSnapshotCycleNumber(ctx: BackendCtx, worldId: bigint) {
+  let maxCycleNumber = 0;
+  for (const snapshot of ctx.db.worldSnapshot.iter()) {
+    if (snapshot.worldId === worldId && snapshot.cycleNumber > maxCycleNumber) {
+      maxCycleNumber = snapshot.cycleNumber;
+    }
+  }
+  return maxCycleNumber + 1;
+}
+
+function deleteLiveWorldObjects(ctx: BackendCtx, worldId: bigint) {
+  const liveObjects = Array.from(ctx.db.worldObject.iter()).filter(
+    (object) => object.worldId === worldId && isLiveObjectState(object.state),
+  );
+
+  liveObjects.forEach((object) => {
+    ctx.db.worldObject.objectId.update({
+      ...object,
+      state: "deleted",
+      graceOwner: undefined,
+      lockOwner: undefined,
+      graceRemainingSeconds: 0,
+      cooldownRemainingSeconds: 0,
+      updatedAt: ctx.timestamp,
+    });
+    clearObjectLock(ctx, object.objectId);
+  });
+}
+
+function failPendingWorldJobs(ctx: BackendCtx, worldId: bigint) {
+  const pendingJobs = Array.from(ctx.db.aiJob.iter()).filter(
+    (job) => job.worldId === worldId && job.status === "pending",
+  );
+
+  pendingJobs.forEach((job) => {
+    ctx.db.aiJob.jobId.update({
+      ...job,
+      status: "failed",
+      completedAt: ctx.timestamp,
+      errorCode: "world_reset",
+    });
+  });
 }
 
 function requireActivePlayer(ctx: BackendCtx) {
@@ -827,6 +983,27 @@ function normalizeId(label: string, value: string) {
   }
   if (normalized.length > maxIdLength) {
     throw new SenderError(`${label} must be ${maxIdLength} characters or fewer`);
+  }
+  return normalized;
+}
+
+function normalizeSnapshotObjectId(value: string) {
+  const normalized = value.trim();
+  if (!normalized) {
+    throw new SenderError("snapshotObjectId is required");
+  }
+  if (normalized.length > maxSnapshotObjectIdLength) {
+    throw new SenderError(
+      `snapshotObjectId must be ${maxSnapshotObjectIdLength} characters or fewer`,
+    );
+  }
+  return normalized;
+}
+
+function normalizeSnapshotReason(reason: string) {
+  const normalized = reason.trim();
+  if (normalized !== "manual_reset" && normalized !== "scheduled_reset") {
+    throw new SenderError("snapshot reason must be manual_reset or scheduled_reset");
   }
   return normalized;
 }

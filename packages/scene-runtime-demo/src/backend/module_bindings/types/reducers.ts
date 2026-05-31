@@ -7,6 +7,7 @@ import { type Infer as __Infer } from "spacetimedb";
 
 // Import all reducer arg schemas
 import CancelEditReducer from "../cancel_edit_reducer";
+import CreateSnapshotReducer from "../create_snapshot_reducer";
 import DeleteObjectReducer from "../delete_object_reducer";
 import ExpireCooldownReducer from "../expire_cooldown_reducer";
 import ExpireEditLockReducer from "../expire_edit_lock_reducer";
@@ -18,12 +19,14 @@ import MovePlayerReducer from "../move_player_reducer";
 import ReleaseObjectReducer from "../release_object_reducer";
 import RequestCreateObjectReducer from "../request_create_object_reducer";
 import RequestEditLockReducer from "../request_edit_lock_reducer";
+import ResetWorldReducer from "../reset_world_reducer";
 import SubmitAiDraftReducer from "../submit_ai_draft_reducer";
 import SubmitObjectEditReducer from "../submit_object_edit_reducer";
 import UpdateDraftTransformReducer from "../update_draft_transform_reducer";
 import UpdateLockedTransformReducer from "../update_locked_transform_reducer";
 
 export type CancelEditParams = __Infer<typeof CancelEditReducer>;
+export type CreateSnapshotParams = __Infer<typeof CreateSnapshotReducer>;
 export type DeleteObjectParams = __Infer<typeof DeleteObjectReducer>;
 export type ExpireCooldownParams = __Infer<typeof ExpireCooldownReducer>;
 export type ExpireEditLockParams = __Infer<typeof ExpireEditLockReducer>;
@@ -35,6 +38,7 @@ export type MovePlayerParams = __Infer<typeof MovePlayerReducer>;
 export type ReleaseObjectParams = __Infer<typeof ReleaseObjectReducer>;
 export type RequestCreateObjectParams = __Infer<typeof RequestCreateObjectReducer>;
 export type RequestEditLockParams = __Infer<typeof RequestEditLockReducer>;
+export type ResetWorldParams = __Infer<typeof ResetWorldReducer>;
 export type SubmitAiDraftParams = __Infer<typeof SubmitAiDraftReducer>;
 export type SubmitObjectEditParams = __Infer<typeof SubmitObjectEditReducer>;
 export type UpdateDraftTransformParams = __Infer<typeof UpdateDraftTransformReducer>;

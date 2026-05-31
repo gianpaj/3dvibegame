@@ -51,6 +51,33 @@ export const PlayerSession = __t.object("PlayerSession", {
 });
 export type PlayerSession = __Infer<typeof PlayerSession>;
 
+export const SnapshotObject = __t.object("SnapshotObject", {
+  snapshotObjectId: __t.string(),
+  snapshotId: __t.string(),
+  sourceObjectId: __t.string(),
+  worldId: __t.u64(),
+  state: __t.string(),
+  capturedState: __t.string(),
+  version: __t.u32(),
+  createdBy: __t.identity(),
+  latestEditor: __t.identity(),
+  category: __t.string(),
+  sizeTier: __t.string(),
+  sourceSpecJson: __t.string(),
+  builderSpecJson: __t.string(),
+  positionX: __t.f64(),
+  positionY: __t.f64(),
+  positionZ: __t.f64(),
+  rotationX: __t.f64(),
+  rotationY: __t.f64(),
+  rotationZ: __t.f64(),
+  scaleX: __t.f64(),
+  scaleY: __t.f64(),
+  scaleZ: __t.f64(),
+  capturedAt: __t.timestamp(),
+});
+export type SnapshotObject = __Infer<typeof SnapshotObject>;
+
 export const World = __t.object("World", {
   worldId: __t.u64(),
   name: __t.string(),
@@ -92,3 +119,12 @@ export const WorldObject = __t.object("WorldObject", {
   updatedAt: __t.timestamp(),
 });
 export type WorldObject = __Infer<typeof WorldObject>;
+
+export const WorldSnapshot = __t.object("WorldSnapshot", {
+  snapshotId: __t.string(),
+  worldId: __t.u64(),
+  cycleNumber: __t.u32(),
+  reason: __t.string(),
+  createdAt: __t.timestamp(),
+});
+export type WorldSnapshot = __Infer<typeof WorldSnapshot>;

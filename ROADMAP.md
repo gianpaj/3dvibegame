@@ -184,6 +184,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Reducer calls use an explicit CLI option separator so negative movement coordinates are covered correctly
 - Existing lock-contention smoke now reuses the same harness for consistent local backend verification
 
+### Phase 2.20 — Archive & Reset Reducer Coverage ✅
+- Added public `world_snapshot` and `snapshot_object` tables for immutable archive metadata and frozen object records
+- Added `create_snapshot` and `reset_world` reducers gated to host, moderator, or platform-admin roles
+- Snapshot creation copies live objects into archived snapshot rows without mutating the live world
+- World reset snapshots first, marks live objects deleted, clears locks, and fails pending AI jobs with `world_reset`
+- Generated TypeScript bindings and archive/reset smoke coverage verify read-only snapshot records and live-world wipe behavior
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 
