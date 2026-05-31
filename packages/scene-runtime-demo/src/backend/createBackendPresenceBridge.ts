@@ -53,7 +53,51 @@ interface BackendPresenceBridgeConfig {
 export interface BackendPresenceBridge {
   getSnapshot(): BackendPresenceSnapshot;
   updateLocalTransform(transform: BackendPlayerTransform): void;
+  requestCreateObject(input: BackendRequestCreateObjectInput): Promise<void>;
+  submitAiDraft(input: BackendSubmitAiDraftInput): Promise<void>;
+  updateDraftTransform(input: BackendObjectTransformInput): Promise<void>;
+  updateLockedTransform(input: BackendObjectTransformInput): Promise<void>;
+  releaseObject(input: BackendObjectIdInput): Promise<void>;
+  requestEditLock(input: BackendRequestEditLockInput): Promise<void>;
+  submitObjectEdit(input: BackendSubmitObjectEditInput): Promise<void>;
+  cancelEdit(input: BackendObjectIdInput): Promise<void>;
+  expireCooldown(input: BackendObjectIdInput): Promise<void>;
   dispose(): void;
+}
+
+export interface BackendRequestCreateObjectInput {
+  jobId: string;
+  sourcePrompt: string;
+}
+
+export interface BackendSubmitAiDraftInput {
+  jobId: string;
+  objectId: string;
+  builderSpecJson: string;
+}
+
+export interface BackendObjectIdInput {
+  objectId: string;
+}
+
+export interface BackendRequestEditLockInput extends BackendObjectIdInput {
+  baseVersion: number;
+}
+
+export interface BackendSubmitObjectEditInput extends BackendRequestEditLockInput {
+  builderSpecJson: string;
+}
+
+export interface BackendObjectTransformInput extends BackendObjectIdInput {
+  positionX: number;
+  positionY: number;
+  positionZ: number;
+  rotationX: number;
+  rotationY: number;
+  rotationZ: number;
+  scaleX: number;
+  scaleY: number;
+  scaleZ: number;
 }
 
 const tokenStorageKey = "vibe-world:spacetimedb-token";
@@ -77,6 +121,15 @@ export function createBackendPresenceBridge({
     return {
       getSnapshot: () => snapshot,
       updateLocalTransform() {},
+      requestCreateObject: rejectDisabledBackend,
+      submitAiDraft: rejectDisabledBackend,
+      updateDraftTransform: rejectDisabledBackend,
+      updateLockedTransform: rejectDisabledBackend,
+      releaseObject: rejectDisabledBackend,
+      requestEditLock: rejectDisabledBackend,
+      submitObjectEdit: rejectDisabledBackend,
+      cancelEdit: rejectDisabledBackend,
+      expireCooldown: rejectDisabledBackend,
       dispose() {},
     };
   }
@@ -223,6 +276,51 @@ export function createBackendPresenceBridge({
         }, movementThrottleMs - elapsed);
       }
     },
+    requestCreateObject(input) {
+      return callLiveReducer("Create request rejected", (conn) =>
+        conn.reducers.requestCreateObject(input),
+      );
+    },
+    submitAiDraft(input) {
+      return callLiveReducer("Draft submit rejected", (conn) =>
+        conn.reducers.submitAiDraft(input),
+      );
+    },
+    updateDraftTransform(input) {
+      return callLiveReducer("Draft transform rejected", (conn) =>
+        conn.reducers.updateDraftTransform(input),
+      );
+    },
+    updateLockedTransform(input) {
+      return callLiveReducer("Locked transform rejected", (conn) =>
+        conn.reducers.updateLockedTransform(input),
+      );
+    },
+    releaseObject(input) {
+      return callLiveReducer("Release rejected", (conn) =>
+        conn.reducers.releaseObject(input),
+      );
+    },
+    requestEditLock(input) {
+      return callLiveReducer("Edit lock rejected", (conn) =>
+        conn.reducers.requestEditLock(input),
+      );
+    },
+    submitObjectEdit(input) {
+      return callLiveReducer("Object edit rejected", (conn) =>
+        conn.reducers.submitObjectEdit(input),
+      );
+    },
+    cancelEdit(input) {
+      return callLiveReducer("Edit cancel rejected", (conn) =>
+        conn.reducers.cancelEdit(input),
+      );
+    },
+    expireCooldown(input) {
+      return callLiveReducer("Cooldown expiry rejected", (conn) =>
+        conn.reducers.expireCooldown(input),
+      );
+    },
   };
 
   function emitCurrent() {
@@ -253,6 +351,23 @@ export function createBackendPresenceBridge({
       message = errorMessage(error, "Movement update rejected");
       emitCurrent();
     });
+  }
+
+  async function callLiveReducer(
+    fallback: string,
+    reducer: (conn: DbConnection) => Promise<unknown>,
+  ) {
+    if (disposed || !joined || !connection?.isActive) {
+      throw new Error("Backend room is not ready yet.");
+    }
+
+    try {
+      await reducer(connection);
+    } catch (error) {
+      message = errorMessage(error, fallback);
+      emitCurrent();
+      throw error;
+    }
   }
 }
 
@@ -480,4 +595,8 @@ function errorMessage(error: unknown, fallback: string) {
     return `${fallback}: ${error.message}`;
   }
   return fallback;
+}
+
+async function rejectDisabledBackend(): Promise<void> {
+  throw new Error("Backend room is not configured.");
 }

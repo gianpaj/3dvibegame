@@ -121,6 +121,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Deleted rows and malformed builder specs are skipped by the client-side adapter instead of crashing the scene
 - HUD room status now includes the subscribed backend object count
 
+### Phase 2.11 — Backend Lifecycle HUD Controls ✅
+- Runtime demo live mode now routes prompt submissions through backend `request_create_object` and `submit_ai_draft` reducers
+- The demo uses fixture-backed builder specs as a client-side AI-worker stand-in while keeping generation out of SpacetimeDB reducers
+- Live HUD state is projected from subscribed backend object rows so grace, released, edit-lock, and cooldown states drive available actions
+- Draft move/rotate/scale, draft release, public refine lock/submit, edit cancel, and demo cooldown expiry are wired to backend reducers
+- Browser smoke covered HUD prompt → backend draft → release → public → refine → version 2 public
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 

@@ -1,0 +1,160 @@
+import type { AuthorityWorld } from "@3dvibegame/scene-authority-ts";
+
+import {
+  buildSceneDocument,
+  scenarios,
+  type GenerationActionId,
+  type GenerationSnapshot,
+} from "../core";
+import type { BackendPresenceSnapshot } from "./createBackendPresenceBridge";
+
+type BackendAuthorityObject = AuthorityWorld["objects"][number];
+
+export function createBackendGenerationSnapshot(
+  backendSnapshot: BackendPresenceSnapshot,
+  fallback: GenerationSnapshot,
+): GenerationSnapshot {
+  const world = backendSnapshot.authorityWorld ?? fallback.world;
+  const object = selectBackendObject(backendSnapshot);
+  const stage = object ? stageForBackendObject(object) : "idle";
+  const lastMessage = backendMessageForObject(object);
+  const stageEvents = [
+    {
+      id: object
+        ? `backend:${object.object_id}:${object.version}:${object.state}`
+        : "backend:idle",
+      stage,
+      message: lastMessage,
+      status: "complete" as const,
+      timestamp: new Date().toISOString(),
+    },
+  ];
+  const availableActions = backendAvailableActions(backendSnapshot, object);
+
+  return {
+    ...fallback,
+    playerId: localBackendPlayerId(backendSnapshot) ?? fallback.playerId,
+    document: buildSceneDocument({
+      playerId: localBackendPlayerId(backendSnapshot) ?? fallback.playerId,
+      world,
+      stage,
+      matchedScenarioKey: fallback.matchedScenarioKey,
+      lastMessage,
+      stageEvents,
+      plannedIntent: null,
+      voxelArtifact: null,
+      compiledArtifact: null,
+      availableActions,
+      activeObjectId: object?.object_id ?? null,
+      selectedObjectId: object?.object_id ?? null,
+      previousDocument: fallback.document,
+    }),
+    stage,
+    world,
+    object,
+    lastMessage,
+    stageEvents,
+    plannedIntent: null,
+    voxelArtifact: null,
+    compiledArtifact: null,
+    availableActions,
+  };
+}
+
+export function selectBackendObject(
+  backendSnapshot: BackendPresenceSnapshot,
+): BackendAuthorityObject | null {
+  const world = backendSnapshot.authorityWorld;
+  if (!world?.objects.length) return null;
+
+  const localPlayerId = localBackendPlayerId(backendSnapshot);
+  const objects = [...world.objects].reverse();
+
+  return (
+    objects.find(
+      (object) => object.state === "grace" && object.grace_owner_id === localPlayerId,
+    ) ??
+    objects.find(
+      (object) =>
+        object.state === "edit_locked" && object.lock_owner_id === localPlayerId,
+    ) ??
+    objects.find((object) => object.state === "cooldown") ??
+    objects.find((object) => object.state === "public") ??
+    objects[0] ??
+    null
+  );
+}
+
+export function localBackendPlayerId(backendSnapshot: BackendPresenceSnapshot) {
+  return backendSnapshot.players.find((player) => player.isLocal)?.id ?? null;
+}
+
+export function backendAvailableActions(
+  backendSnapshot: BackendPresenceSnapshot,
+  object = selectBackendObject(backendSnapshot),
+): GenerationActionId[] {
+  if (!object) return [];
+
+  const localPlayerId = localBackendPlayerId(backendSnapshot);
+  const isGraceOwner = object.state === "grace" && object.grace_owner_id === localPlayerId;
+  const isLockOwner =
+    object.state === "edit_locked" && object.lock_owner_id === localPlayerId;
+
+  if (isGraceOwner || isLockOwner) {
+    return ["nudge_draft", "rotate_draft", "scale_draft", "release_object"];
+  }
+
+  if (object.state !== "public") {
+    return [];
+  }
+
+  const nextStep = scenarios.avatar_forge.refineSteps[object.version - 1];
+  return nextStep ? [nextStep.actionId] : ["nudge_draft", "rotate_draft", "scale_draft"];
+}
+
+function stageForBackendObject(
+  object: BackendAuthorityObject,
+): GenerationSnapshot["stage"] {
+  switch (object.state) {
+    case "draft":
+    case "grace":
+      return "grace";
+    case "edit_locked":
+      return "edit_locked";
+    case "cooldown":
+      return "cooldown";
+    case "public":
+    case "archived":
+      return "released";
+    case "deleted":
+      return "failed";
+    default:
+      object.state satisfies never;
+      return "failed";
+  }
+}
+
+function backendMessageForObject(object: BackendAuthorityObject | null) {
+  if (!object) {
+    return "Live room ready. Prompt Savi to create a backend object.";
+  }
+
+  switch (object.state) {
+    case "draft":
+    case "grace":
+      return "Backend draft ready. Move, scale, or release it.";
+    case "edit_locked":
+      return "Backend edit lock active. Submit or release the locked edit.";
+    case "cooldown":
+      return "Backend edit accepted and waiting for cooldown expiry.";
+    case "public":
+      return `Backend object version ${object.version} is public and ready to remix.`;
+    case "archived":
+      return `Backend object version ${object.version} is archived read-only.`;
+    case "deleted":
+      return "Backend object was deleted.";
+    default:
+      object.state satisfies never;
+      return "Backend object state is unknown.";
+  }
+}

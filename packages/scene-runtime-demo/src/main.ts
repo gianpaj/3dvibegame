@@ -1,6 +1,10 @@
 import "./styles.css";
 
-import type { BackendPlayerTransform, BackendPresenceSnapshot } from "./backend";
+import type {
+  BackendLifecycleCommands,
+  BackendPlayerTransform,
+  BackendPresenceSnapshot,
+} from "./backend";
 import { createGenerationSessionController, scenarioCatalog } from "./core";
 import { createEditorCommands, createHud } from "./editor";
 import {
@@ -39,6 +43,8 @@ cameraRig.focus(sceneState.defaultFocus);
 const playerPresenceRenderer = createPlayerPresenceRenderer(sceneState.presenceRoot);
 let disposeBackendPresence = () => {};
 let publishBackendTransform = (_transform: BackendPlayerTransform) => {};
+let backendCommands: BackendLifecycleCommands | null = null;
+let backendPresenceSnapshot: BackendPresenceSnapshot | null = null;
 let backendSceneWorld: BackendPresenceSnapshot["authorityWorld"] = null;
 
 const authorityBridge = createAuthorityBridge({
@@ -59,14 +65,32 @@ loop.add(() => {
 loop.start();
 
 const generation = createGenerationSessionController();
+let renderBackendSnapshot: ((
+  backendSnapshot: BackendPresenceSnapshot,
+  fallbackSnapshot: ReturnType<typeof generation.getSnapshot>,
+) => ReturnType<typeof generation.getSnapshot>) | null = null;
 const editorCommands = createEditorCommands(generation);
 const hud = createHud({
   root: hudRoot,
   scenarios: scenarioCatalog,
   onPromptSubmit(prompt) {
+    if (backendCommands?.canHandle()) {
+      void backendCommands.submitPrompt(prompt).catch((error: unknown) => {
+        hud.setContextMessage(errorMessage(error, "Backend prompt failed"));
+      });
+      return;
+    }
+
     editorCommands.submitPrompt(prompt);
   },
   onAction(actionId) {
+    if (backendCommands?.canHandle()) {
+      void backendCommands.dispatchAction(actionId).catch((error: unknown) => {
+        hud.setContextMessage(errorMessage(error, "Backend action failed"));
+      });
+      return;
+    }
+
     editorCommands.dispatchAction(actionId);
   },
   onInteractionStateChange(state) {
@@ -75,22 +99,31 @@ const hud = createHud({
 });
 if (hasBackendConfig()) {
   void import("./backend")
-    .then(({ createBackendPresenceBridge }) => {
-      const backendPresence = createBackendPresenceBridge({
-        onSnapshot(snapshot) {
-          hud.setBackendPresence(snapshot);
-          playerPresenceRenderer.sync(snapshot);
-          backendSceneWorld =
-            snapshot.status === "connected" ? snapshot.authorityWorld : null;
-          renderSnapshot();
-        },
-      });
-      disposeBackendPresence = () => backendPresence.dispose();
-      publishBackendTransform = (transform) => {
-        backendPresence.updateLocalTransform(transform);
-      };
-      publishBackendTransform(cameraRig.getPresenceTransform());
-    })
+    .then(
+      ({
+        createBackendGenerationSnapshot,
+        createBackendLifecycleCommands,
+        createBackendPresenceBridge,
+      }) => {
+        const backendPresence = createBackendPresenceBridge({
+          onSnapshot(snapshot) {
+            hud.setBackendPresence(snapshot);
+            playerPresenceRenderer.sync(snapshot);
+            backendPresenceSnapshot = snapshot;
+            backendSceneWorld =
+              snapshot.status === "connected" ? snapshot.authorityWorld : null;
+            renderSnapshot();
+          },
+        });
+        backendCommands = createBackendLifecycleCommands(backendPresence);
+        disposeBackendPresence = () => backendPresence.dispose();
+        publishBackendTransform = (transform) => {
+          backendPresence.updateLocalTransform(transform);
+        };
+        publishBackendTransform(cameraRig.getPresenceTransform());
+        renderBackendSnapshot = createBackendGenerationSnapshot;
+      },
+    )
     .catch((error: unknown) => {
       hud.setContextMessage(errorMessage(error, "Backend bridge failed to load"));
     });
@@ -119,7 +152,11 @@ renderer.canvas.addEventListener("webglcontextrestored", () => {
 renderSnapshot();
 
 function renderSnapshot() {
-  const snapshot = generation.getSnapshot();
+  const localSnapshot = generation.getSnapshot();
+  const snapshot =
+    backendPresenceSnapshot?.status === "connected" && renderBackendSnapshot
+      ? renderBackendSnapshot(backendPresenceSnapshot, localSnapshot)
+      : localSnapshot;
   const backendWorld =
     backendSceneWorld && backendSceneWorld.objects.length > 0 ? backendSceneWorld : null;
   const focusPoint = backendWorld
