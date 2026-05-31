@@ -28,6 +28,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Runtime demo live mode now routes HUD prompt, draft transform, release, and public refine actions through backend lifecycle reducers using fixture-backed builder specs as the demo AI-worker stand-in.
 - Runtime demo live HUD now shows backend lifecycle status for grace windows, edit locks, cooldowns, archived/deleted rows, and reducer errors.
 - Runtime demo now has an explicit fixture-backed `AiWorkerClient` boundary that returns canonical source specs plus derived builder artifacts before reducer submission.
+- Runtime demo can swap that boundary to an HTTP AI worker with `VITE_AI_WORKER_URL`, while fixture generation remains the offline default.
 - Runtime demo Debug panel now exposes backend canonical source specs and derived renderer artifacts for the selected live object without feeding them back into render authority state.
 - World backend now has a repeatable two-client lock-contention smoke that uses separate server-issued anonymous identities for Alice and Bob.
 - HUD workflow states now map idle, queued, generating, grace, refining, released, failed, and local-vs-live multiplayer modes.
@@ -47,9 +48,9 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 ## Next Slices
 
-1. Introduce an HTTP worker client shape behind `AiWorkerClient` while keeping fixtures as offline fallback.
-2. Add backend rate-limit/object-cap guardrails for public-room creation.
-3. Add multiplayer load/replay coverage around presence, object deltas, reconnect, and lock contention.
+1. Add backend rate-limit/object-cap guardrails for public-room creation.
+2. Add multiplayer load/replay coverage around presence, object deltas, reconnect, and lock contention.
+3. Add archive/reset reducer coverage for read-only historical worlds.
 
 ## Later
 
@@ -71,6 +72,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Temporary backend artifact-boundary smoke: `submit_ai_draft` accepted paired `source_spec_json` and `builder_spec_json` and created a grace object as of 2026-05-31.
 - Live lifecycle HUD affordance typecheck/build: passing as of 2026-05-31.
 - Fixture AI worker boundary typecheck/build: passing as of 2026-05-31.
+- HTTP AI worker client boundary typecheck/build: passing as of 2026-05-31.
 - Backend artifact debug visibility typecheck/build: passing as of 2026-05-31.
 - Two-client backend lock-contention smoke: `pnpm --filter @3dvibegame/world-backend smoke:lock-contention` passing as of 2026-05-31.
 - Backend object delta rendering adapter typecheck/build: passing as of 2026-05-31.

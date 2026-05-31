@@ -5,7 +5,11 @@ import type {
   BackendPlayerTransform,
   BackendPresenceSnapshot,
 } from "./backend";
-import { createGenerationSessionController, scenarioCatalog } from "./core";
+import {
+  createConfiguredAiWorkerClient,
+  createGenerationSessionController,
+  scenarioCatalog,
+} from "./core";
 import { createEditorCommands, createHud } from "./editor";
 import {
   createAuthorityBridge,
@@ -117,7 +121,10 @@ if (hasBackendConfig()) {
             renderSnapshot();
           },
         });
-        backendCommands = createBackendLifecycleCommands(backendPresence);
+        backendCommands = createBackendLifecycleCommands(
+          backendPresence,
+          createConfiguredAiWorkerClient(),
+        );
         disposeBackendPresence = () => backendPresence.dispose();
         publishBackendTransform = (transform) => {
           backendPresence.updateLocalTransform(transform);

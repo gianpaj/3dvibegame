@@ -1,6 +1,9 @@
 import type { AiWorkerClient, GenerationActionId, ScenarioActionId } from "../core";
-import { createFixtureAiWorkerClient } from "../core";
-import type { BackendPresenceBridge } from "./createBackendPresenceBridge";
+import { createFixtureAiWorkerClient, scenarios } from "../core";
+import type {
+  BackendPresenceBridge,
+  BackendPresenceSnapshot,
+} from "./createBackendPresenceBridge";
 import {
   backendAvailableActions,
   localBackendPlayerId,
@@ -103,6 +106,13 @@ export function createBackendLifecycleCommands(
         actionId,
         baseObjectId: object.object_id,
         baseVersion: object.version,
+        sourcePrompt: sourcePromptForAction(actionId),
+        objectContext: {
+          objectId: object.object_id,
+          version: object.version,
+          sourceSpecJson: sourceSpecJsonForObject(snapshot, object.object_id),
+          builderSpecJson: JSON.stringify(object.builder_spec),
+        },
       });
 
       await bridge.requestEditLock({
@@ -118,6 +128,18 @@ export function createBackendLifecycleCommands(
       await bridge.expireCooldown({ objectId: object.object_id });
     },
   };
+}
+
+function sourcePromptForAction(actionId: ScenarioActionId) {
+  return (
+    scenarios.avatar_forge.refineSteps.find((step) => step.actionId === actionId)
+      ?.description ?? actionId
+  );
+}
+
+function sourceSpecJsonForObject(snapshot: BackendPresenceSnapshot, objectId: string) {
+  return snapshot.objectArtifacts.find((artifact) => artifact.objectId === objectId)
+    ?.sourceSpecJson;
 }
 
 function isScenarioAction(actionId: GenerationActionId): actionId is ScenarioActionId {

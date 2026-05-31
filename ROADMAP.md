@@ -163,6 +163,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Bob is rejected when trying to acquire a second edit lock, mutate Alice's locked object, or submit Alice's locked edit
 - Final assertions confirm the object advances to version 2 cooldown and the active `object_lock` row is cleared
 
+### Phase 2.17 — HTTP AI Worker Client Boundary ✅
+- Added an HTTP-backed `AiWorkerClient` implementation selected with `VITE_AI_WORKER_URL`
+- The HTTP client posts one create/refine request shape with prompt, target object, base version, and object-context fields
+- Worker responses are normalized into canonical `source_spec_json` and derived `builder_spec_json` before reducer submission
+- `VITE_AI_WORKER_TIMEOUT_MS` controls request timeout, and worker failure responses surface as HUD/backend action errors
+- Fixture generation remains the default offline fallback when no worker URL is configured
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 

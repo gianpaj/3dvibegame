@@ -20,7 +20,16 @@ export interface AiWorkerClient {
     actionId: ScenarioActionId;
     baseObjectId: string;
     baseVersion: number;
+    sourcePrompt?: string;
+    objectContext?: AiWorkerObjectContext | null;
   }): Promise<AiWorkerArtifact>;
+}
+
+export interface AiWorkerObjectContext {
+  objectId: string;
+  version: number;
+  sourceSpecJson?: string | null;
+  builderSpecJson?: string | null;
 }
 
 export function createFixtureAiWorkerClient(): AiWorkerClient {
