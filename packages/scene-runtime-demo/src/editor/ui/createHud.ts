@@ -463,6 +463,8 @@ export function createHud({
   }
 
   function renderDebugPanel(snapshot: GenerationSnapshot) {
+    const backendArtifact = backendArtifactForSnapshot(snapshot, latestBackendPresence);
+
     return `
       <section class="sheet-section">
         <h2>Stage timeline</h2>
@@ -491,6 +493,7 @@ export function createHud({
         <h2>Artifacts</h2>
         <p>${escapeHtml(snapshot.voxelArtifact?.summary ?? "Voxel source not ready.")}</p>
         <p>${escapeHtml(snapshot.compiledArtifact?.summary ?? "Runtime artifact not ready.")}</p>
+        ${backendArtifact ? renderBackendArtifactDebug(backendArtifact) : ""}
         <details class="json-card">
           <summary>Authority world JSON</summary>
           <pre>${escapeHtml(prettyJson(snapshot.world))}</pre>
@@ -1137,6 +1140,90 @@ function required<TElement extends HTMLElement>(
 
 function prettyJson(value: unknown) {
   return value ? JSON.stringify(value, null, 2) : "No data yet.";
+}
+
+function backendArtifactForSnapshot(
+  snapshot: GenerationSnapshot,
+  backendPresence: BackendPresenceSnapshot | null,
+) {
+  const objectId = snapshot.object?.object_id;
+  if (!objectId || !backendPresence?.enabled) return null;
+
+  return (
+    backendPresence.objectArtifacts.find((artifact) => artifact.objectId === objectId) ??
+    null
+  );
+}
+
+function renderBackendArtifactDebug(
+  artifact: NonNullable<ReturnType<typeof backendArtifactForSnapshot>>,
+) {
+  return `
+    <div class="metric-grid">
+      ${metric("Source", sourceSpecSummary(artifact.sourceSpecJson))}
+      ${metric("Runtime", builderSpecSummary(artifact.builderSpecJson))}
+    </div>
+    <details class="json-card">
+      <summary>Canonical source spec JSON</summary>
+      <pre>${escapeHtml(prettyJsonText(artifact.sourceSpecJson))}</pre>
+    </details>
+    <details class="json-card">
+      <summary>Derived renderer artifact JSON</summary>
+      <pre>${escapeHtml(prettyJsonText(artifact.builderSpecJson))}</pre>
+    </details>
+  `;
+}
+
+function sourceSpecSummary(sourceSpecJson: string) {
+  const parsed = parseJsonRecord(sourceSpecJson);
+  if (!parsed) return "invalid source";
+
+  const operations = Array.isArray(parsed.operations) ? parsed.operations.length : 0;
+  return `${stringField(parsed, "object_category")} / ${operations} ops`;
+}
+
+function builderSpecSummary(builderSpecJson: string) {
+  const parsed = parseJsonRecord(builderSpecJson);
+  if (!parsed) return "invalid artifact";
+
+  const complexity = parseRecord(parsed.complexity);
+  const parts = numberField(complexity, "part_count");
+  const instances = numberField(complexity, "instance_count");
+  return `${stringField(parsed, "object_category")} / ${parts} parts / ${instances} instances`;
+}
+
+function prettyJsonText(jsonText: string) {
+  try {
+    return JSON.stringify(JSON.parse(jsonText), null, 2);
+  } catch {
+    return jsonText;
+  }
+}
+
+function parseJsonRecord(jsonText: string) {
+  try {
+    return parseRecord(JSON.parse(jsonText));
+  } catch {
+    return null;
+  }
+}
+
+function parseRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function stringField(value: Record<string, unknown> | null, field: string) {
+  const fieldValue = value?.[field];
+  return typeof fieldValue === "string" && fieldValue ? fieldValue : "unknown";
+}
+
+function numberField(value: Record<string, unknown> | null, field: string) {
+  const fieldValue = value?.[field];
+  return typeof fieldValue === "number" && Number.isFinite(fieldValue)
+    ? String(fieldValue)
+    : "0";
 }
 
 function escapeHtml(value: string) {

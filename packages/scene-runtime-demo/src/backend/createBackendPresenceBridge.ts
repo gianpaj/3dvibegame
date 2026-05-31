@@ -1,7 +1,7 @@
 import type { AuthorityWorld } from "@3dvibegame/scene-authority-ts";
 
 import { DbConnection, type SubscriptionHandle } from "./module_bindings";
-import type { PlayerSession, World } from "./module_bindings/types";
+import type { PlayerSession, World, WorldObject } from "./module_bindings/types";
 import { mapBackendAuthorityWorld } from "./mapBackendAuthorityWorld";
 
 export type BackendPresenceStatus =
@@ -35,6 +35,14 @@ export interface BackendWorldPresence {
   maxPlayers: number;
 }
 
+export interface BackendObjectArtifactDebug {
+  objectId: string;
+  state: string;
+  version: number;
+  sourceSpecJson: string;
+  builderSpecJson: string;
+}
+
 export interface BackendPresenceSnapshot {
   enabled: boolean;
   status: BackendPresenceStatus;
@@ -44,6 +52,7 @@ export interface BackendPresenceSnapshot {
   world: BackendWorldPresence | null;
   players: BackendPlayerPresence[];
   authorityWorld: AuthorityWorld | null;
+  objectArtifacts: BackendObjectArtifactDebug[];
 }
 
 interface BackendPresenceBridgeConfig {
@@ -440,13 +449,16 @@ function readSnapshotFromConnection({
   }
 
   const world = first(connection.db.world.iter());
+  const worldObjects = world
+    ? Array.from(connection.db.worldObject.iter()).filter(
+        (object) => object.worldId === world.worldId,
+      )
+    : [];
   const players = Array.from(connection.db.playerSession.iter())
     .filter((player) => !world || player.worldId === world.worldId)
     .sort(comparePlayers)
     .map((player) => mapPlayer(player, localIdentityHex));
-  const authorityWorld = world
-    ? mapBackendAuthorityWorld(world, connection.db.worldObject.iter())
-    : null;
+  const authorityWorld = world ? mapBackendAuthorityWorld(world, worldObjects) : null;
 
   return {
     enabled,
@@ -457,6 +469,7 @@ function readSnapshotFromConnection({
     world: world ? mapWorld(world) : null,
     players,
     authorityWorld,
+    objectArtifacts: worldObjects.map(mapObjectArtifactDebug),
   };
 }
 
@@ -480,6 +493,7 @@ function createBaseSnapshot({
     world: null,
     players: [],
     authorityWorld: null,
+    objectArtifacts: [],
   };
 }
 
@@ -558,6 +572,16 @@ function mapPlayer(
       rotationPitch: player.rotationPitch,
     },
     isLocal: localIdentityHex === id,
+  };
+}
+
+function mapObjectArtifactDebug(object: WorldObject): BackendObjectArtifactDebug {
+  return {
+    objectId: object.objectId,
+    state: object.state,
+    version: object.version,
+    sourceSpecJson: object.sourceSpecJson,
+    builderSpecJson: object.builderSpecJson,
   };
 }
 

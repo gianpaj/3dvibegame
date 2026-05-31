@@ -149,6 +149,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Live reducer calls still pass validated source/artifact JSON to SpacetimeDB; generation remains outside reducers
 - Demo typecheck/build verifies the fixture worker boundary stays swappable
 
+### Phase 2.15 — Backend Artifact Debug Visibility ✅
+- Backend presence snapshots now expose per-object source/artifact debug payloads separately from render authority state
+- HUD Debug panel shows backend canonical source spec summaries and derived runtime artifact summaries for the selected live object
+- Collapsed debug details expose `source_spec_json` and `builder_spec_json` for inspection without making renderer artifacts authoritative
+- Local fixture debug output remains unchanged when no backend is connected
+- Demo typecheck/build verifies backend artifact debug data does not affect rendering
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 
