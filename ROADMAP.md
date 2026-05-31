@@ -212,6 +212,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Collapsed debug details expose snapshot rows and frozen object rows without feeding archive records into render authority state
 - Demo typecheck/build verifies archive state visibility stays compatible with local fixture mode
 
+### Phase 2.24 — Demo AI Job Failure Affordances ✅
+- Runtime demo live mode now subscribes to backend `ai_job` rows
+- Backend prompt submission reserves a create job before calling the external AI worker
+- HTTP worker failures and timeouts map to structured job failure codes and call `fail_ai_job` or `expire_ai_job`
+- Failed and pending AI jobs now drive backend HUD workflow states when no live object is selected
+- HUD Debug panel summarizes AI job counts, pending jobs, failed jobs, latest status, and latest error code
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 

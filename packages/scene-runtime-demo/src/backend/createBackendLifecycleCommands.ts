@@ -1,5 +1,16 @@
-import type { AiWorkerClient, GenerationActionId, ScenarioActionId } from "../core";
-import { createFixtureAiWorkerClient, scenarios } from "../core";
+import type {
+  AiWorkerClient,
+  AiWorkerFailureCode,
+  GenerationActionId,
+  ScenarioActionId,
+} from "../core";
+import {
+  AiWorkerError,
+  aiWorkerFailureLabel,
+  createFixtureAiWorkerClient,
+  normalizeAiWorkerError,
+  scenarios,
+} from "../core";
 import type {
   BackendPresenceBridge,
   BackendPresenceSnapshot,
@@ -32,21 +43,33 @@ export function createBackendLifecycleCommands(
         throw new Error("Type a message before sending it to Savi.");
       }
 
-      const draft = await aiWorker.createDraft({ prompt: trimmed });
       const idSuffix = `${Date.now().toString(36)}_${sequence++}`;
-      const jobId = `${draft.jobIdBase}_${idSuffix}`;
-      const objectId = `${draft.objectIdBase}_${idSuffix}`;
+      const jobId = `backend_create_${idSuffix}`;
 
       await bridge.requestCreateObject({
         jobId,
         sourcePrompt: trimmed,
       });
-      await bridge.submitAiDraft({
-        jobId,
-        objectId,
-        sourceSpecJson: draft.sourceSpecJson,
-        builderSpecJson: draft.builderSpecJson,
-      });
+
+      let draft: Awaited<ReturnType<AiWorkerClient["createDraft"]>>;
+      try {
+        draft = await aiWorker.createDraft({ prompt: trimmed });
+      } catch (error) {
+        throw await failCreateJobForWorkerError(bridge, jobId, error);
+      }
+
+      const objectId = `${draft.objectIdBase}_${idSuffix}`;
+      try {
+        await bridge.submitAiDraft({
+          jobId,
+          objectId,
+          sourceSpecJson: draft.sourceSpecJson,
+          builderSpecJson: draft.builderSpecJson,
+        });
+      } catch (error) {
+        await failCreateJob(bridge, jobId, "validation_failed");
+        throw error;
+      }
     },
     async dispatchAction(actionId: GenerationActionId) {
       const snapshot = bridge.getSnapshot();
@@ -102,18 +125,23 @@ export function createBackendLifecycleCommands(
         throw new Error("Backend refine action is not supported by the AI worker.");
       }
 
-      const edit = await aiWorker.createEdit({
-        actionId,
-        baseObjectId: object.object_id,
-        baseVersion: object.version,
-        sourcePrompt: sourcePromptForAction(actionId),
-        objectContext: {
-          objectId: object.object_id,
-          version: object.version,
-          sourceSpecJson: sourceSpecJsonForObject(snapshot, object.object_id),
-          builderSpecJson: JSON.stringify(object.builder_spec),
-        },
-      });
+      let edit: Awaited<ReturnType<AiWorkerClient["createEdit"]>>;
+      try {
+        edit = await aiWorker.createEdit({
+          actionId,
+          baseObjectId: object.object_id,
+          baseVersion: object.version,
+          sourcePrompt: sourcePromptForAction(actionId),
+          objectContext: {
+            objectId: object.object_id,
+            version: object.version,
+            sourceSpecJson: sourceSpecJsonForObject(snapshot, object.object_id),
+            builderSpecJson: JSON.stringify(object.builder_spec),
+          },
+        });
+      } catch (error) {
+        throw userFacingAiWorkerError(error);
+      }
 
       await bridge.requestEditLock({
         objectId: object.object_id,
@@ -128,6 +156,43 @@ export function createBackendLifecycleCommands(
       await bridge.expireCooldown({ objectId: object.object_id });
     },
   };
+}
+
+async function failCreateJobForWorkerError(
+  bridge: BackendPresenceBridge,
+  jobId: string,
+  error: unknown,
+) {
+  const normalized = normalizeAiWorkerError(error);
+  await failCreateJob(bridge, jobId, normalized.code);
+  return userFacingAiWorkerError(normalized);
+}
+
+async function failCreateJob(
+  bridge: BackendPresenceBridge,
+  jobId: string,
+  errorCode: AiWorkerFailureCode,
+) {
+  try {
+    if (errorCode === "timeout") {
+      await bridge.expireAiJob({ jobId });
+      return;
+    }
+
+    await bridge.failAiJob({ jobId, errorCode });
+  } catch {
+    // The original worker or draft-submit failure is more useful to the caller.
+  }
+}
+
+function userFacingAiWorkerError(error: unknown) {
+  const normalized = normalizeAiWorkerError(error);
+  const label = aiWorkerFailureLabel(normalized.code);
+  const message =
+    normalized.message === label || normalized.message.startsWith(label)
+      ? normalized.message
+      : `${label} ${normalized.message}`;
+  return new AiWorkerError(normalized.code, message);
 }
 
 function sourcePromptForAction(actionId: ScenarioActionId) {

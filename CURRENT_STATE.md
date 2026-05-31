@@ -29,6 +29,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Runtime demo live HUD now shows backend lifecycle status for grace windows, edit locks, cooldowns, archived/deleted rows, and reducer errors.
 - Runtime demo now has an explicit fixture-backed `AiWorkerClient` boundary that returns canonical source specs plus derived builder artifacts before reducer submission.
 - Runtime demo can swap that boundary to an HTTP AI worker with `VITE_AI_WORKER_URL`, while fixture generation remains the offline default.
+- Runtime demo now records backend create-job failures/timeouts when the HTTP AI worker fails or returns invalid artifacts.
 - Runtime demo Debug panel now exposes backend canonical source specs and derived renderer artifacts for the selected live object without feeding them back into render authority state.
 - World backend now has a repeatable two-client lock-contention smoke that uses separate server-issued anonymous identities for Alice and Bob.
 - World backend now has a configurable multiplayer replay smoke for joins, movement presence, reconnect, object deltas, and lock contention.
@@ -54,8 +55,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 ## Next Slices
 
-1. Add client-facing AI job failure affordances for HTTP worker errors and timeouts.
-2. Add host-facing world settings controls in the demo HUD.
+1. Add host-facing world settings controls in the demo HUD.
 
 ## Later
 
@@ -78,6 +78,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Live lifecycle HUD affordance typecheck/build: passing as of 2026-05-31.
 - Fixture AI worker boundary typecheck/build: passing as of 2026-05-31.
 - HTTP AI worker client boundary typecheck/build: passing as of 2026-05-31.
+- Demo AI job failure affordance typecheck/build: passing as of 2026-05-31.
 - Backend artifact debug visibility typecheck/build: passing as of 2026-05-31.
 - Two-client backend lock-contention smoke: `pnpm --filter @3dvibegame/world-backend smoke:lock-contention` passing as of 2026-05-31.
 - Multiplayer backend replay smoke: `pnpm --filter @3dvibegame/world-backend smoke:multiplayer-replay` passing as of 2026-05-31.

@@ -8,6 +8,11 @@ import type {
   AiWorkerClient,
   AiWorkerObjectContext,
 } from "./fixtureAiWorkerClient";
+import {
+  AiWorkerError,
+  aiWorkerFailureCodeFromUnknown,
+  normalizeAiWorkerError,
+} from "./aiWorkerErrors";
 
 export interface HttpAiWorkerClientConfig {
   url: string;
@@ -52,32 +57,40 @@ export function createHttpAiWorkerClient({
 
   return {
     async createDraft({ prompt }) {
-      const response = await postWorkerRequest(fetchImpl, endpoint, timeoutMs, {
-        operation: "create",
-        source_prompt: prompt,
-        target_object_id: null,
-        base_object_version: null,
-        object_context: null,
-      });
+      try {
+        const response = await postWorkerRequest(fetchImpl, endpoint, timeoutMs, {
+          operation: "create",
+          source_prompt: prompt,
+          target_object_id: null,
+          base_object_version: null,
+          object_context: null,
+        });
 
-      return {
-        jobIdBase: response.job_id_base ?? response.jobIdBase ?? "http_worker_job",
-        objectIdBase:
-          response.object_id_base ?? response.objectIdBase ?? "http_worker_object",
-        ...toArtifact(response),
-      };
+        return {
+          jobIdBase: response.job_id_base ?? response.jobIdBase ?? "http_worker_job",
+          objectIdBase:
+            response.object_id_base ?? response.objectIdBase ?? "http_worker_object",
+          ...toArtifact(response),
+        };
+      } catch (error) {
+        throw normalizeAiWorkerError(error);
+      }
     },
     async createEdit({ actionId, baseObjectId, baseVersion, sourcePrompt, objectContext }) {
-      const response = await postWorkerRequest(fetchImpl, endpoint, timeoutMs, {
-        operation: "refine",
-        source_prompt: sourcePrompt ?? actionId,
-        action_id: actionId,
-        target_object_id: baseObjectId,
-        base_object_version: baseVersion,
-        object_context: objectContext ?? null,
-      });
+      try {
+        const response = await postWorkerRequest(fetchImpl, endpoint, timeoutMs, {
+          operation: "refine",
+          source_prompt: sourcePrompt ?? actionId,
+          action_id: actionId,
+          target_object_id: baseObjectId,
+          base_object_version: baseVersion,
+          object_context: objectContext ?? null,
+        });
 
-      return toArtifact(response);
+        return toArtifact(response);
+      } catch (error) {
+        throw normalizeAiWorkerError(error);
+      }
     },
   };
 }
@@ -103,13 +116,16 @@ async function postWorkerRequest(
 
     const payload: unknown = await response.json().catch(() => null);
     if (!response.ok) {
-      throw new Error(workerErrorMessage(payload, `HTTP ${response.status}`));
+      throw new AiWorkerError(
+        workerErrorCode(payload),
+        workerErrorMessage(payload, `HTTP ${response.status}`),
+      );
     }
 
     return parseWorkerResponse(payload);
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
-      throw new Error(`AI worker timed out after ${timeoutMs}ms`);
+      throw new AiWorkerError("timeout", `AI worker timed out after ${timeoutMs}ms`);
     }
     throw error;
   } finally {
@@ -119,43 +135,70 @@ async function postWorkerRequest(
 
 function parseWorkerResponse(payload: unknown): HttpAiWorkerResponse {
   if (!isRecord(payload)) {
-    throw new Error("AI worker returned a non-object response.");
+    throw new AiWorkerError(
+      "validation_failed",
+      "AI worker returned a non-object response.",
+    );
   }
 
   const status = typeof payload.status === "string" ? payload.status : "completed";
   if (status !== "completed") {
-    throw new Error(workerErrorMessage(payload, `AI worker returned ${status}`));
+    throw new AiWorkerError(
+      workerErrorCode(payload),
+      workerErrorMessage(payload, `AI worker returned ${status}`),
+    );
   }
 
   const response = payload as HttpAiWorkerResponse;
   if (!isRecord(response.source_spec ?? response.sourceSpec)) {
-    throw new Error("AI worker response is missing source_spec.");
+    throw new AiWorkerError(
+      "validation_failed",
+      "AI worker response is missing source_spec.",
+    );
   }
   if (!isRecord(response.builder_spec ?? response.builderSpec)) {
-    throw new Error("AI worker response is missing builder_spec.");
+    throw new AiWorkerError(
+      "validation_failed",
+      "AI worker response is missing builder_spec.",
+    );
   }
 
   return response;
 }
 
 function toArtifact(response: HttpAiWorkerResponse): AiWorkerArtifact {
-  const sourceSpec = parseVoxelBuilderSpec(response.source_spec ?? response.sourceSpec);
-  const builderSpec = parseBuilderSpec(response.builder_spec ?? response.builderSpec);
+  try {
+    const sourceSpec = parseVoxelBuilderSpec(response.source_spec ?? response.sourceSpec);
+    const builderSpec = parseBuilderSpec(response.builder_spec ?? response.builderSpec);
 
-  return {
-    sourceSpec,
-    builderSpec,
-    sourceSpecJson: JSON.stringify(sourceSpec),
-    builderSpecJson: JSON.stringify(builderSpec),
-  };
+    return {
+      sourceSpec,
+      builderSpec,
+      sourceSpecJson: JSON.stringify(sourceSpec),
+      builderSpecJson: JSON.stringify(builderSpec),
+    };
+  } catch (error) {
+    throw normalizeAiWorkerError(error, "validation_failed");
+  }
 }
 
 function parseBuilderSpec(value: unknown): BuilderSpec {
   if (!isRecord(value)) {
-    throw new Error("AI worker builder_spec must be an object.");
+    throw new AiWorkerError(
+      "validation_failed",
+      "AI worker builder_spec must be an object.",
+    );
   }
 
   return value as unknown as BuilderSpec;
+}
+
+function workerErrorCode(payload: unknown) {
+  if (!isRecord(payload)) return "generation_failed";
+
+  return aiWorkerFailureCodeFromUnknown(
+    typeof payload.error_code === "string" ? payload.error_code : payload.errorCode,
+  );
 }
 
 function workerErrorMessage(payload: unknown, fallback: string) {

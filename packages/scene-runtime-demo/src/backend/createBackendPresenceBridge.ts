@@ -2,6 +2,7 @@ import type { AuthorityWorld } from "@3dvibegame/scene-authority-ts";
 
 import { DbConnection, type SubscriptionHandle } from "./module_bindings";
 import type {
+  AiJob,
   PlayerSession,
   SnapshotObject,
   World,
@@ -76,6 +77,19 @@ export interface BackendSnapshotObjectDebug {
   capturedAt: string;
 }
 
+export interface BackendAiJobDebug {
+  jobId: string;
+  worldId: string;
+  playerId: string;
+  targetObjectId: string | null;
+  jobType: string;
+  status: string;
+  sourcePrompt: string;
+  requestedAt: string;
+  completedAt: string | null;
+  errorCode: string | null;
+}
+
 export interface BackendPresenceSnapshot {
   enabled: boolean;
   status: BackendPresenceStatus;
@@ -86,6 +100,7 @@ export interface BackendPresenceSnapshot {
   players: BackendPlayerPresence[];
   authorityWorld: AuthorityWorld | null;
   objectArtifacts: BackendObjectArtifactDebug[];
+  aiJobs: BackendAiJobDebug[];
   worldSnapshots: BackendWorldSnapshotDebug[];
   snapshotObjects: BackendSnapshotObjectDebug[];
 }
@@ -106,6 +121,8 @@ export interface BackendPresenceBridge {
   submitObjectEdit(input: BackendSubmitObjectEditInput): Promise<void>;
   cancelEdit(input: BackendObjectIdInput): Promise<void>;
   expireCooldown(input: BackendObjectIdInput): Promise<void>;
+  failAiJob(input: BackendFailAiJobInput): Promise<void>;
+  expireAiJob(input: BackendAiJobIdInput): Promise<void>;
   dispose(): void;
 }
 
@@ -123,6 +140,14 @@ export interface BackendSubmitAiDraftInput {
 
 export interface BackendObjectIdInput {
   objectId: string;
+}
+
+export interface BackendAiJobIdInput {
+  jobId: string;
+}
+
+export interface BackendFailAiJobInput extends BackendAiJobIdInput {
+  errorCode: string;
 }
 
 export interface BackendRequestEditLockInput extends BackendObjectIdInput {
@@ -176,6 +201,8 @@ export function createBackendPresenceBridge({
       submitObjectEdit: rejectDisabledBackend,
       cancelEdit: rejectDisabledBackend,
       expireCooldown: rejectDisabledBackend,
+      failAiJob: rejectDisabledBackend,
+      expireAiJob: rejectDisabledBackend,
       dispose() {},
     };
   }
@@ -257,6 +284,7 @@ export function createBackendPresenceBridge({
           })
           .subscribe([
             "SELECT * FROM world",
+            "SELECT * FROM ai_job",
             "SELECT * FROM player_session",
             "SELECT * FROM world_object",
             "SELECT * FROM world_snapshot",
@@ -369,6 +397,16 @@ export function createBackendPresenceBridge({
         conn.reducers.expireCooldown(input),
       );
     },
+    failAiJob(input) {
+      return callLiveReducer("AI job failure rejected", (conn) =>
+        conn.reducers.failAiJob(input),
+      );
+    },
+    expireAiJob(input) {
+      return callLiveReducer("AI job expiry rejected", (conn) =>
+        conn.reducers.expireAiJob(input),
+      );
+    },
   };
 
   function emitCurrent() {
@@ -420,6 +458,14 @@ export function createBackendPresenceBridge({
 }
 
 function installTableListeners(connection: DbConnection, onChange: () => void) {
+  const onAiJobInsert: Parameters<typeof connection.db.aiJob.onInsert>[0] = () =>
+    onChange();
+  const onAiJobDelete: Parameters<typeof connection.db.aiJob.onDelete>[0] = () =>
+    onChange();
+  const onAiJobUpdate: NonNullable<
+    Parameters<NonNullable<typeof connection.db.aiJob.onUpdate>>[0]
+  > = () => onChange();
+
   const onPlayerInsert: Parameters<typeof connection.db.playerSession.onInsert>[0] =
     () => onChange();
   const onPlayerDelete: Parameters<typeof connection.db.playerSession.onDelete>[0] =
@@ -461,6 +507,9 @@ function installTableListeners(connection: DbConnection, onChange: () => void) {
     Parameters<NonNullable<typeof connection.db.snapshotObject.onUpdate>>[0]
   > = () => onChange();
 
+  connection.db.aiJob.onInsert(onAiJobInsert);
+  connection.db.aiJob.onDelete(onAiJobDelete);
+  connection.db.aiJob.onUpdate(onAiJobUpdate);
   connection.db.playerSession.onInsert(onPlayerInsert);
   connection.db.playerSession.onDelete(onPlayerDelete);
   connection.db.playerSession.onUpdate(onPlayerUpdate);
@@ -478,6 +527,9 @@ function installTableListeners(connection: DbConnection, onChange: () => void) {
   connection.db.snapshotObject.onUpdate(onSnapshotObjectUpdate);
 
   return () => {
+    connection.db.aiJob.removeOnInsert(onAiJobInsert);
+    connection.db.aiJob.removeOnDelete(onAiJobDelete);
+    connection.db.aiJob.removeOnUpdate(onAiJobUpdate);
     connection.db.playerSession.removeOnInsert(onPlayerInsert);
     connection.db.playerSession.removeOnDelete(onPlayerDelete);
     connection.db.playerSession.removeOnUpdate(onPlayerUpdate);
@@ -521,6 +573,11 @@ function readSnapshotFromConnection({
         (object) => object.worldId === world.worldId,
       )
     : [];
+  const aiJobs = world
+    ? Array.from(connection.db.aiJob.iter())
+        .filter((job) => job.worldId === world.worldId)
+        .sort(compareAiJobs)
+    : [];
   const worldSnapshots = world
     ? Array.from(connection.db.worldSnapshot.iter())
         .filter((snapshot) => snapshot.worldId === world.worldId)
@@ -547,6 +604,7 @@ function readSnapshotFromConnection({
     players,
     authorityWorld,
     objectArtifacts: worldObjects.map(mapObjectArtifactDebug),
+    aiJobs: aiJobs.map(mapAiJobDebug),
     worldSnapshots: worldSnapshots.map(mapWorldSnapshotDebug),
     snapshotObjects: snapshotObjects.map(mapSnapshotObjectDebug),
   };
@@ -573,6 +631,7 @@ function createBaseSnapshot({
     players: [],
     authorityWorld: null,
     objectArtifacts: [],
+    aiJobs: [],
     worldSnapshots: [],
     snapshotObjects: [],
   };
@@ -672,6 +731,21 @@ function mapObjectArtifactDebug(object: WorldObject): BackendObjectArtifactDebug
   };
 }
 
+function mapAiJobDebug(job: AiJob): BackendAiJobDebug {
+  return {
+    jobId: job.jobId,
+    worldId: job.worldId.toString(),
+    playerId: job.playerIdentity.toHexString(),
+    targetObjectId: job.targetObjectId ?? null,
+    jobType: job.jobType,
+    status: job.status,
+    sourcePrompt: job.sourcePrompt,
+    requestedAt: job.requestedAt.toString(),
+    completedAt: job.completedAt?.toString() ?? null,
+    errorCode: job.errorCode ?? null,
+  };
+}
+
 function mapWorldSnapshotDebug(
   snapshot: WorldSnapshot,
 ): BackendWorldSnapshotDebug {
@@ -724,6 +798,10 @@ function comparePlayers(a: PlayerSession, b: PlayerSession) {
   const stateDelta = playerStateWeight(a) - playerStateWeight(b);
   if (stateDelta !== 0) return stateDelta;
   return a.nickname.localeCompare(b.nickname);
+}
+
+function compareAiJobs(a: AiJob, b: AiJob) {
+  return b.jobId.localeCompare(a.jobId);
 }
 
 function compareWorldSnapshots(a: WorldSnapshot, b: WorldSnapshot) {

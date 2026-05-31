@@ -2,11 +2,16 @@ import type { AuthorityWorld } from "@3dvibegame/scene-authority-ts";
 
 import {
   buildSceneDocument,
+  aiWorkerFailureCodeFromUnknown,
+  aiWorkerFailureLabel,
   scenarios,
   type GenerationActionId,
   type GenerationSnapshot,
 } from "../core";
-import type { BackendPresenceSnapshot } from "./createBackendPresenceBridge";
+import type {
+  BackendAiJobDebug,
+  BackendPresenceSnapshot,
+} from "./createBackendPresenceBridge";
 
 type BackendAuthorityObject = AuthorityWorld["objects"][number];
 
@@ -16,13 +21,18 @@ export function createBackendGenerationSnapshot(
 ): GenerationSnapshot {
   const world = backendSnapshot.authorityWorld ?? fallback.world;
   const object = selectBackendObject(backendSnapshot);
-  const stage = object ? stageForBackendObject(object) : "idle";
-  const lastMessage = backendMessageForObject(backendSnapshot, object);
+  const aiJob = object ? null : selectBackendAiJob(backendSnapshot);
+  const stage = object ? stageForBackendObject(object) : stageForBackendAiJob(aiJob);
+  const lastMessage = object
+    ? backendMessageForObject(backendSnapshot, object)
+    : backendMessageForAiJob(aiJob);
   const stageEvents = [
     {
       id: object
         ? `backend:${object.object_id}:${object.version}:${object.state}`
-        : "backend:idle",
+        : aiJob
+          ? `backend-ai-job:${aiJob.jobId}:${aiJob.status}:${aiJob.errorCode ?? "none"}`
+          : "backend:idle",
       stage,
       message: lastMessage,
       status: "complete" as const,
@@ -59,6 +69,22 @@ export function createBackendGenerationSnapshot(
     compiledArtifact: null,
     availableActions,
   };
+}
+
+function selectBackendAiJob(
+  backendSnapshot: BackendPresenceSnapshot,
+): BackendAiJobDebug | null {
+  const localPlayerId = localBackendPlayerId(backendSnapshot);
+  const jobs = localPlayerId
+    ? backendSnapshot.aiJobs.filter((job) => job.playerId === localPlayerId)
+    : backendSnapshot.aiJobs;
+
+  return (
+    jobs.find((job) => job.status === "pending") ??
+    jobs.find((job) => job.status === "failed") ??
+    jobs[0] ??
+    null
+  );
 }
 
 export function selectBackendObject(
@@ -134,6 +160,15 @@ function stageForBackendObject(
   }
 }
 
+function stageForBackendAiJob(
+  job: BackendAiJobDebug | null,
+): GenerationSnapshot["stage"] {
+  if (!job) return "idle";
+  if (job.status === "pending") return "queued";
+  if (job.status === "failed") return "failed";
+  return "idle";
+}
+
 function backendMessageForObject(
   backendSnapshot: BackendPresenceSnapshot,
   object: BackendAuthorityObject | null,
@@ -166,4 +201,23 @@ function backendMessageForObject(
       object.state satisfies never;
       return "Backend object state is unknown.";
   }
+}
+
+function backendMessageForAiJob(job: BackendAiJobDebug | null) {
+  if (!job) {
+    return "Live room ready. Prompt Savi to create a backend object.";
+  }
+
+  if (job.status === "pending") {
+    return "Backend create request is waiting on the AI worker.";
+  }
+
+  if (job.status === "failed") {
+    const label = aiWorkerFailureLabel(
+      aiWorkerFailureCodeFromUnknown(job.errorCode),
+    );
+    return `${label} Try another prompt when ready.`;
+  }
+
+  return "Live room ready. Prompt Savi to create a backend object.";
 }

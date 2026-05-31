@@ -489,6 +489,7 @@ export function createHud({
         </ol>
       </section>
 
+      ${renderBackendAiJobDebug(latestBackendPresence)}
       ${renderBackendArchiveDebug(latestBackendPresence)}
 
       <section class="sheet-section">
@@ -1155,6 +1156,36 @@ function backendArtifactForSnapshot(
     backendPresence.objectArtifacts.find((artifact) => artifact.objectId === objectId) ??
     null
   );
+}
+
+function renderBackendAiJobDebug(backendPresence: BackendPresenceSnapshot | null) {
+  if (!backendPresence?.enabled) return "";
+
+  const latestJob = backendPresence.aiJobs[0] ?? null;
+  const pendingJobs = backendPresence.aiJobs.filter(
+    (job) => job.status === "pending",
+  ).length;
+  const failedJobs = backendPresence.aiJobs.filter(
+    (job) => job.status === "failed",
+  ).length;
+
+  return `
+    <section class="sheet-section">
+      <h2>AI jobs</h2>
+      <div class="metric-grid">
+        ${metric("Jobs", String(backendPresence.aiJobs.length))}
+        ${metric("Pending", String(pendingJobs))}
+        ${metric("Failed", String(failedJobs))}
+        ${metric("Latest status", latestJob?.status ?? "none")}
+        ${metric("Latest code", latestJob?.errorCode ?? "none")}
+        ${metric("Latest type", latestJob?.jobType ?? "none")}
+      </div>
+      <details class="json-card">
+        <summary>AI job rows</summary>
+        <pre>${escapeHtml(prettyJson(backendPresence.aiJobs))}</pre>
+      </details>
+    </section>
+  `;
 }
 
 function renderBackendArchiveDebug(backendPresence: BackendPresenceSnapshot | null) {
