@@ -1,4 +1,4 @@
-import type { BuilderPart, BuilderSpec } from "./contracts";
+import type { BuilderInstance, BuilderPart, BuilderSpec } from "./contracts";
 import type {
   AddBoxOp,
   AddLineOp,
@@ -41,6 +41,17 @@ type Shape =
 
 export function compileVoxelBuilderSpec(spec: VoxelBuilderSpec): BuilderSpec {
   const diagnostics = [...spec.diagnostics];
+  const instancedCloneLayout = compileInstancedCloneLayout(spec, diagnostics);
+  if (instancedCloneLayout) {
+    return createBuilderSpec({
+      spec,
+      parts: instancedCloneLayout.parts,
+      instances: instancedCloneLayout.instances,
+      placementOffsetMeters: instancedCloneLayout.placementOffsetMeters,
+      diagnostics,
+    });
+  }
+
   let shapes: Shape[] = [];
 
   spec.operations.forEach((op) => {
@@ -85,17 +96,9 @@ export function compileVoxelBuilderSpec(spec: VoxelBuilderSpec): BuilderSpec {
     spec.placement.offset,
     spec.grid.unit_meters,
   );
-  const offsetMagnitude = vectorLength(instanceOffset);
 
-  return {
-    builder_version: "0.2",
-    request_id: spec.request_id,
-    intent_id: spec.intent_id,
-    operation: spec.operation,
-    target_object_id: spec.target_object_id ?? null,
-    base_object_version: spec.base_object_version ?? null,
-    object_category: spec.object_category,
-    size_tier: spec.size_tier,
+  return createBuilderSpec({
+    spec,
     parts,
     instances: [
       {
@@ -106,6 +109,35 @@ export function compileVoxelBuilderSpec(spec: VoxelBuilderSpec): BuilderSpec {
         offset: instanceOffset,
       },
     ],
+    placementOffsetMeters: vectorLength(instanceOffset),
+    diagnostics,
+  });
+}
+
+function createBuilderSpec({
+  spec,
+  parts,
+  instances,
+  placementOffsetMeters,
+  diagnostics,
+}: {
+  spec: VoxelBuilderSpec;
+  parts: BuilderPart[];
+  instances: BuilderInstance[];
+  placementOffsetMeters: number;
+  diagnostics: string[];
+}): BuilderSpec {
+  return {
+    builder_version: "0.1",
+    request_id: spec.request_id,
+    intent_id: spec.intent_id,
+    operation: spec.operation,
+    target_object_id: spec.target_object_id ?? null,
+    base_object_version: spec.base_object_version ?? null,
+    object_category: spec.object_category,
+    size_tier: spec.size_tier,
+    parts,
+    instances,
     attachments: [],
     materials: unique(parts.map((part) => part.material)),
     behaviors: [...spec.behaviors],
@@ -113,11 +145,11 @@ export function compileVoxelBuilderSpec(spec: VoxelBuilderSpec): BuilderSpec {
       mode: spec.placement.mode,
       reference_object: spec.placement.reference_object ?? null,
       relation: spec.placement.relation ?? null,
-      offset_meters: offsetMagnitude > 0 ? offsetMagnitude : null,
+      offset_meters: placementOffsetMeters > 0 ? placementOffsetMeters : null,
     },
     complexity: {
       part_count: parts.length,
-      instance_count: 1,
+      instance_count: instances.length,
       behavior_count: spec.behaviors.length,
     },
     diagnostics,
@@ -129,6 +161,78 @@ function assertSupportedBlendMode(mode: BlendMode | undefined, opId: string) {
   throw new Error(
     `current BuilderSpec compiler target only supports union mode; ${opId} requested ${mode}`,
   );
+}
+
+function compileInstancedCloneLayout(
+  spec: VoxelBuilderSpec,
+  diagnostics: string[],
+): {
+  parts: BuilderPart[];
+  instances: BuilderInstance[];
+  placementOffsetMeters: number;
+} | null {
+  const finalOp = spec.operations.at(-1);
+  if (!finalOp || finalOp.kind !== "clone_region") return null;
+
+  const seedOps = spec.operations.slice(0, -1);
+  if (!seedOps.length) return null;
+
+  let shapes: Shape[] = [];
+  for (const op of seedOps) {
+    switch (op.kind) {
+      case "add_box":
+        assertSupportedBlendMode(op.mode, op.op_id);
+        shapes.push(shapeFromBox(op));
+        break;
+      case "add_sphere":
+        assertSupportedBlendMode(op.mode, op.op_id);
+        shapes.push(shapeFromSphere(op));
+        break;
+      case "add_line":
+        assertSupportedBlendMode(op.mode, op.op_id);
+        shapes.push(shapeFromLine(op));
+        break;
+      default:
+        return null;
+    }
+  }
+
+  assertSupportedBlendMode(finalOp.mode, finalOp.op_id);
+  const selected = shapes.filter((shape) => matchesRegion(shape, finalOp.target));
+  if (!selected.length || selected.length !== shapes.length) return null;
+
+  const layoutOrigin = getLayoutOrigin(selected, finalOp);
+  const localShapes = selected.map((shape) =>
+    translateShape(shape, scaleVector(layoutOrigin, -1)),
+  );
+  const parts = localShapes.map((shape, index) =>
+    toBuilderPart(shape, index, spec.grid.unit_meters, diagnostics),
+  );
+  const instanceOffsets = buildCloneInstanceOffsets(
+    finalOp,
+    layoutOrigin,
+    spec.placement.offset,
+  );
+  const instances = instanceOffsets.map((offset, index) => ({
+    instance_id: `instance_${index}`,
+    anchor_mode: spec.placement.mode,
+    reference_object: spec.placement.reference_object ?? null,
+    relation: spec.placement.relation ?? null,
+    offset: scaleVector(offset, spec.grid.unit_meters),
+  }));
+  const explicitPlacementOffset = vectorLength(
+    scaleVector(spec.placement.offset, spec.grid.unit_meters),
+  );
+  const clonePlacementOffset = vectorLength(
+    scaleVector(getClonePlacementDelta(finalOp, layoutOrigin), spec.grid.unit_meters),
+  );
+
+  return {
+    parts,
+    instances,
+    placementOffsetMeters:
+      explicitPlacementOffset > 0 ? explicitPlacementOffset : clonePlacementOffset,
+  };
 }
 
 function shapeFromBox(op: AddBoxOp): Shape {
@@ -204,6 +308,70 @@ function cloneShapes(
       ),
     );
   }).flat();
+}
+
+function getLayoutOrigin(shapes: Shape[], op: CloneRegionOp): VoxelVector3 {
+  const bounds = getCombinedBounds(shapes);
+  const center = midpoint(bounds.min, bounds.max);
+
+  if (op.copies.type === "radial") {
+    switch (op.copies.axis) {
+      case "x":
+        return [op.copies.center[0], center[1], center[2]];
+      case "y":
+        return [center[0], op.copies.center[1], center[2]];
+      case "z":
+        return [center[0], center[1], op.copies.center[2]];
+      default:
+        return center;
+    }
+  }
+
+  return [center[0], 0, center[2]];
+}
+
+function getClonePlacementDelta(
+  op: CloneRegionOp,
+  layoutOrigin: VoxelVector3,
+): VoxelVector3 {
+  if (op.copies.type !== "radial") {
+    return layoutOrigin;
+  }
+
+  return subtractVectors(layoutOrigin, op.copies.center);
+}
+
+function buildCloneInstanceOffsets(
+  op: CloneRegionOp,
+  layoutOrigin: VoxelVector3,
+  placementOffset: VoxelVector3,
+): VoxelVector3[] {
+  const { copies } = op;
+
+  if (copies.count === 0) {
+    return [addVectors(placementOffset, layoutOrigin)];
+  }
+
+  if (copies.type === "linear") {
+    return Array.from({ length: copies.count + 1 }, (_, index) =>
+      addVectors(
+        placementOffset,
+        addVectors(layoutOrigin, scaleVector(copies.step, index)),
+      ),
+    );
+  }
+
+  return Array.from({ length: copies.count + 1 }, (_, index) => {
+    if (index === 0) {
+      return addVectors(placementOffset, layoutOrigin);
+    }
+
+    const angle = (-Math.PI * 2 * index) / (copies.count + 1);
+    return addVectors(
+      placementOffset,
+      rotatePoint(layoutOrigin, copies.axis, angle, copies.center),
+    );
+  });
 }
 
 function rotateShape(shape: Shape, op: RotateRegionOp): Shape {
@@ -315,6 +483,41 @@ function matchesRegion(shape: Shape, target: RegionSelector): boolean {
   }
 
   return true;
+}
+
+function getCombinedBounds(shapes: Shape[]) {
+  const first = shapes[0];
+  if (!first) {
+    return {
+      min: [0, 0, 0] as VoxelVector3,
+      max: [0, 0, 0] as VoxelVector3,
+    };
+  }
+
+  const rest = shapes.slice(1);
+  const initial = getShapeBounds(first);
+
+  return rest.reduce(
+    (bounds, shape) => {
+      const shapeBounds = getShapeBounds(shape);
+      return {
+        min: [
+          Math.min(bounds.min[0], shapeBounds.min[0]),
+          Math.min(bounds.min[1], shapeBounds.min[1]),
+          Math.min(bounds.min[2], shapeBounds.min[2]),
+        ] as VoxelVector3,
+        max: [
+          Math.max(bounds.max[0], shapeBounds.max[0]),
+          Math.max(bounds.max[1], shapeBounds.max[1]),
+          Math.max(bounds.max[2], shapeBounds.max[2]),
+        ] as VoxelVector3,
+      };
+    },
+    {
+      min: [...initial.min] as VoxelVector3,
+      max: [...initial.max] as VoxelVector3,
+    },
+  );
 }
 
 function getShapeBounds(shape: Shape) {

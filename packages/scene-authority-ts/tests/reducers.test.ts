@@ -309,7 +309,7 @@ function createBuilderSpec(input: {
     ];
 
   return {
-    builder_version: "0.2",
+    builder_version: "0.1",
     request_id: input.requestId,
     intent_id: `${input.requestId}_intent`,
     operation: input.operation ?? "create",

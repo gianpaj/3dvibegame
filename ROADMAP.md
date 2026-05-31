@@ -100,6 +100,12 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Settings panel summarizes the current local feedback state
 - Feedback remains local until AI worker quality metrics and backend persistence are introduced
 
+### Phase 2.8 — Builder Benchmark Parity Tests ✅
+- TypeScript voxel compiler output is covered against the checked-in builder benchmark fixture expectations
+- Pine tree create, pine tree refine, and barrel triangle fixtures now compile deterministically in tests
+- Whole-object `clone_region` layouts compile into repeated `BuilderSpec.instances` when the source can be represented that way
+- Compiled `BuilderSpec` artifacts stay on the benchmark `builder_version: "0.1"` contract while preserving voxel-enriched local part metadata
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 

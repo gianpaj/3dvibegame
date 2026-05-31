@@ -25,6 +25,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - HUD workflow states now map idle, queued, generating, grace, refining, released, failed, and local-vs-live multiplayer modes.
 - HUD chat panel now keeps a local transcript of player prompts and generation stage events; backend chat reducers are deferred.
 - HUD generation feedback now stores thumbs up/down plus a note per object version in local state.
+- TypeScript voxel compiler parity tests now cover the pine tree, pine tree refine, and barrel triangle builder benchmark fixture expectations.
 - Fixture-backed avatar/object generation and refinement flow.
 - Spawn HUD and interaction research captured in `docs/spawn-reverse-engineering.md`.
 - `scene-builder-bench` in `vibe-world` passes its current pytest suite.
@@ -38,9 +39,9 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 ## Next Slices
 
-1. Add TypeScript builder parity tests against the `vibe-world` builder benchmark expectations.
-2. Start object lifecycle networking: create draft object rows, release, lock, remix, and delete reducers.
-3. Choose the next major rendering branch: canonical voxel dirty recompilation or backend object delta rendering.
+1. Start object lifecycle networking: create draft object rows, release, lock, remix, and delete reducers.
+2. Choose the next major rendering branch: canonical voxel dirty recompilation or backend object delta rendering.
+3. Decide where canonical `VoxelBuilderSpec` source and compiled runtime artifacts live in backend object rows.
 
 ## Later
 
@@ -54,6 +55,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 - `pnpm typecheck`: passing as of 2026-05-31.
 - `pnpm --filter @3dvibegame/scene-authority-ts test`: passing as of 2026-05-31.
+- `pnpm --filter @3dvibegame/scene-authority-ts typecheck`: passing as of 2026-05-31.
 - `pnpm --filter @3dvibegame/world-backend build`: passing as of 2026-05-31.
 - `pnpm --filter @3dvibegame/scene-runtime-demo typecheck`: passing as of 2026-05-31.
 - `pnpm demo:build`: passing as of 2026-05-31.
