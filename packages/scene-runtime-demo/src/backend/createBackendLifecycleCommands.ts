@@ -14,6 +14,7 @@ import {
 import type {
   BackendPresenceBridge,
   BackendPresenceSnapshot,
+  BackendUpdateWorldSettingsInput,
 } from "./createBackendPresenceBridge";
 import {
   backendAvailableActions,
@@ -25,6 +26,7 @@ export interface BackendLifecycleCommands {
   canHandle(): boolean;
   submitPrompt(prompt: string): Promise<void>;
   dispatchAction(actionId: GenerationActionId): Promise<void>;
+  updateWorldSettings(input: BackendUpdateWorldSettingsInput): Promise<void>;
 }
 
 export function createBackendLifecycleCommands(
@@ -36,6 +38,13 @@ export function createBackendLifecycleCommands(
   return {
     canHandle() {
       return isBackendReady(bridge);
+    },
+    updateWorldSettings(input) {
+      if (!isBackendReady(bridge)) {
+        throw new Error("Backend room is not ready yet.");
+      }
+
+      return bridge.updateWorldSettings(input);
     },
     async submitPrompt(prompt: string) {
       const trimmed = prompt.trim();

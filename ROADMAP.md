@@ -219,6 +219,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Failed and pending AI jobs now drive backend HUD workflow states when no live object is selected
 - HUD Debug panel summarizes AI job counts, pending jobs, failed jobs, latest status, and latest error code
 
+### Phase 2.25 — Demo World Settings Controls ✅
+- Backend bridge exposes `update_world_settings` to the runtime demo command boundary
+- HUD Settings panel renders host-facing controls for visibility, player cap, object caps, pending create cap, cooldown, grace period, and destructive edits
+- Settings submissions preserve the subscribed world row values and route updates through the authoritative reducer
+- Reducer failures surface in the existing context toast, including role checks and public-world destructive edit rejection
+- Demo typecheck/build verifies settings controls stay compatible with local fixture mode and optional backend mode
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 

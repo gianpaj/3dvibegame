@@ -35,6 +35,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -113,6 +114,7 @@ button[aria-pressed="true"] {
 
 .hud-shell button,
 .hud-shell input,
+.hud-shell select,
 .hud-shell textarea,
 .room-card,
 .status-strip,
@@ -539,6 +541,54 @@ button[aria-pressed="true"] {
   align-items: start;
 }
 
+.world-settings-form {
+  display: grid;
+  gap: 0.68rem;
+}
+
+.settings-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.settings-field {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  color: var(--hud-soft);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.settings-field input,
+.settings-field select {
+  width: 100%;
+  min-height: 2.35rem;
+  padding: 0.42rem 0.52rem;
+  border: 1px solid var(--hud-line);
+  border-radius: 8px;
+  color: var(--hud-ink);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.settings-checkbox {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  align-self: end;
+  min-height: 2.35rem;
+  padding: 0.42rem 0.52rem;
+  border: 1px solid var(--hud-line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.66);
+}
+
+.settings-checkbox input {
+  width: 1rem;
+  min-height: 1rem;
+  padding: 0;
+}
+
 .presence-strip {
   position: absolute;
   left: 1rem;
@@ -876,6 +926,7 @@ button[aria-pressed="true"] {
   }
 
   .metric-grid,
+  .settings-field-grid,
   .dock-card {
     grid-template-columns: 1fr;
   }

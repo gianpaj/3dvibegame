@@ -99,6 +99,22 @@ const hud = createHud({
 
     editorCommands.dispatchAction(actionId);
   },
+  onWorldSettingsSubmit(input) {
+    if (!backendCommands?.canHandle()) {
+      hud.setContextMessage("Backend room settings are only available in a live room.");
+      return;
+    }
+
+    hud.setContextMessage("Updating world settings.");
+    void backendCommands
+      .updateWorldSettings(input)
+      .then(() => {
+        hud.setContextMessage("World settings updated.");
+      })
+      .catch((error: unknown) => {
+        hud.setContextMessage(errorMessage(error, "World settings update failed"));
+      });
+  },
   onInteractionStateChange(state) {
     cameraRig.controls.enabled = !state.controlsLocked;
   },

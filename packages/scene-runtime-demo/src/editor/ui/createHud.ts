@@ -45,11 +45,23 @@ export interface HudInteractionState {
   controlsLocked: boolean;
 }
 
+export interface HudWorldSettingsInput {
+  visibility: string;
+  maxPlayers: number;
+  maxLiveObjects: number;
+  maxObjectsPerPlayer: number;
+  maxPendingCreateJobsPerPlayer: number;
+  destructiveEditsEnabled: boolean;
+  objectCooldownSeconds: number;
+  gracePeriodSeconds: number;
+}
+
 interface HudConfig {
   root: HTMLElement;
   scenarios: ScenarioOption[];
   onPromptSubmit(prompt: string): void;
   onAction(actionId: GenerationActionId): void;
+  onWorldSettingsSubmit?(input: HudWorldSettingsInput): void;
   onInteractionStateChange?(state: HudInteractionState): void;
 }
 
@@ -99,6 +111,7 @@ export function createHud({
   scenarios,
   onPromptSubmit,
   onAction,
+  onWorldSettingsSubmit,
   onInteractionStateChange,
 }: HudConfig) {
   const initialPrompt = scenarios[0]?.sourcePrompt ?? "";
@@ -203,6 +216,19 @@ export function createHud({
     });
     render();
     onPromptSubmit(prompt);
+  });
+
+  root.addEventListener("submit", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLFormElement)) return;
+    if (target.dataset.role !== "world-settings-form") return;
+
+    event.preventDefault();
+    try {
+      onWorldSettingsSubmit?.(readWorldSettingsForm(target));
+    } catch (error) {
+      setContextMessage(error instanceof Error ? error.message : "World settings are invalid.");
+    }
   });
 
   promptInput.addEventListener("focus", () => {
@@ -522,6 +548,8 @@ export function createHud({
           ${metric("Backend", backendStatusLabel(latestBackendPresence))}
         </div>
       </section>
+
+      ${renderWorldSettingsControls(latestBackendPresence)}
 
       <section class="sheet-section settings-actions">
         <button type="button" data-action="mute">${muted ? "Unmute room" : "Mute room"}</button>
@@ -884,6 +912,44 @@ function metric(label: string, value: string) {
   `;
 }
 
+function readWorldSettingsForm(form: HTMLFormElement): HudWorldSettingsInput {
+  const data = new FormData(form);
+  const visibility = formStringField(data, "visibility");
+  if (visibility !== "public" && visibility !== "private") {
+    throw new Error("Visibility must be public or private.");
+  }
+
+  return {
+    visibility,
+    maxPlayers: formIntegerField(data, "maxPlayers"),
+    maxLiveObjects: formIntegerField(data, "maxLiveObjects"),
+    maxObjectsPerPlayer: formIntegerField(data, "maxObjectsPerPlayer"),
+    maxPendingCreateJobsPerPlayer: formIntegerField(
+      data,
+      "maxPendingCreateJobsPerPlayer",
+    ),
+    destructiveEditsEnabled: data.get("destructiveEditsEnabled") === "true",
+    objectCooldownSeconds: formIntegerField(data, "objectCooldownSeconds"),
+    gracePeriodSeconds: formIntegerField(data, "gracePeriodSeconds"),
+  };
+}
+
+function formStringField(data: FormData, name: string) {
+  const value = data.get(name);
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`${name} is required.`);
+  }
+  return value.trim();
+}
+
+function formIntegerField(data: FormData, name: string) {
+  const value = Number(formStringField(data, name));
+  if (!Number.isInteger(value)) {
+    throw new Error(`${name} must be a whole number.`);
+  }
+  return value;
+}
+
 function lifecycleStatusLabel(snapshot: GenerationSnapshot) {
   const object = snapshot.object;
   if (!object) return "none";
@@ -1156,6 +1222,59 @@ function backendArtifactForSnapshot(
     backendPresence.objectArtifacts.find((artifact) => artifact.objectId === objectId) ??
     null
   );
+}
+
+function renderWorldSettingsControls(
+  backendPresence: BackendPresenceSnapshot | null,
+) {
+  const world = backendPresence?.world;
+  if (!backendPresence?.enabled || !world) return "";
+
+  return `
+    <section class="sheet-section">
+      <h2>World settings</h2>
+      <form class="world-settings-form" data-role="world-settings-form">
+        <div class="settings-field-grid">
+          <label class="settings-field">
+            <span>Visibility</span>
+            <select name="visibility">
+              <option value="public"${world.visibility === "public" ? " selected" : ""}>Public</option>
+              <option value="private"${world.visibility === "private" ? " selected" : ""}>Private</option>
+            </select>
+          </label>
+          <label class="settings-field">
+            <span>Max players</span>
+            <input name="maxPlayers" type="number" min="1" max="32" step="1" value="${world.maxPlayers}" />
+          </label>
+          <label class="settings-field">
+            <span>Live cap</span>
+            <input name="maxLiveObjects" type="number" min="1" max="500" step="1" value="${world.maxLiveObjects}" />
+          </label>
+          <label class="settings-field">
+            <span>Per player cap</span>
+            <input name="maxObjectsPerPlayer" type="number" min="1" max="100" step="1" value="${world.maxObjectsPerPlayer}" />
+          </label>
+          <label class="settings-field">
+            <span>Pending cap</span>
+            <input name="maxPendingCreateJobsPerPlayer" type="number" min="1" max="5" step="1" value="${world.maxPendingCreateJobsPerPlayer}" />
+          </label>
+          <label class="settings-field">
+            <span>Cooldown sec</span>
+            <input name="objectCooldownSeconds" type="number" min="0" max="300" step="1" value="${world.objectCooldownSeconds}" />
+          </label>
+          <label class="settings-field">
+            <span>Grace sec</span>
+            <input name="gracePeriodSeconds" type="number" min="0" max="120" step="1" value="${world.gracePeriodSeconds}" />
+          </label>
+          <label class="settings-field settings-checkbox">
+            <input name="destructiveEditsEnabled" type="checkbox" value="true"${world.destructiveEditsEnabled ? " checked" : ""} />
+            <span>Destructive edits</span>
+          </label>
+        </div>
+        <button type="submit">Apply world settings</button>
+      </form>
+    </section>
+  `;
 }
 
 function renderBackendAiJobDebug(backendPresence: BackendPresenceSnapshot | null) {

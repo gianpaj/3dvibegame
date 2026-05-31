@@ -123,6 +123,7 @@ export interface BackendPresenceBridge {
   expireCooldown(input: BackendObjectIdInput): Promise<void>;
   failAiJob(input: BackendFailAiJobInput): Promise<void>;
   expireAiJob(input: BackendAiJobIdInput): Promise<void>;
+  updateWorldSettings(input: BackendUpdateWorldSettingsInput): Promise<void>;
   dispose(): void;
 }
 
@@ -148,6 +149,17 @@ export interface BackendAiJobIdInput {
 
 export interface BackendFailAiJobInput extends BackendAiJobIdInput {
   errorCode: string;
+}
+
+export interface BackendUpdateWorldSettingsInput {
+  visibility: string;
+  maxPlayers: number;
+  maxLiveObjects: number;
+  maxObjectsPerPlayer: number;
+  maxPendingCreateJobsPerPlayer: number;
+  destructiveEditsEnabled: boolean;
+  objectCooldownSeconds: number;
+  gracePeriodSeconds: number;
 }
 
 export interface BackendRequestEditLockInput extends BackendObjectIdInput {
@@ -203,6 +215,7 @@ export function createBackendPresenceBridge({
       expireCooldown: rejectDisabledBackend,
       failAiJob: rejectDisabledBackend,
       expireAiJob: rejectDisabledBackend,
+      updateWorldSettings: rejectDisabledBackend,
       dispose() {},
     };
   }
@@ -405,6 +418,11 @@ export function createBackendPresenceBridge({
     expireAiJob(input) {
       return callLiveReducer("AI job expiry rejected", (conn) =>
         conn.reducers.expireAiJob(input),
+      );
+    },
+    updateWorldSettings(input) {
+      return callLiveReducer("World settings update rejected", (conn) =>
+        conn.reducers.updateWorldSettings(input),
       );
     },
   };
