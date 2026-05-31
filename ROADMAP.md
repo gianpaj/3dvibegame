@@ -135,6 +135,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Reducers validate source/artifact category, size tier, and operation alignment before mutating object rows
 - Generated client bindings were refreshed for the expanded submit reducer payloads and object row shape
 
+### Phase 2.13 — Live Lifecycle HUD Affordances ✅
+- Live backend snapshots now surface grace-window, edit-lock, cooldown, public, archived, and deleted object messages
+- HUD build metrics show lifecycle status and renderer part count from backend object rows when compiled artifacts are not locally cached
+- Action dock now distinguishes unavailable states such as another player's grace window, another editor's lock, cooldown, archive, and removed objects
+- Backend prompt/action attempts clear stale error toasts before issuing reducer calls and surface reducer failures in the context toast
+- Demo typecheck/build verifies the live affordance projection stays compatible with local fixture mode
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 

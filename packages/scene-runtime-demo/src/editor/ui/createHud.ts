@@ -412,7 +412,8 @@ export function createHud({
           ${metric("Stage", stageLabels[snapshot.stage])}
           ${metric("Recipe", snapshot.matchedScenarioLabel)}
           ${metric("Version", snapshot.object ? `v${snapshot.object.version}` : "none")}
-          ${metric("Parts", snapshot.compiledArtifact ? String(snapshot.compiledArtifact.payload.complexity.part_count) : "0")}
+          ${metric("Lifecycle", lifecycleStatusLabel(snapshot))}
+          ${metric("Parts", partCountLabel(snapshot))}
         </div>
       </section>
     `;
@@ -579,9 +580,9 @@ export function createHud({
     if (!snapshot.availableActions.length) {
       return `
         <div class="dock-card">
-          <span>Avatar profile</span>
-          <strong>v${escapeHtml(String(snapshot.object.version))} published</strong>
-          <p>All planned refine steps are complete.</p>
+          <span>${escapeHtml(unavailableActionKicker(snapshot))}</span>
+          <strong>${escapeHtml(unavailableActionTitle(snapshot))}</strong>
+          <p>${escapeHtml(snapshot.lastMessage)}</p>
         </div>
       `;
     }
@@ -875,6 +876,88 @@ function metric(label: string, value: string) {
       <strong>${escapeHtml(value)}</strong>
     </div>
   `;
+}
+
+function lifecycleStatusLabel(snapshot: GenerationSnapshot) {
+  const object = snapshot.object;
+  if (!object) return "none";
+
+  switch (object.state) {
+    case "draft":
+    case "grace":
+      return `${object.grace_remaining_seconds}s grace`;
+    case "edit_locked":
+      return "edit lock";
+    case "cooldown":
+      return `${object.cooldown_remaining_seconds}s cooldown`;
+    case "public":
+      return "public";
+    case "archived":
+      return "archived";
+    case "deleted":
+      return "deleted";
+    default:
+      object.state satisfies never;
+      return "unknown";
+  }
+}
+
+function partCountLabel(snapshot: GenerationSnapshot) {
+  if (snapshot.compiledArtifact) {
+    return String(snapshot.compiledArtifact.payload.complexity.part_count);
+  }
+  return snapshot.object ? String(snapshot.object.builder_spec.complexity.part_count) : "0";
+}
+
+function unavailableActionKicker(snapshot: GenerationSnapshot) {
+  const state = snapshot.object?.state;
+
+  switch (state) {
+    case "grace":
+      return "Grace window";
+    case "edit_locked":
+      return "Edit lock";
+    case "cooldown":
+      return "Cooldown";
+    case "archived":
+      return "Archive";
+    case "deleted":
+      return "Removed object";
+    case "public":
+      return "Avatar profile";
+    case "draft":
+      return "Draft";
+    case undefined:
+      return "No object";
+    default:
+      state satisfies never;
+      return "Object";
+  }
+}
+
+function unavailableActionTitle(snapshot: GenerationSnapshot) {
+  const object = snapshot.object;
+  if (!object) return "No object selected";
+
+  switch (object.state) {
+    case "grace":
+      return "Waiting for creator release";
+    case "edit_locked":
+      return "Locked by another editor";
+    case "cooldown":
+      return `v${object.version} cooling down`;
+    case "archived":
+      return `v${object.version} archived`;
+    case "deleted":
+      return "Object removed";
+    case "public":
+      return `v${object.version} published`;
+    case "draft":
+      return "Draft pending";
+    default:
+      object.state satisfies never;
+      return "Unavailable";
+  }
 }
 
 function resolveStageState(snapshot: GenerationSnapshot) {

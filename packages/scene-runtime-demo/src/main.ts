@@ -75,6 +75,7 @@ const hud = createHud({
   scenarios: scenarioCatalog,
   onPromptSubmit(prompt) {
     if (backendCommands?.canHandle()) {
+      hud.setContextMessage("");
       void backendCommands.submitPrompt(prompt).catch((error: unknown) => {
         hud.setContextMessage(errorMessage(error, "Backend prompt failed"));
       });
@@ -85,6 +86,7 @@ const hud = createHud({
   },
   onAction(actionId) {
     if (backendCommands?.canHandle()) {
+      hud.setContextMessage("");
       void backendCommands.dispatchAction(actionId).catch((error: unknown) => {
         hud.setContextMessage(errorMessage(error, "Backend action failed"));
       });

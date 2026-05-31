@@ -17,7 +17,7 @@ export function createBackendGenerationSnapshot(
   const world = backendSnapshot.authorityWorld ?? fallback.world;
   const object = selectBackendObject(backendSnapshot);
   const stage = object ? stageForBackendObject(object) : "idle";
-  const lastMessage = backendMessageForObject(object);
+  const lastMessage = backendMessageForObject(backendSnapshot, object);
   const stageEvents = [
     {
       id: object
@@ -134,19 +134,28 @@ function stageForBackendObject(
   }
 }
 
-function backendMessageForObject(object: BackendAuthorityObject | null) {
+function backendMessageForObject(
+  backendSnapshot: BackendPresenceSnapshot,
+  object: BackendAuthorityObject | null,
+) {
   if (!object) {
     return "Live room ready. Prompt Savi to create a backend object.";
   }
 
+  const localPlayerId = localBackendPlayerId(backendSnapshot);
+
   switch (object.state) {
     case "draft":
     case "grace":
-      return "Backend draft ready. Move, scale, or release it.";
+      return object.grace_owner_id === localPlayerId
+        ? `Backend draft ready. ${object.grace_remaining_seconds}s remain in grace.`
+        : `Backend draft is in another player's grace window for ${object.grace_remaining_seconds}s.`;
     case "edit_locked":
-      return "Backend edit lock active. Submit or release the locked edit.";
+      return object.lock_owner_id === localPlayerId
+        ? "Backend edit lock active. Submit or release the locked edit."
+        : "Backend object is locked by another editor.";
     case "cooldown":
-      return "Backend edit accepted and waiting for cooldown expiry.";
+      return `Backend edit accepted. ${object.cooldown_remaining_seconds}s cooldown remain.`;
     case "public":
       return `Backend object version ${object.version} is public and ready to remix.`;
     case "archived":
