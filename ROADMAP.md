@@ -57,6 +57,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - `join_world`, `leave_world`, and `heartbeat_player` reducers added
 - Presence movement, object lifecycle networking, and AI jobs remain out of scope
 
+### Phase 2.2 — SpacetimeDB Player Movement & Presence ✅
+- Player session rows now carry connection identity and world transform state
+- `move_player` reducer added for approximate authoritative movement updates
+- Movement bounds and pitch validation added server-side
+- Public `player_session` rows are ready for world-scoped presence subscriptions
+- Client binding generation and demo connection remain the next slice
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 

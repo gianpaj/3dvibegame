@@ -18,6 +18,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - `@3dvibegame/scene-authority-ts` package with lifecycle reducers, contracts, and voxel builder compiler.
 - Authority reducer lifecycle test harness covering create, grace, release, locks, stale versions, cooldown, permissions, and builder-spec validation.
 - `@3dvibegame/world-backend` SpacetimeDB TypeScript module with default world seeding and anonymous join/leave/heartbeat reducers.
+- Backend player sessions now include connection identity, transform state, and a validated `move_player` reducer for presence updates.
 - Fixture-backed avatar/object generation and refinement flow.
 - Spawn HUD and interaction research captured in `docs/spawn-reverse-engineering.md`.
 - `scene-builder-bench` in `vibe-world` passes its current pytest suite.
@@ -31,13 +32,12 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 ## Next Slices
 
-1. Add SpacetimeDB player movement and presence subscriptions.
-2. Generate TypeScript client bindings and connect the demo to the backend join flow.
-3. Finish HUD interaction states: idle, queued, generating, grace, refining, released, failed, and static-vs-live multiplayer status.
-4. Add real chat behavior or mark chat as prototype-only until multiplayer backend work starts.
-5. Wire feedback note text alongside thumbs up/down state.
-6. Add TypeScript builder parity tests against the `vibe-world` builder benchmark expectations.
-7. Choose the next major implementation branch after presence: canonical voxel dirty recompilation or object lifecycle networking.
+1. Generate TypeScript client bindings and connect the demo to the backend join flow.
+2. Finish HUD interaction states: idle, queued, generating, grace, refining, released, failed, and static-vs-live multiplayer status.
+3. Add real chat behavior or mark chat as prototype-only until multiplayer backend work starts.
+4. Wire feedback note text alongside thumbs up/down state.
+5. Add TypeScript builder parity tests against the `vibe-world` builder benchmark expectations.
+6. Choose the next major implementation branch after presence: canonical voxel dirty recompilation or object lifecycle networking.
 
 ## Later
 
