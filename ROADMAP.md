@@ -50,6 +50,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Finalize `public-world-permission-matrix` (action-by-role model)
 - Finalize `ai-worker-contract` (external AI generation service boundary)
 
+### Phase 2.1 — SpacetimeDB Backend Skeleton & Anonymous Join ✅
+- SpacetimeDB TypeScript module package added
+- One default public development world seeded on module init
+- Anonymous player session rows keyed by connection identity
+- `join_world`, `leave_world`, and `heartbeat_player` reducers added
+- Presence movement, object lifecycle networking, and AI jobs remain out of scope
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 
