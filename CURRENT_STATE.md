@@ -31,6 +31,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Runtime demo can swap that boundary to an HTTP AI worker with `VITE_AI_WORKER_URL`, while fixture generation remains the offline default.
 - Runtime demo Debug panel now exposes backend canonical source specs and derived renderer artifacts for the selected live object without feeding them back into render authority state.
 - World backend now has a repeatable two-client lock-contention smoke that uses separate server-issued anonymous identities for Alice and Bob.
+- Public-room object creation now rejects duplicate pending create jobs and enforces prototype live-object caps per world and per creator.
 - HUD workflow states now map idle, queued, generating, grace, refining, released, failed, and local-vs-live multiplayer modes.
 - HUD chat panel now keeps a local transcript of player prompts and generation stage events; backend chat reducers are deferred.
 - HUD generation feedback now stores thumbs up/down plus a note per object version in local state.
@@ -48,9 +49,9 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 ## Next Slices
 
-1. Add backend rate-limit/object-cap guardrails for public-room creation.
-2. Add multiplayer load/replay coverage around presence, object deltas, reconnect, and lock contention.
-3. Add archive/reset reducer coverage for read-only historical worlds.
+1. Add multiplayer load/replay coverage around presence, object deltas, reconnect, and lock contention.
+2. Add archive/reset reducer coverage for read-only historical worlds.
+3. Add backend AI job failure/timeout reducers so stale worker responses do not leave pending jobs around.
 
 ## Later
 
@@ -75,6 +76,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - HTTP AI worker client boundary typecheck/build: passing as of 2026-05-31.
 - Backend artifact debug visibility typecheck/build: passing as of 2026-05-31.
 - Two-client backend lock-contention smoke: `pnpm --filter @3dvibegame/world-backend smoke:lock-contention` passing as of 2026-05-31.
+- Public creation guardrail smoke coverage: pending duplicate create rejection passing as of 2026-05-31.
 - Backend object delta rendering adapter typecheck/build: passing as of 2026-05-31.
 - Temporary live backend render smoke: seeded one `world_object` row and browser HUD showed `public room - 1/20 online - 1 object` as of 2026-05-31.
 - Temporary live backend control smoke: browser HUD prompt created a backend draft, release moved it to public, and refine moved it to version 2 public as of 2026-05-31.

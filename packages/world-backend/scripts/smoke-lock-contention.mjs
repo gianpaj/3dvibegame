@@ -59,6 +59,17 @@ try {
   ]);
   activatePlayers(serverUrl, dbName);
 
+  expectReducerFailure(
+    () =>
+      callAs(aliceConfigPath, serverUrl, dbName, "request_create_object", [
+        "lock-smoke-extra-create-job",
+        "create a second pine tree too quickly",
+      ]),
+    "too many pending creation jobs",
+    "Alice should not queue a second public create while one is pending",
+  );
+  activatePlayers(serverUrl, dbName);
+
   callAs(aliceConfigPath, serverUrl, dbName, "submit_ai_draft", [
     "lock-smoke-create-job",
     smokeObjectId,

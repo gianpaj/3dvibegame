@@ -7,6 +7,9 @@ const defaultWorldVisibility = "public";
 const defaultMaxPlayers = 20;
 const defaultObjectCooldownSeconds = 30;
 const defaultGracePeriodSeconds = 12;
+const defaultMaxLiveObjectsPerPublicWorld = 120;
+const defaultMaxLiveObjectsPerPublicPlayer = 12;
+const defaultMaxPendingCreateJobsPerPublicPlayer = 1;
 const maxNicknameLength = 24;
 const maxIdLength = 80;
 const maxPromptLength = 500;
@@ -140,10 +143,14 @@ export const request_create_object = spacetimedb.reducer(
     const player = requireActivePlayer(ctx);
     const normalizedJobId = normalizeId("jobId", jobId);
     const normalizedPrompt = normalizePrompt(sourcePrompt);
+    const world = requireWorld(ctx, player.worldId);
 
     if (ctx.db.aiJob.jobId.find(normalizedJobId)) {
       throw new SenderError("AI job already exists");
     }
+    assertPublicCreationGuardrails(ctx, world, ctx.sender, {
+      includePendingJobs: true,
+    });
 
     ctx.db.aiJob.insert({
       jobId: normalizedJobId,
@@ -185,11 +192,14 @@ export const submit_ai_draft = spacetimedb.reducer(
     if (ctx.db.worldObject.objectId.find(normalizedObjectId)) {
       throw new SenderError("object already exists");
     }
+    const world = requireWorld(ctx, player.worldId);
+    assertPublicCreationGuardrails(ctx, world, job.playerIdentity, {
+      includePendingJobs: false,
+    });
 
     const sourceSpec = parseSourceSpecJson(sourceSpecJson);
     const builderSpec = parseBuilderSpecJson(builderSpecJson);
     assertArtifactMatchesSource(sourceSpec, builderSpec);
-    const world = requireWorld(ctx, player.worldId);
 
     ctx.db.worldObject.insert({
       objectId: normalizedObjectId,
@@ -536,6 +546,97 @@ function activePlayersInWorld(ctx: BackendCtx, worldId: bigint) {
     }
   }
   return count;
+}
+
+function assertPublicCreationGuardrails(
+  ctx: BackendCtx,
+  world: ReturnType<typeof requireWorld>,
+  playerIdentity: BackendCtx["sender"],
+  {
+    includePendingJobs,
+  }: {
+    includePendingJobs: boolean;
+  },
+) {
+  if (world.visibility !== "public") {
+    return;
+  }
+
+  if (
+    includePendingJobs &&
+    pendingCreateJobsForPlayer(ctx, world.worldId, playerIdentity) >=
+      defaultMaxPendingCreateJobsPerPublicPlayer
+  ) {
+    throw new SenderError("player has too many pending creation jobs");
+  }
+
+  if (liveObjectsInWorld(ctx, world.worldId) >= defaultMaxLiveObjectsPerPublicWorld) {
+    throw new SenderError("public world object cap reached");
+  }
+
+  if (
+    liveObjectsCreatedByPlayer(ctx, world.worldId, playerIdentity) >=
+    defaultMaxLiveObjectsPerPublicPlayer
+  ) {
+    throw new SenderError("player public object cap reached");
+  }
+}
+
+function pendingCreateJobsForPlayer(
+  ctx: BackendCtx,
+  worldId: bigint,
+  playerIdentity: BackendCtx["sender"],
+) {
+  let count = 0;
+  for (const job of ctx.db.aiJob.iter()) {
+    if (
+      job.worldId === worldId &&
+      job.jobType === "create" &&
+      job.status === "pending" &&
+      sameIdentity(job.playerIdentity, playerIdentity)
+    ) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function liveObjectsInWorld(ctx: BackendCtx, worldId: bigint) {
+  let count = 0;
+  for (const object of ctx.db.worldObject.iter()) {
+    if (object.worldId === worldId && isLiveObjectState(object.state)) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function liveObjectsCreatedByPlayer(
+  ctx: BackendCtx,
+  worldId: bigint,
+  playerIdentity: BackendCtx["sender"],
+) {
+  let count = 0;
+  for (const object of ctx.db.worldObject.iter()) {
+    if (
+      object.worldId === worldId &&
+      isLiveObjectState(object.state) &&
+      sameIdentity(object.createdBy, playerIdentity)
+    ) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function isLiveObjectState(state: string) {
+  return (
+    state === "draft" ||
+    state === "grace" ||
+    state === "public" ||
+    state === "edit_locked" ||
+    state === "cooldown"
+  );
 }
 
 function requireActivePlayer(ctx: BackendCtx) {

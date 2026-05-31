@@ -170,6 +170,13 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - `VITE_AI_WORKER_TIMEOUT_MS` controls request timeout, and worker failure responses surface as HUD/backend action errors
 - Fixture generation remains the default offline fallback when no worker URL is configured
 
+### Phase 2.18 — Backend Public Creation Guardrails ✅
+- Public rooms now reject a player's second pending create job before the first AI draft is submitted
+- Public create requests and draft submissions enforce prototype live-object caps per world and per creator
+- Deleted and archived objects do not count against live public-room caps
+- Private rooms remain more permissive while exact V1 public rate-limit numbers stay open for tuning
+- The two-client backend smoke now also covers pending-create rejection before the lock-contention flow continues
+
 ### Phase 3 — First Playable (Prototype 1)
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 
