@@ -13,7 +13,16 @@ export interface BackendPlayerPresence {
   nickname: string;
   role: string;
   presenceState: string;
+  transform: BackendPlayerTransform;
   isLocal: boolean;
+}
+
+export interface BackendPlayerTransform {
+  positionX: number;
+  positionY: number;
+  positionZ: number;
+  rotationYaw: number;
+  rotationPitch: number;
 }
 
 export interface BackendWorldPresence {
@@ -39,11 +48,14 @@ interface BackendPresenceBridgeConfig {
 
 export interface BackendPresenceBridge {
   getSnapshot(): BackendPresenceSnapshot;
+  updateLocalTransform(transform: BackendPlayerTransform): void;
   dispose(): void;
 }
 
 const tokenStorageKey = "vibe-world:spacetimedb-token";
 const heartbeatMs = 15_000;
+const movementThrottleMs = 180;
+const movementEpsilon = 0.025;
 
 export function createBackendPresenceBridge({
   onSnapshot,
@@ -60,6 +72,7 @@ export function createBackendPresenceBridge({
     onSnapshot(snapshot);
     return {
       getSnapshot: () => snapshot,
+      updateLocalTransform() {},
       dispose() {},
     };
   }
@@ -73,6 +86,11 @@ export function createBackendPresenceBridge({
   let subscription: SubscriptionHandle | null = null;
   let removeTableListeners: (() => void) | null = null;
   let heartbeatId: number | null = null;
+  let movementTimeoutId: number | null = null;
+  let lastMovementSentAt = 0;
+  let lastQueuedTransform: BackendPlayerTransform | null = null;
+  let pendingTransform: BackendPlayerTransform | null = null;
+  let joined = false;
 
   let snapshot = createBaseSnapshot({
     enabled: true,
@@ -105,6 +123,12 @@ export function createBackendPresenceBridge({
             emitCurrent();
             void conn.reducers
               .joinWorld({ nickname: backendConfig.nickname })
+              .then(() => {
+                if (disposed) return;
+                joined = true;
+                emitCurrent();
+                flushPendingTransform();
+              })
               .catch((error: unknown) => {
                 if (!disposed) {
                   status = "error";
@@ -157,6 +181,10 @@ export function createBackendPresenceBridge({
         window.clearInterval(heartbeatId);
         heartbeatId = null;
       }
+      if (movementTimeoutId !== null) {
+        window.clearTimeout(movementTimeoutId);
+        movementTimeoutId = null;
+      }
       try {
         subscription?.unsubscribe();
       } catch {
@@ -167,6 +195,24 @@ export function createBackendPresenceBridge({
         void connection.reducers.leaveWorld({}).finally(() => connection?.disconnect());
       } else {
         connection?.disconnect();
+      }
+    },
+    updateLocalTransform(transform: BackendPlayerTransform) {
+      if (disposed || !shouldQueueTransform(transform, lastQueuedTransform)) return;
+      lastQueuedTransform = cloneTransform(transform);
+      pendingTransform = cloneTransform(transform);
+
+      const elapsed = window.performance.now() - lastMovementSentAt;
+      if (elapsed >= movementThrottleMs) {
+        flushPendingTransform();
+        return;
+      }
+
+      if (movementTimeoutId === null) {
+        movementTimeoutId = window.setTimeout(() => {
+          movementTimeoutId = null;
+          flushPendingTransform();
+        }, movementThrottleMs - elapsed);
       }
     },
   };
@@ -181,7 +227,24 @@ export function createBackendPresenceBridge({
       nickname: backendConfig.nickname,
       localIdentityHex,
     });
+    if (snapshot.players.some((player) => player.isLocal && player.presenceState === "active")) {
+      joined = true;
+    }
     onSnapshot(snapshot);
+    flushPendingTransform();
+  }
+
+  function flushPendingTransform() {
+    if (!pendingTransform || !joined || !connection?.isActive) return;
+
+    const transform = pendingTransform;
+    pendingTransform = null;
+    lastMovementSentAt = window.performance.now();
+    void connection.reducers.movePlayer(transform).catch((error: unknown) => {
+      if (disposed) return;
+      message = errorMessage(error, "Movement update rejected");
+      emitCurrent();
+    });
   }
 }
 
@@ -344,8 +407,34 @@ function mapPlayer(
     nickname: player.nickname,
     role: player.role,
     presenceState: player.presenceState,
+    transform: {
+      positionX: player.positionX,
+      positionY: player.positionY,
+      positionZ: player.positionZ,
+      rotationYaw: player.rotationYaw,
+      rotationPitch: player.rotationPitch,
+    },
     isLocal: localIdentityHex === id,
   };
+}
+
+function shouldQueueTransform(
+  next: BackendPlayerTransform,
+  previous: BackendPlayerTransform | null,
+) {
+  if (!previous) return true;
+
+  return (
+    Math.abs(next.positionX - previous.positionX) > movementEpsilon ||
+    Math.abs(next.positionY - previous.positionY) > movementEpsilon ||
+    Math.abs(next.positionZ - previous.positionZ) > movementEpsilon ||
+    Math.abs(next.rotationYaw - previous.rotationYaw) > movementEpsilon ||
+    Math.abs(next.rotationPitch - previous.rotationPitch) > movementEpsilon
+  );
+}
+
+function cloneTransform(transform: BackendPlayerTransform): BackendPlayerTransform {
+  return { ...transform };
 }
 
 function comparePlayers(a: PlayerSession, b: PlayerSession) {

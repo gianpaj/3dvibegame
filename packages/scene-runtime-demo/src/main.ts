@@ -1,11 +1,13 @@
 import "./styles.css";
 
+import type { BackendPlayerTransform } from "./backend";
 import { createGenerationSessionController, scenarioCatalog } from "./core";
 import { createEditorCommands, createHud } from "./editor";
 import {
   createAuthorityBridge,
   createCameraRig,
   createLoop,
+  createPlayerPresenceRenderer,
   createRenderer,
   createScene,
 } from "./viewer";
@@ -34,6 +36,9 @@ const renderer = createRenderer(viewport);
 const sceneState = createScene();
 const cameraRig = createCameraRig(renderer.renderer);
 cameraRig.focus(sceneState.defaultFocus);
+const playerPresenceRenderer = createPlayerPresenceRenderer(sceneState.presenceRoot);
+let disposeBackendPresence = () => {};
+let publishBackendTransform = (_transform: BackendPlayerTransform) => {};
 
 const authorityBridge = createAuthorityBridge({
   draftRoot: sceneState.draftRoot,
@@ -48,6 +53,7 @@ const loop = createLoop({
 });
 loop.add(() => {
   cameraRig.controls.update();
+  publishBackendTransform(cameraRig.getPresenceTransform());
 });
 loop.start();
 
@@ -66,16 +72,20 @@ const hud = createHud({
     cameraRig.controls.enabled = !state.controlsLocked;
   },
 });
-let disposeBackendPresence = () => {};
 if (hasBackendConfig()) {
   void import("./backend")
     .then(({ createBackendPresenceBridge }) => {
       const backendPresence = createBackendPresenceBridge({
         onSnapshot(snapshot) {
           hud.setBackendPresence(snapshot);
+          playerPresenceRenderer.sync(snapshot);
         },
       });
       disposeBackendPresence = () => backendPresence.dispose();
+      publishBackendTransform = (transform) => {
+        backendPresence.updateLocalTransform(transform);
+      };
+      publishBackendTransform(cameraRig.getPresenceTransform());
     })
     .catch((error: unknown) => {
       hud.setContextMessage(errorMessage(error, "Backend bridge failed to load"));
@@ -108,6 +118,7 @@ function renderSnapshot() {
   const snapshot = generation.getSnapshot();
   const focusPoint = authorityBridge.renderDocument(snapshot.document);
   cameraRig.focus(focusPoint);
+  publishBackendTransform(cameraRig.getPresenceTransform());
   hud.setSnapshot(snapshot);
 }
 
@@ -116,6 +127,7 @@ window.addEventListener("beforeunload", () => {
   unsubscribe();
   generation.dispose();
   authorityBridge.dispose();
+  playerPresenceRenderer.dispose();
 });
 
 function hasBackendConfig() {

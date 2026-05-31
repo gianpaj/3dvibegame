@@ -29,13 +29,17 @@ export function createScene() {
   const referenceWorld = createReferenceWorld();
   const draftRoot = new THREE.Group();
   draftRoot.name = "runtime-drafts";
+  const presenceRoot = new THREE.Group();
+  presenceRoot.name = "remote-player-presence";
 
   scene.add(referenceWorld.group);
   scene.add(draftRoot);
+  scene.add(presenceRoot);
 
   return {
     scene,
     draftRoot,
+    presenceRoot,
     anchors: referenceWorld.anchors,
     defaultFocus: referenceWorld.defaultFocus,
   };
