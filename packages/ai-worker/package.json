@@ -20,6 +20,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@3dvibegame/ai-planning": "workspace:*",
     "@3dvibegame/scene-authority-ts": "workspace:*",
     "@ai-sdk/google": "^3.0.80",
     "ai": "^6.0.193",

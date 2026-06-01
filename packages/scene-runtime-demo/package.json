@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "smoke:live-archive-readonly": "node scripts/smoke-live-archive-readonly-browser.mjs",
+    "smoke:live-browser-gemini": "node scripts/smoke-live-browser-gemini-browser.mjs",
     "smoke:live-first-playable": "node scripts/smoke-live-first-playable-browser.mjs",
     "smoke:live-gemini-ai-worker": "node scripts/smoke-live-gemini-ai-worker-browser.mjs",
     "smoke:live-http-ai-worker": "node scripts/smoke-live-http-ai-worker-browser.mjs",
@@ -14,6 +15,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@3dvibegame/ai-planning": "workspace:*",
     "@3dvibegame/scene-authority-ts": "workspace:*",
     "@3dvibegame/scene-runtime-ts": "workspace:*",
     "spacetimedb": "2.0.3",

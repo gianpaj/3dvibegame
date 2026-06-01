@@ -1,20 +1,41 @@
 import type { AiWorkerClient } from "./fixtureAiWorkerClient";
+import { createBrowserGeminiAiWorkerClient } from "./browserGeminiAiWorkerClient";
 import { createFixtureAiWorkerClient } from "./fixtureAiWorkerClient";
 import { createHttpAiWorkerClient } from "./httpAiWorkerClient";
 
-export function createConfiguredAiWorkerClient(): AiWorkerClient {
+export interface ConfiguredAiWorkerClientOptions {
+  getBrowserGeminiApiKey?: () => string | null;
+}
+
+export function createConfiguredAiWorkerClient({
+  getBrowserGeminiApiKey,
+}: ConfiguredAiWorkerClientOptions = {}): AiWorkerClient {
   const fixtureClient = createFixtureAiWorkerClient();
   const workerUrl = stringEnv("VITE_AI_WORKER_URL");
-  if (!workerUrl) {
-    return fixtureClient;
-  }
+  const httpClient = workerUrl
+    ? createHttpAiWorkerClient({
+        url: workerUrl,
+        timeoutMs: numberEnv("VITE_AI_WORKER_TIMEOUT_MS") ?? undefined,
+      })
+    : null;
+  const browserGeminiClient = getBrowserGeminiApiKey
+    ? createBrowserGeminiAiWorkerClient({
+        apiKey: getBrowserGeminiApiKey,
+        model: stringEnv("VITE_BROWSER_GEMINI_MODEL") ?? undefined,
+        timeoutMs: numberEnv("VITE_AI_WORKER_TIMEOUT_MS") ?? undefined,
+      })
+    : null;
 
-  const httpClient = createHttpAiWorkerClient({
-    url: workerUrl,
-    timeoutMs: numberEnv("VITE_AI_WORKER_TIMEOUT_MS") ?? undefined,
-  });
   return {
-    createDraft: httpClient.createDraft,
+    createDraft(input) {
+      if (browserGeminiClient && getBrowserGeminiApiKey?.()?.trim()) {
+        return browserGeminiClient.createDraft(input);
+      }
+      if (httpClient) {
+        return httpClient.createDraft(input);
+      }
+      return fixtureClient.createDraft(input);
+    },
     createEdit: fixtureClient.createEdit,
   };
 }

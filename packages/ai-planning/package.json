@@ -1,0 +1,24 @@
+{
+  "name": "@3dvibegame/ai-planning",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@3dvibegame/scene-authority-ts": "workspace:*",
+    "zod": "^4.1.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

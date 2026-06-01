@@ -8,8 +8,24 @@ importers:
 
   .: {}
 
+  packages/ai-planning:
+    dependencies:
+      '@3dvibegame/scene-authority-ts':
+        specifier: workspace:*
+        version: link:../scene-authority-ts
+      zod:
+        specifier: ^4.1.8
+        version: 4.3.6
+    devDependencies:
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+
   packages/ai-worker:
     dependencies:
+      '@3dvibegame/ai-planning':
+        specifier: workspace:*
+        version: link:../ai-planning
       '@3dvibegame/scene-authority-ts':
         specifier: workspace:*
         version: link:../scene-authority-ts
@@ -51,6 +67,9 @@ importers:
 
   packages/scene-runtime-demo:
     dependencies:
+      '@3dvibegame/ai-planning':
+        specifier: workspace:*
+        version: link:../ai-planning
       '@3dvibegame/scene-authority-ts':
         specifier: workspace:*
         version: link:../scene-authority-ts

@@ -49,6 +49,7 @@ let publishBackendTransform = (_transform: BackendPlayerTransform) => {};
 let backendCommands: BackendLifecycleCommands | null = null;
 let backendPresenceSnapshot: BackendPresenceSnapshot | null = null;
 let backendSceneWorld: BackendPresenceSnapshot["authorityWorld"] = null;
+let browserGeminiApiKey: string | null = null;
 
 const authorityBridge = createAuthorityBridge({
   draftRoot: sceneState.draftRoot,
@@ -96,6 +97,12 @@ const hud = createHud({
     }
 
     editorCommands.dispatchAction(actionId);
+  },
+  onAiSettingsSubmit(input) {
+    browserGeminiApiKey = input.geminiApiKey;
+  },
+  onAiSettingsClear() {
+    browserGeminiApiKey = null;
   },
   onWorldSettingsSubmit(input) {
     if (!backendCommands?.canHandle()) {
@@ -160,7 +167,9 @@ if (hasBackendConfig()) {
         });
         backendCommands = createBackendLifecycleCommands(
           backendPresence,
-          createConfiguredAiWorkerClient(),
+          createConfiguredAiWorkerClient({
+            getBrowserGeminiApiKey: () => browserGeminiApiKey,
+          }),
         );
         disposeBackendPresence = () => backendPresence.dispose();
         publishBackendTransform = (transform) => {

@@ -53,10 +53,16 @@ export interface HudWorldLifecycleInput {
   reason: "manual_reset";
 }
 
+export interface HudAiSettingsInput {
+  geminiApiKey: string;
+}
+
 interface HudConfig {
   root: HTMLElement;
   onPromptSubmit(prompt: string): void;
   onAction(actionId: GenerationActionId): void;
+  onAiSettingsSubmit?(input: HudAiSettingsInput): void;
+  onAiSettingsClear?(): void;
   onWorldSettingsSubmit?(input: HudWorldSettingsInput): void;
   onWorldLifecycleAction?(input: HudWorldLifecycleInput): void;
   onInteractionStateChange?(state: HudInteractionState): void;
@@ -89,6 +95,8 @@ export function createHud({
   root,
   onPromptSubmit,
   onAction,
+  onAiSettingsSubmit,
+  onAiSettingsClear,
   onWorldSettingsSubmit,
   onWorldLifecycleAction,
   onInteractionStateChange,
@@ -105,6 +113,7 @@ export function createHud({
   let chatMessages: ChatTranscriptMessage[] = [];
   const seenStageEventIds = new Set<string>();
   let promptFocused = false;
+  let browserGeminiKeyConfigured = false;
 
   root.innerHTML = `
     <div class="hud-shell" data-role="hud-shell" data-panel="none" data-mode="play">
@@ -207,6 +216,24 @@ export function createHud({
     }
   });
 
+  root.addEventListener("submit", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLFormElement)) return;
+    if (target.dataset.role !== "ai-settings-form") return;
+
+    event.preventDefault();
+    try {
+      const input = readAiSettingsForm(target);
+      browserGeminiKeyConfigured = true;
+      target.reset();
+      onAiSettingsSubmit?.(input);
+      setContextMessage("Browser Gemini key configured for this tab.");
+      render();
+    } catch (error) {
+      setContextMessage(error instanceof Error ? error.message : "AI settings are invalid.");
+    }
+  });
+
   promptInput.addEventListener("focus", () => {
     promptFocused = true;
     emitInteractionState();
@@ -286,6 +313,12 @@ export function createHud({
         activePanel = "chat";
         render();
         promptInput.focus();
+        break;
+      case "clear-ai-key":
+        browserGeminiKeyConfigured = false;
+        onAiSettingsClear?.();
+        setContextMessage("Browser Gemini key cleared.");
+        render();
         break;
       default:
         break;
@@ -511,6 +544,7 @@ export function createHud({
         </div>
       </section>
 
+      ${renderAiSettingsControls(browserGeminiKeyConfigured)}
       ${renderWorldSettingsControls(latestBackendPresence)}
       ${renderWorldLifecycleControls(latestBackendPresence)}
 
@@ -906,6 +940,12 @@ function readWorldSettingsForm(form: HTMLFormElement): HudWorldSettingsInput {
   };
 }
 
+function readAiSettingsForm(form: HTMLFormElement): HudAiSettingsInput {
+  const data = new FormData(form);
+  const geminiApiKey = formStringField(data, "geminiApiKey");
+  return { geminiApiKey };
+}
+
 function formStringField(data: FormData, name: string) {
   const value = data.get(name);
   if (typeof value !== "string" || !value.trim()) {
@@ -1194,6 +1234,36 @@ function backendArtifactForSnapshot(
     backendPresence.objectArtifacts.find((artifact) => artifact.objectId === objectId) ??
     null
   );
+}
+
+function renderAiSettingsControls(browserGeminiKeyConfigured: boolean) {
+  return `
+    <section class="sheet-section">
+      <h2>AI provider</h2>
+      <form class="world-settings-form" data-role="ai-settings-form">
+        <div class="settings-field-grid">
+          <label class="settings-field">
+            <span>Gemini key</span>
+            <input
+              name="geminiApiKey"
+              type="password"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="${browserGeminiKeyConfigured ? "configured for this tab" : "AIza..."}"
+            />
+          </label>
+          <div class="settings-field">
+            <span>Browser mode</span>
+            <strong>${browserGeminiKeyConfigured ? "Gemini direct" : "Fixture or worker"}</strong>
+          </div>
+        </div>
+        <div class="world-lifecycle-actions">
+          <button type="submit">Use Gemini key</button>
+          <button type="button" data-action="clear-ai-key">Clear key</button>
+        </div>
+      </form>
+    </section>
+  `;
 }
 
 function renderWorldSettingsControls(

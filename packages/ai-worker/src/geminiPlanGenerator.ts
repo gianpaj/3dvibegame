@@ -2,6 +2,7 @@ import { google } from "@ai-sdk/google";
 import { generateText, Output } from "ai";
 
 import {
+  createPlanSystemPrompt,
   createPlanSchema,
   type CreatePlanGenerator,
 } from "./contracts.ts";
@@ -23,8 +24,7 @@ export function createGeminiPlanGenerator({
         maxOutputTokens: 900,
         output: Output.object({ schema: createPlanSchema }),
         prompt: `Player prompt: ${sourcePrompt}`,
-        system:
-          "You plan simple voxel objects for Vibe World. Return a small, safe, world-native create plan only. Do not request terrain edits, accounts, economy, combat, scripting, raw meshes, or destructive actions.",
+        system: createPlanSystemPrompt,
         temperature,
       });
 

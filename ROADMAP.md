@@ -370,6 +370,13 @@ Sub-phases:
 - The only remaining object button is `Release`, treated as a lifecycle reducer action rather than an LLM-authored creative action
 - Live browser smokes now assert released objects do not expose fixed move/rotate/scale/refine buttons or the old `data-refine` / `data-prompt` affordances
 
+### Phase 4.5 — Shared AI Planning & Browser Gemini BYOK ✅
+- Extracted the create-plan schema, Gemini structured-output schema, system prompt, and deterministic plan-to-builder conversion into `@3dvibegame/ai-planning`
+- Refactored the Node AI worker to consume the shared package instead of owning browser-incompatible converter logic
+- Added a browser Gemini AI-worker client that calls `generateContent` directly with a test user's key, validates the returned plan, and compiles it through the shared converter
+- Added HUD Settings controls for a tab-memory Gemini key; no key is sent to SpacetimeDB and `Release` remains the only lifecycle button
+- Added `smoke:live-browser-gemini` to prove direct browser Gemini create, backend draft submission, release, and completed create-job rows without starting the external worker
+
 ### Phase 5 — V1 Hardening & Launch
 - Rate limiting and abuse guardrails
 - World settings UI for hosts (presets, reset schedules, permission toggles)
