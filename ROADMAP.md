@@ -282,6 +282,12 @@ Sub-phases:
 - Public-world destructive delete remains rejected during the flow, preserving non-destructive remixing
 - The gate uses two anonymous players so creator and remixer roles exercise real sender permissions
 
+### Phase 3.4 — Live First-Playable Browser Smoke ✅
+- Added `smoke:live-first-playable` for the runtime demo live path with a temporary SpacetimeDB backend, Vite server, and Chromium CDP driver
+- The smoke verifies browser-visible live connection, prompt-to-grace release affordance, public release, remix to version 2, and final released UI state
+- Browser prompt-to-draft elapsed time is logged so local playtest runs have a repeatable latency signal
+- The gate fails on browser runtime or console errors while avoiding a new browser automation dependency
+
 ### Phase 4 — Multiplayer Validation (Prototype 2)
 - Multi-host world network (federated worlds model)
 - Trusted builder role (host-elevated players)
