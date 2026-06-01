@@ -270,6 +270,12 @@ Sub-phases:
 - HUD room status reports latest archive cycle and frozen object count when showing archive mode
 - Live backend browser smoke verified reset archive rendering and read-only HUD state
 
+### Phase 3.2 — 20-Player Replay Smoke ✅
+- Multiplayer replay smoke now allows the V1 target of 20 anonymous players
+- Added `smoke:multiplayer-20` as an explicit backend verification gate
+- The 20-player run covers join, active presence rows, movement deltas, reconnect nickname refresh, object create/release deltas, and edit-lock contention
+- This begins turning the Phase 3 success criteria into repeatable local gates rather than temporary manual checks
+
 ### Phase 4 — Multiplayer Validation (Prototype 2)
 - Multi-host world network (federated worlds model)
 - Trusted builder role (host-elevated players)

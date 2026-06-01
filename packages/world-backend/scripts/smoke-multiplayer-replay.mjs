@@ -113,8 +113,8 @@ function readPlayerCount() {
   if (!raw) return 4;
 
   const parsed = Number(raw);
-  if (!Number.isInteger(parsed) || parsed < 3 || parsed > 12) {
-    throw new Error("VIBE_WORLD_SMOKE_PLAYERS must be an integer from 3 to 12");
+  if (!Number.isInteger(parsed) || parsed < 3 || parsed > 20) {
+    throw new Error("VIBE_WORLD_SMOKE_PLAYERS must be an integer from 3 to 20");
   }
   return parsed;
 }

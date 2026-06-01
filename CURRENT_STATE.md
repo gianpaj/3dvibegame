@@ -33,6 +33,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Runtime demo Debug panel now exposes backend canonical source specs and derived renderer artifacts for the selected live object without feeding them back into render authority state.
 - World backend now has a repeatable two-client lock-contention smoke that uses separate server-issued anonymous identities for Alice and Bob.
 - World backend now has a configurable multiplayer replay smoke for joins, movement presence, reconnect, object deltas, and lock contention.
+- World backend now has an explicit 20-player replay smoke for the Phase 3 target concurrency gate.
 - Public-room object creation now rejects duplicate pending create jobs and enforces prototype live-object caps per world and per creator.
 - Backend archive/reset reducers now snapshot live objects into immutable archive rows, wipe live objects on reset, clear locks, and fail pending AI jobs.
 - Runtime demo live mode now surfaces backend archive/reset rows in bridge snapshots and the HUD Debug panel.
@@ -60,7 +61,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 ## Next Slices
 
 1. Add a repeatable archive read-only smoke when a stable browser harness is available.
-2. Continue Phase 3 toward first-playable stability/playtest coverage.
+2. Add first-playable playtest checks around prompt-to-draft latency and release/remix feel.
 
 ## Later
 
@@ -87,6 +88,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Backend artifact debug visibility typecheck/build: passing as of 2026-05-31.
 - Two-client backend lock-contention smoke: `pnpm --filter @3dvibegame/world-backend smoke:lock-contention` passing as of 2026-05-31.
 - Multiplayer backend replay smoke: `pnpm --filter @3dvibegame/world-backend smoke:multiplayer-replay` passing as of 2026-05-31.
+- 20-player backend replay smoke: `pnpm --filter @3dvibegame/world-backend smoke:multiplayer-20` passing as of 2026-06-01.
 - Backend archive/reset smoke: `pnpm --filter @3dvibegame/world-backend smoke:archive-reset` passing as of 2026-05-31.
 - Backend AI job failure smoke: `pnpm --filter @3dvibegame/world-backend smoke:ai-job-failure` passing as of 2026-05-31.
 - Backend world settings smoke: `pnpm --filter @3dvibegame/world-backend smoke:world-settings` passing as of 2026-05-31.
