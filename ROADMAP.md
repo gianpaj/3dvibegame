@@ -351,6 +351,12 @@ Sub-phases:
 - Added `smoke:multi-world-hosting` for two host-created worlds, selected visitor join, default-world join preservation, host role assignment, per-world object creation, and cross-world edit rejection
 - This proves the first multi-host backend slice while leaving persistent ownership, discovery ranking, and room-management UI for the next Phase 4 increments
 
+### Phase 4.2 — Live Gemini Browser Create Smoke ✅
+- Added `smoke:live-gemini-ai-worker` for the runtime demo live path with a temporary SpacetimeDB backend, real Gemini-backed AI worker, Vite server, and Chromium browser
+- The smoke loads a local repo-root `.env` when present and skips cleanly when `GOOGLE_GENERATIVE_AI_API_KEY` is unavailable
+- Browser prompt submission now has a keyed real-LLM gate that reaches backend grace state, releases the generated object, and verifies the backend create job completed
+- A local keyed run on 2026-06-01 created a `tree` object and reached draft state in roughly 2.6 seconds
+
 ### Phase 5 — V1 Hardening & Launch
 - Rate limiting and abuse guardrails
 - World settings UI for hosts (presets, reset schedules, permission toggles)
