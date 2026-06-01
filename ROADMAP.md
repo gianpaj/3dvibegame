@@ -276,6 +276,12 @@ Sub-phases:
 - The 20-player run covers join, active presence rows, movement deltas, reconnect nickname refresh, object create/release deltas, and edit-lock contention
 - This begins turning the Phase 3 success criteria into repeatable local gates rather than temporary manual checks
 
+### Phase 3.3 — First-Playable Flow Smoke ✅
+- Added `smoke:first-playable-flow` for the core V1 story: prompt request, AI draft submit, grace transform, release, public remix, cooldown, and final public return
+- The smoke records local prompt-to-draft elapsed time for the reducer/fixture path
+- Public-world destructive delete remains rejected during the flow, preserving non-destructive remixing
+- The gate uses two anonymous players so creator and remixer roles exercise real sender permissions
+
 ### Phase 4 — Multiplayer Validation (Prototype 2)
 - Multi-host world network (federated worlds model)
 - Trusted builder role (host-elevated players)

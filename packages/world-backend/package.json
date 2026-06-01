@@ -7,6 +7,7 @@
     "build": "spacetime build --module-path .",
     "smoke:archive-reset": "node scripts/smoke-archive-reset.mjs",
     "smoke:ai-job-failure": "node scripts/smoke-ai-job-failure.mjs",
+    "smoke:first-playable-flow": "node scripts/smoke-first-playable-flow.mjs",
     "smoke:lock-contention": "node scripts/smoke-lock-contention.mjs",
     "smoke:multiplayer-20": "VIBE_WORLD_SMOKE_PLAYERS=20 node scripts/smoke-multiplayer-replay.mjs",
     "smoke:multiplayer-replay": "node scripts/smoke-multiplayer-replay.mjs",
