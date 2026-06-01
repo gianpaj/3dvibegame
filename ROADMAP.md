@@ -240,7 +240,7 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - HUD Debug panel surfaced a failed backend `ai_job` row with `generation_failed`
 - Browser smoke used `Snapshot world` and verified snapshot metrics advanced to cycle `#1` without console errors
 
-### Phase 3 — First Playable (Prototype 1) 🔄 *(current)*
+### Phase 3 — First Playable (Prototype 1) ✅
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 
 Sub-phases:
@@ -304,7 +304,7 @@ Sub-phases:
 - Live browser smokes show the fixture-backed path is mechanically responsive: recent local runs reached grace in roughly 115-123 ms
 - That latency is not real AI latency; it only validates browser, reducer, fixture-worker, and sync overhead
 - The grace/release/remix loop is legible in the HUD: draft ready, release, public refine, and v2 public return all have visible states
-- Main feel risks remain: avatar-specific copy still dominates the world-object flow, transforms are button-level rather than direct manipulation, and prompt variety is still fixture-limited
+- Main feel risks remain: transforms are button-level rather than direct manipulation, prompt variety is still fixture-limited, and the avatar-specific copy needs a world-object pass
 - The next product-risk slice should connect a real create-only external AI worker or run human playtests with varied prompt outputs before treating prompt-to-feel as validated
 
 ### Phase 3.8 — Create-Only External AI Worker ✅
@@ -330,7 +330,12 @@ Sub-phases:
 - The suite covers first-playable flow, 20-player replay, lock contention, private destructive editing, archive/reset, AI job failure, world settings, fake AI worker create, optional Gemini live smoke, and live browser flows
 - This gives Phase 3 one command for pre-close regression checks while preserving the focused smoke scripts for debugging
 
-### Phase 4 — Multiplayer Validation (Prototype 2)
+### Phase 3.12 — World-Object HUD Copy Polish ✅
+- Replaced the most visible avatar-specific HUD labels with object/world wording in the room title, action dock, build panel subtitle, local room status, and player status copy
+- Live first-playable browser smoke now reaches the released remix state with `Object actions`, keeping the first playable framed as world object creation rather than avatar editing
+- Direct manipulation remains a later playtest polish candidate, but Phase 3 now has the reducer, browser, AI-worker, and copy gates needed to close the prototype
+
+### Phase 4 — Multiplayer Validation (Prototype 2) 🔄 *(current)*
 - Multi-host world network (federated worlds model)
 - Trusted builder role (host-elevated players)
 - World discovery — surface engaging worlds using player count, retention, and moderation stability

@@ -83,9 +83,9 @@ const actionLabels: Record<GenerationActionId, string> = {
 const actionDescriptions: Record<GenerationActionId, string> = {
   refine_silhouette: "Broaden the stance and make the character read clearly at distance.",
   add_ornament: "Add the chest rune and shoulder details for stronger identity.",
-  nudge_draft: "Shift the avatar slightly in the preview.",
-  rotate_draft: "Turn the avatar to inspect its silhouette.",
-  scale_draft: "Increase the avatar scale a little.",
+  nudge_draft: "Shift the draft object slightly in the preview.",
+  rotate_draft: "Turn the draft object to inspect its silhouette.",
+  scale_draft: "Increase the draft object scale a little.",
   release_object: "Publish the draft so refine steps can start.",
 };
 
@@ -141,7 +141,7 @@ export function createHud({
         <div class="room-card">
           <div class="room-card__mark" aria-hidden="true">3D</div>
           <div class="room-card__copy">
-            <strong>Avatar Grove</strong>
+            <strong>Vibe Grove</strong>
             <span data-role="room-subtitle">Private multiplayer room</span>
           </div>
         </div>
@@ -646,7 +646,7 @@ export function createHud({
     return `
       <div class="dock-card dock-card--actions">
         <div>
-          <span>Avatar actions</span>
+          <span>Object actions</span>
           <strong>${escapeHtml(actionLabels[snapshot.availableActions[0]])}</strong>
           <p>${escapeHtml(actionDescriptions[snapshot.availableActions[0]])}</p>
         </div>
@@ -861,7 +861,7 @@ function roomPlayers(
       initials: "YOU",
       name: "You",
       detail: "Creator profile",
-      status: snapshot.object ? `avatar v${snapshot.object.version}` : "setting up",
+      status: snapshot.object ? `object v${snapshot.object.version}` : "setting up",
       state: snapshot.stage === "failed" ? "blocked" : "active",
     },
     {
@@ -911,14 +911,14 @@ function roomSubtitleLabel(
   }
 
   return snapshot.object
-    ? `Private room - avatar v${snapshot.object.version} - ${snapshot.object.state}`
+    ? `Private room - object v${snapshot.object.version} - ${snapshot.object.state}`
     : "Private multiplayer room - local authority";
 }
 
 function sheetSubtitle(panel: HudPanel, snapshot: GenerationSnapshot) {
   switch (panel) {
     case "build":
-      return snapshot.object ? `Avatar v${snapshot.object.version}` : "Start from a prompt";
+      return snapshot.object ? `Object v${snapshot.object.version}` : "Start from a prompt";
     case "chat":
       return "Room conversation and AI turns";
     case "players":
@@ -1026,7 +1026,7 @@ function unavailableActionKicker(snapshot: GenerationSnapshot) {
     case "deleted":
       return "Removed object";
     case "public":
-      return "Avatar profile";
+      return "Object profile";
     case "draft":
       return "Draft";
     case undefined:

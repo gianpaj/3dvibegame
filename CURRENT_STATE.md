@@ -8,7 +8,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 - `vibe-world` is the product and architecture source of truth: multiplayer rooms, prompt-first creation, object lifecycle, SpacetimeDB authority, and AI worker boundaries.
 - `3dvibegame` is the active TypeScript app: Three.js playfield, fixture-backed generation, authority reducers, voxel builder compilation, and the current HUD prototype.
-- The current playable wedge is `prompt -> staged generation -> compiled avatar/object -> grace/refine/release -> released object`.
+- The Phase 3 playable wedge is `prompt -> external-or-fixture AI worker -> compiled object -> grace/refine/release -> released object`.
 - Multiplayer UI is still prototype state. Presence can read the backend, publish local movement, render remote player markers, render subscribed backend object rows, and route prompt/object lifecycle actions to reducers when Vite SpacetimeDB env vars are configured; HUD workflow, local chat transcript, and local generation feedback are explicit, while invite and room management remain local/static.
 
 ## Completed
@@ -43,6 +43,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Runtime demo live browser smokes now cover `VITE_AI_WORKER_URL` by running the fake external AI worker through the HTTP create path.
 - AI worker now has an optional Gemini live smoke that runs only when `GOOGLE_GENERATIVE_AI_API_KEY` is set and otherwise skips cleanly.
 - Root `phase3:smoke` now aggregates the backend, AI-worker, and live browser Phase 3 gates.
+- The most visible live HUD labels now use object/world wording instead of avatar-editor wording.
 - Public-room object creation now rejects duplicate pending create jobs and enforces prototype live-object caps per world and per creator.
 - Backend archive/reset reducers now snapshot live objects into immutable archive rows, wipe live objects on reset, clear locks, and fail pending AI jobs.
 - Runtime demo live mode now surfaces backend archive/reset rows in bridge snapshots and the HUD Debug panel.
@@ -63,14 +64,13 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 ## In Progress
 
-- Multiplayer-style HUD over the existing 3D playfield.
-- Avatar creation/refine vertical slice.
-- Consolidate dirty worktree changes into clear slices: docs, HUD/avatar code, fixtures, and scripts.
+- Phase 4 multiplayer validation planning.
+- Decide the first Phase 4 implementation slice: multi-host world network, trusted builder role, or discovery/archive validation.
 
 ## Next Slices
 
-1. Decide whether Phase 3 is ready to close or needs a small UX copy/direct-manipulation polish pass.
-2. Start Phase 4 multiplayer validation planning if Phase 3 is accepted.
+1. Plan Phase 4.1 around the smallest multiplayer-validation increment.
+2. Keep direct-manipulation move/rotate/scale polish as a playtest-driven follow-up, not a Phase 3 blocker.
 
 ## Later
 
@@ -107,7 +107,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - 20-player backend replay smoke: `pnpm --filter @3dvibegame/world-backend smoke:multiplayer-20` passing as of 2026-06-01.
 - First-playable backend flow smoke: `pnpm --filter @3dvibegame/world-backend smoke:first-playable-flow` passing as of 2026-06-01.
 - Private destructive editing smoke: `pnpm --filter @3dvibegame/world-backend smoke:private-destructive-edit` passing as of 2026-06-01.
-- Live first-playable browser smoke: `pnpm --filter @3dvibegame/scene-runtime-demo smoke:live-first-playable` passing as of 2026-06-01.
+- Live first-playable browser smoke: `pnpm --filter @3dvibegame/scene-runtime-demo smoke:live-first-playable` passing with object-worded HUD actions as of 2026-06-01.
 - Live archive read-only browser smoke: `pnpm --filter @3dvibegame/scene-runtime-demo smoke:live-archive-readonly` passing as of 2026-06-01.
 - Backend archive/reset smoke: `pnpm --filter @3dvibegame/world-backend smoke:archive-reset` passing as of 2026-05-31.
 - Backend AI job failure smoke: `pnpm --filter @3dvibegame/world-backend smoke:ai-job-failure` passing as of 2026-05-31.
