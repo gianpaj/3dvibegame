@@ -156,7 +156,7 @@ if (hasBackendConfig()) {
             playerPresenceRenderer.sync(snapshot);
             backendPresenceSnapshot = snapshot;
             backendSceneWorld =
-              snapshot.status === "connected" ? snapshot.authorityWorld : null;
+              snapshot.status === "connected" ? visibleBackendWorld(snapshot) : null;
             renderSnapshot();
           },
         });
@@ -213,6 +213,12 @@ function renderSnapshot() {
   cameraRig.focus(focusPoint);
   publishBackendTransform(cameraRig.getPresenceTransform());
   hud.setSnapshot(snapshot);
+}
+
+function visibleBackendWorld(snapshot: BackendPresenceSnapshot) {
+  const liveWorld = snapshot.authorityWorld;
+  if (liveWorld?.objects.length) return liveWorld;
+  return snapshot.archiveAuthorityWorld;
 }
 
 window.addEventListener("beforeunload", () => {

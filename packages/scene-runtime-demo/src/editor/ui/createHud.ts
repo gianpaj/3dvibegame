@@ -893,8 +893,16 @@ function roomSubtitleLabel(
   backendPresence: BackendPresenceSnapshot | null,
 ) {
   if (backendPresence?.enabled && backendPresence.world) {
-    const objectCount = backendPresence.authorityWorld?.objects.length ?? 0;
-    const objectLabel = objectCount === 1 ? "1 object" : `${objectCount} objects`;
+    const liveCount = backendPresence.authorityWorld?.objects.length ?? 0;
+    const archiveCount = backendPresence.archiveAuthorityWorld?.objects.length ?? 0;
+    const objectLabel =
+      liveCount > 0
+        ? liveCount === 1
+          ? "1 object"
+          : `${liveCount} objects`
+        : archiveCount > 0
+          ? `archive #${backendPresence.worldSnapshots[0]?.cycleNumber ?? "?"} - ${archiveCount} frozen`
+          : "0 objects";
     return `${backendPresence.world.visibility} room - ${backendPresence.onlineCount}/${backendPresence.world.maxPlayers} online - ${objectLabel}`;
   }
 

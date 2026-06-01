@@ -6,7 +6,12 @@ import type {
   BuilderSpec,
 } from "@3dvibegame/scene-authority-ts";
 
-import type { World, WorldObject } from "./module_bindings/types";
+import type {
+  SnapshotObject,
+  World,
+  WorldObject,
+  WorldSnapshot,
+} from "./module_bindings/types";
 
 export function mapBackendAuthorityWorld(
   world: World,
@@ -23,6 +28,38 @@ export function mapBackendAuthorityWorld(
     settings: {
       visibility: world.visibility === "private" ? "private" : "public",
       destructive_edits_enabled: world.destructiveEditsEnabled,
+      object_cooldown_seconds: world.objectCooldownSeconds,
+      protected_spawn_enabled: true,
+    },
+    jobs: [],
+    objects,
+    events: [],
+  };
+}
+
+export function mapBackendArchiveAuthorityWorld(
+  world: World,
+  snapshot: WorldSnapshot | null,
+  snapshotObjects: Iterable<SnapshotObject>,
+): AuthorityWorld | null {
+  if (!snapshot || snapshot.worldId !== world.worldId) return null;
+
+  const objects = Array.from(snapshotObjects)
+    .filter(
+      (object) =>
+        object.worldId === world.worldId && object.snapshotId === snapshot.snapshotId,
+    )
+    .map(mapSnapshotObject)
+    .filter(isPresent)
+    .sort(compareAuthorityObjects);
+
+  if (!objects.length) return null;
+
+  return {
+    world_id: `${world.worldId.toString()}:archive:${snapshot.snapshotId}`,
+    settings: {
+      visibility: world.visibility === "private" ? "private" : "public",
+      destructive_edits_enabled: false,
       object_cooldown_seconds: world.objectCooldownSeconds,
       protected_spawn_enabled: true,
     },
@@ -57,6 +94,32 @@ function mapWorldObject(object: WorldObject): AuthorityWorld["objects"][number] 
     },
     cooldown_remaining_seconds: object.cooldownRemainingSeconds,
     grace_remaining_seconds: object.graceRemainingSeconds,
+  };
+}
+
+function mapSnapshotObject(
+  object: SnapshotObject,
+): AuthorityWorld["objects"][number] | null {
+  const builderSpec = parseBuilderSpec(object.builderSpecJson);
+  if (!builderSpec) return null;
+
+  return {
+    object_id: object.snapshotObjectId,
+    world_id: object.worldId.toString(),
+    state: "archived",
+    version: object.version,
+    created_by: object.createdBy.toHexString(),
+    latest_editor: object.latestEditor.toHexString(),
+    grace_owner_id: null,
+    lock_owner_id: null,
+    builder_spec: builderSpec,
+    transform: {
+      position: [object.positionX, object.positionY, object.positionZ],
+      rotation: [object.rotationX, object.rotationY, object.rotationZ],
+      scale: [object.scaleX, object.scaleY, object.scaleZ],
+    },
+    cooldown_remaining_seconds: 0,
+    grace_remaining_seconds: 0,
   };
 }
 

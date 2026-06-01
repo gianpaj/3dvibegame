@@ -42,7 +42,7 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Malformed / out-of-bounds builder spec rejection covered
 - Tests now serve as the executable contract for future SpacetimeDB reducers
 
-### Phase 2 — Contracts & Backend Definition 🔄 *(current)*
+### Phase 2 — Contracts & Backend Definition ✅
 - Finalize `prompt-ir-spec` (constrained prompt IR)
 - Finalize `reducer-api-spec` (authoritative backend surface)
 - Finalize `spacetimedb-v1-schema` (multiplayer schema)
@@ -240,7 +240,7 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - HUD Debug panel surfaced a failed backend `ai_job` row with `generation_failed`
 - Browser smoke used `Snapshot world` and verified snapshot metrics advanced to cycle `#1` without console errors
 
-### Phase 3 — First Playable (Prototype 1)
+### Phase 3 — First Playable (Prototype 1) 🔄 *(current)*
 **Goal:** One small hosted voxel world where players can prompt rough-draft objects into existence.
 
 Sub-phases:
@@ -261,6 +261,14 @@ Sub-phases:
 - Single-editor locking on public objects
 - Edit cooldowns
 - Coherent latency / sync
+
+### Phase 3.1 — Archive Read-Only Presentation ✅
+- Latest `world_snapshot` rows now project into an archive-only `AuthorityWorld` when no live renderable objects remain after reset
+- Snapshot objects render with archived state, no edit actions, and no destructive reducer paths
+- Runtime renderer includes archived objects while continuing to exclude deleted live rows
+- Archived objects use subdued translucent materials plus an archive ring so reset history is visually distinct from live editable objects
+- HUD room status reports latest archive cycle and frozen object count when showing archive mode
+- Live backend browser smoke verified reset archive rendering and read-only HUD state
 
 ### Phase 4 — Multiplayer Validation (Prototype 2)
 - Multi-host world network (federated worlds model)

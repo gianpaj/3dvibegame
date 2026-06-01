@@ -1,6 +1,6 @@
 # Current State
 
-Last updated: 2026-05-31
+Last updated: 2026-06-01
 
 Use this file as the short project tracker. Keep long reasoning in `docs/plans/` and `/Users/gianpaj_it/github/gianpaj/ideas/vibe-world`.
 
@@ -36,6 +36,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Public-room object creation now rejects duplicate pending create jobs and enforces prototype live-object caps per world and per creator.
 - Backend archive/reset reducers now snapshot live objects into immutable archive rows, wipe live objects on reset, clear locks, and fail pending AI jobs.
 - Runtime demo live mode now surfaces backend archive/reset rows in bridge snapshots and the HUD Debug panel.
+- Runtime demo now renders the latest archive snapshot as a read-only scene when reset leaves no live renderable objects.
 - Backend AI jobs can now be explicitly failed or expired so stale worker responses are rejected and pending-job guardrails unblock.
 - Host-level world settings can now tune visibility, player caps, live-object caps, pending-create caps, cooldowns, grace periods, and destructive edits.
 - Runtime demo Settings panel now submits host-facing world settings updates through the backend reducer.
@@ -58,8 +59,8 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 ## Next Slices
 
-1. Automate live backend HUD smoke coverage when a repeatable browser harness is available.
-2. Start Phase 3 archive read-only presentation after reset.
+1. Add a repeatable archive read-only smoke when a stable browser harness is available.
+2. Continue Phase 3 toward first-playable stability/playtest coverage.
 
 ## Later
 
@@ -94,6 +95,8 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Demo snapshot/reset controls typecheck/build: passing as of 2026-05-31.
 - Browser settings-panel smoke in local fixture mode: passing as of 2026-05-31.
 - Live backend HUD smoke verified backend connection, settings controls, failed AI job debug, and snapshot cycle `#1` as of 2026-05-31.
+- Archive read-only presentation typecheck/build: passing as of 2026-06-01.
+- Live archive render smoke verified `archive #1 - 1 frozen` and read-only archived object state as of 2026-06-01.
 - Public creation guardrail smoke coverage: pending duplicate create rejection passing as of 2026-05-31.
 - Backend object delta rendering adapter typecheck/build: passing as of 2026-05-31.
 - Temporary live backend render smoke: seeded one `world_object` row and browser HUD showed `public room - 1/20 online - 1 object` as of 2026-05-31.

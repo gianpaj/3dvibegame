@@ -19,7 +19,7 @@ export function createBackendGenerationSnapshot(
   backendSnapshot: BackendPresenceSnapshot,
   fallback: GenerationSnapshot,
 ): GenerationSnapshot {
-  const world = backendSnapshot.authorityWorld ?? fallback.world;
+  const world = visibleBackendWorld(backendSnapshot) ?? fallback.world;
   const object = selectBackendObject(backendSnapshot);
   const aiJob = object ? null : selectBackendAiJob(backendSnapshot);
   const stage = object ? stageForBackendObject(object) : stageForBackendAiJob(aiJob);
@@ -90,7 +90,7 @@ function selectBackendAiJob(
 export function selectBackendObject(
   backendSnapshot: BackendPresenceSnapshot,
 ): BackendAuthorityObject | null {
-  const world = backendSnapshot.authorityWorld;
+  const world = visibleBackendWorld(backendSnapshot);
   if (!world?.objects.length) return null;
 
   const localPlayerId = localBackendPlayerId(backendSnapshot);
@@ -109,6 +109,12 @@ export function selectBackendObject(
     objects[0] ??
     null
   );
+}
+
+function visibleBackendWorld(backendSnapshot: BackendPresenceSnapshot) {
+  const liveWorld = backendSnapshot.authorityWorld;
+  if (liveWorld?.objects.length) return liveWorld;
+  return backendSnapshot.archiveAuthorityWorld ?? liveWorld;
 }
 
 export function localBackendPlayerId(backendSnapshot: BackendPresenceSnapshot) {

@@ -13,6 +13,6 @@ export function listRenderableSceneObjects(document: SceneDocument) {
   return document.root_object_ids
     .map((objectId) => document.objects_by_id[objectId])
     .filter((record): record is SceneObjectRecord =>
-      Boolean(record && record.authority.state !== "deleted" && record.authority.state !== "archived"),
+      Boolean(record && record.authority.state !== "deleted"),
     );
 }

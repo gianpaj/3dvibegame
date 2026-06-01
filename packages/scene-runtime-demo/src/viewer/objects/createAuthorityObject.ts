@@ -30,7 +30,7 @@ export function createAuthorityObject({
     instanceGroup.scale.set(...object.transform.scale);
 
     object.builder_spec.parts.forEach((part, partIndex) => {
-      const partMesh = createPartMesh(part, partIndex);
+      const partMesh = createPartMesh(part, partIndex, object.state);
       partMesh.position.copy(resolvePartPosition(object.builder_spec.parts, part, partIndex));
       if (part.local_rotation) {
         partMesh.rotation.set(...part.local_rotation);
@@ -65,6 +65,12 @@ export function createAuthorityObject({
     const stateRing = createStateRing(object.state, ringMetrics.radius);
     stateRing.position.set(focusPoint.x, ringMetrics.y, focusPoint.z);
     group.add(stateRing);
+  }
+
+  if (object.state === "archived") {
+    const archiveRing = createArchiveRing(ringMetrics.radius);
+    archiveRing.position.set(focusPoint.x, ringMetrics.y, focusPoint.z);
+    group.add(archiveRing);
   }
 
   return { group, focusPoint };
@@ -109,9 +115,13 @@ function resolvePartPosition(
   return new THREE.Vector3(0, yBase + partIndex * 0.02, 0);
 }
 
-function createPartMesh(part: BuilderPart, partIndex: number) {
+function createPartMesh(
+  part: BuilderPart,
+  partIndex: number,
+  state: AuthorityObject["state"],
+) {
   const geometry = createGeometry(part);
-  const material = createMaterial(part.material, part.modifiers);
+  const material = createMaterial(part.material, part.modifiers, state);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
@@ -132,16 +142,28 @@ function createGeometry(part: BuilderPart) {
   }
 }
 
-function createMaterial(name: string, modifiers: string[]) {
+function createMaterial(
+  name: string,
+  modifiers: string[],
+  state: AuthorityObject["state"],
+) {
   const color = resolveMaterialColor(name);
   const glowing = modifiers.includes("soft_glow") || name === "neon";
+  const archiveColor = new THREE.Color(color).lerp(new THREE.Color("#d7dfdb"), 0.56);
 
   return new THREE.MeshStandardMaterial({
-    color,
-    roughness: name === "glass_block" ? 0.2 : 0.84,
-    metalness: glowing ? 0.08 : 0.03,
-    emissive: glowing ? new THREE.Color(color).multiplyScalar(0.35) : new THREE.Color("#000000"),
-    emissiveIntensity: glowing ? 0.5 : 0,
+    color: state === "archived" ? archiveColor : color,
+    roughness: state === "archived" ? 0.92 : name === "glass_block" ? 0.2 : 0.84,
+    metalness: state === "archived" ? 0.01 : glowing ? 0.08 : 0.03,
+    emissive:
+      state === "archived"
+        ? new THREE.Color("#9fb4ad").multiplyScalar(0.18)
+        : glowing
+          ? new THREE.Color(color).multiplyScalar(0.35)
+          : new THREE.Color("#000000"),
+    emissiveIntensity: state === "archived" ? 0.2 : glowing ? 0.5 : 0,
+    transparent: state === "archived",
+    opacity: state === "archived" ? 0.62 : 1,
   });
 }
 
@@ -173,6 +195,24 @@ function createSelectionRing(radius: number) {
       opacity: 0.9,
       roughness: 0.65,
       metalness: 0.02,
+    }),
+  );
+  ring.rotation.x = Math.PI / 2;
+  return ring;
+}
+
+function createArchiveRing(radius: number) {
+  const color = "#d7dfdb";
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(radius, Math.max(radius * 0.026, 0.035), 10, 64),
+    new THREE.MeshStandardMaterial({
+      color,
+      emissive: "#7f9690",
+      emissiveIntensity: 0.12,
+      transparent: true,
+      opacity: 0.72,
+      roughness: 0.9,
+      metalness: 0.01,
     }),
   );
   ring.rotation.x = Math.PI / 2;

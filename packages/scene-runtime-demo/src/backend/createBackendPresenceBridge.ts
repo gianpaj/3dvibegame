@@ -9,7 +9,10 @@ import type {
   WorldObject,
   WorldSnapshot,
 } from "./module_bindings/types";
-import { mapBackendAuthorityWorld } from "./mapBackendAuthorityWorld";
+import {
+  mapBackendArchiveAuthorityWorld,
+  mapBackendAuthorityWorld,
+} from "./mapBackendAuthorityWorld";
 
 export type BackendPresenceStatus =
   | "disabled"
@@ -99,6 +102,7 @@ export interface BackendPresenceSnapshot {
   world: BackendWorldPresence | null;
   players: BackendPlayerPresence[];
   authorityWorld: AuthorityWorld | null;
+  archiveAuthorityWorld: AuthorityWorld | null;
   objectArtifacts: BackendObjectArtifactDebug[];
   aiJobs: BackendAiJobDebug[];
   worldSnapshots: BackendWorldSnapshotDebug[];
@@ -630,6 +634,9 @@ function readSnapshotFromConnection({
     .sort(comparePlayers)
     .map((player) => mapPlayer(player, localIdentityHex));
   const authorityWorld = world ? mapBackendAuthorityWorld(world, worldObjects) : null;
+  const archiveAuthorityWorld = world
+    ? mapBackendArchiveAuthorityWorld(world, worldSnapshots[0] ?? null, snapshotObjects)
+    : null;
 
   return {
     enabled,
@@ -640,6 +647,7 @@ function readSnapshotFromConnection({
     world: world ? mapWorld(world) : null,
     players,
     authorityWorld,
+    archiveAuthorityWorld,
     objectArtifacts: worldObjects.map(mapObjectArtifactDebug),
     aiJobs: aiJobs.map(mapAiJobDebug),
     worldSnapshots: worldSnapshots.map(mapWorldSnapshotDebug),
@@ -667,6 +675,7 @@ function createBaseSnapshot({
     world: null,
     players: [],
     authorityWorld: null,
+    archiveAuthorityWorld: null,
     objectArtifacts: [],
     aiJobs: [],
     worldSnapshots: [],
