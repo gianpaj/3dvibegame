@@ -300,6 +300,13 @@ Sub-phases:
 - Private rooms with destructive edits enabled allow a non-creator player to delete a released object
 - This separates the V1 private-room success criterion from the broader world-settings smoke
 
+### Phase 3.7 — Prompt-to-Feel Playtest Notes ✅
+- Live browser smokes show the fixture-backed path is mechanically responsive: recent local runs reached grace in roughly 115-123 ms
+- That latency is not real AI latency; it only validates browser, reducer, fixture-worker, and sync overhead
+- The grace/release/remix loop is legible in the HUD: draft ready, release, public refine, and v2 public return all have visible states
+- Main feel risks remain: avatar-specific copy still dominates the world-object flow, transforms are button-level rather than direct manipulation, and prompt variety is still fixture-limited
+- The next product-risk slice should connect a real create-only external AI worker or run human playtests with varied prompt outputs before treating prompt-to-feel as validated
+
 ### Phase 4 — Multiplayer Validation (Prototype 2)
 - Multi-host world network (federated worlds model)
 - Trusted builder role (host-elevated players)

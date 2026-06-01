@@ -38,6 +38,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - World backend now has an explicit private destructive editing smoke covering public rejection, private-disabled rejection, and private-enabled delete.
 - Runtime demo live mode now has a first-playable browser smoke for backend connection, prompt-to-grace latency, release, remix to v2, and browser runtime error checks.
 - Runtime demo live browser smokes now share a backend/Vite/Chromium CDP harness, including archive read-only coverage after reset.
+- Phase 3 prompt-to-feel notes now distinguish fixture latency from real AI latency and flag remaining UX feel risks.
 - Public-room object creation now rejects duplicate pending create jobs and enforces prototype live-object caps per world and per creator.
 - Backend archive/reset reducers now snapshot live objects into immutable archive rows, wipe live objects on reset, clear locks, and fail pending AI jobs.
 - Runtime demo live mode now surfaces backend archive/reset rows in bridge snapshots and the HUD Debug panel.
@@ -64,8 +65,8 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 ## Next Slices
 
-1. Add subjective prompt-to-feel playtest notes around rough draft, grace timing, and remix feel.
-2. Add an aggregate Phase 3 smoke command once the remaining gates are stable.
+1. Review and implement the create-only real AI worker plan so prompt-to-feel can be tested beyond fixtures.
+2. Add an aggregate Phase 3 smoke command once the real-worker boundary is stable.
 
 ## Later
 
@@ -73,7 +74,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Multiplayer load and replay: 20 anonymous players, presence sync, object deltas, reconnect, and lock contention.
 - Archive/reset wedge: snapshot a live world, freeze it, and reopen it as read-only exploration.
 - Remix safety benchmark: reject destructive edits in public worlds while allowing them in private worlds when enabled.
-- Prompt-to-feel playtest: check whether rough draft plus grace period feels fun in real use.
+- Human prompt-to-feel playtest with real AI outputs.
 
 ## Verification Snapshot
 
