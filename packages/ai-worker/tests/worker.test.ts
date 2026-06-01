@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { createServer, type RequestListener } from "node:http";
 import { test } from "node:test";
 
+import type { BuilderSpec } from "@3dvibegame/scene-authority-ts";
 import {
+  buildCreateResponse,
   createAiWorkerHandler,
   createStaticPlanGenerator,
 } from "../src/index.ts";
@@ -52,6 +54,36 @@ test("create request returns source and builder specs", async () => {
   } finally {
     await server.close();
   }
+});
+
+test("deterministic create specs are grounded and visible at runtime scale", () => {
+  const payload = buildCreateResponse(
+    {
+      operation: "create",
+      source_prompt: "Create a mossy forest guardian with a glowing chest rune",
+      target_object_id: null,
+      base_object_version: null,
+      object_context: null,
+    },
+    {
+      object_category: "guardian",
+      size_tier: "medium",
+      shape: "creature",
+      palette: "forest",
+      style_tags: ["mossy", "forest", "guardian"],
+      behaviors: ["idle"],
+      key_features: ["broad shoulders", "glowing chest rune"],
+    },
+  );
+
+  const builderSpec = payload.builder_spec as BuilderSpec;
+  const bounds = builderBounds(builderSpec);
+  assert.ok(bounds.minY >= -Number.EPSILON, `expected grounded spec, got minY ${bounds.minY}`);
+  assert.ok(bounds.height >= 1.5, `expected visible object height, got ${bounds.height}`);
+  assert.deepEqual(
+    [...new Set(builderSpec.parts.map((part) => part.material))].sort(),
+    ["moss_stone", "neon", "wood"],
+  );
 });
 
 test("refine and malformed create requests fail with worker error codes", async () => {
@@ -112,4 +144,18 @@ function postGenerate(url: string, body: unknown) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
+}
+
+function builderBounds(spec: BuilderSpec) {
+  let minY = Infinity;
+  let maxY = -Infinity;
+
+  for (const part of spec.parts) {
+    const centerY = part.local_position?.[1] ?? 0;
+    const height = part.dimensions[1];
+    minY = Math.min(minY, centerY - height / 2);
+    maxY = Math.max(maxY, centerY + height / 2);
+  }
+
+  return { minY, maxY, height: maxY - minY };
 }

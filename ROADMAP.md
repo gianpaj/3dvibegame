@@ -357,6 +357,13 @@ Sub-phases:
 - Browser prompt submission now has a keyed real-LLM gate that reaches backend grace state, releases the generated object, and verifies the backend create job completed
 - A local keyed run on 2026-06-01 created a `tree` object and reached draft state in roughly 2.6 seconds
 
+### Phase 4.3 — Real AI Object Visibility Fix ✅
+- Diagnosed the barely visible real-LLM object issue as deterministic converter output, not raw Gemini geometry: generated specs used quarter-meter units and renderer-unknown `primary` / `secondary` / `accent` material ids
+- AI worker create specs now use fixture-scale half-meter grid units and larger size tiers
+- Generated operations are y-grounded before compilation so line/sphere bounds do not dip below the scene plane
+- Palette conversion now emits renderer-known material ids such as `moss_stone`, `wood`, and `neon`
+- Regression coverage verifies a mossy guardian compiles to a grounded, visible-height builder spec with distinct runtime materials
+
 ### Phase 5 — V1 Hardening & Launch
 - Rate limiting and abuse guardrails
 - World settings UI for hosts (presets, reset schedules, permission toggles)

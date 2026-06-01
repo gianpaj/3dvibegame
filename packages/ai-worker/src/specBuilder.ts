@@ -14,19 +14,43 @@ import type {
 } from "./contracts.ts";
 
 const palettes = {
-  forest: { primary: "#2f7d46", secondary: "#7a4f2a", accent: "#9be564" },
-  stone: { primary: "#8a8f98", secondary: "#555b63", accent: "#c9d1d9" },
-  warm: { primary: "#d9822b", secondary: "#8f4a21", accent: "#ffd166" },
-  cool: { primary: "#4f8cc9", secondary: "#2f5d7c", accent: "#9ad7ff" },
-  magic: { primary: "#7c5cff", secondary: "#35206b", accent: "#f3a6ff" },
-  neutral: { primary: "#a99f8f", secondary: "#61584d", accent: "#f0e6d2" },
+  forest: {
+    primary: material("moss_stone", "#6d8860", ["primary"]),
+    secondary: material("wood", "#8f6745", ["secondary"]),
+    accent: material("neon", "#4de8c3", ["accent"]),
+  },
+  stone: {
+    primary: material("moss_stone", "#8a8f98", ["primary"]),
+    secondary: material("void", "#555b63", ["secondary"]),
+    accent: material("glass_block", "#d3f5ff", ["accent"]),
+  },
+  warm: {
+    primary: material("wood", "#d9822b", ["primary"]),
+    secondary: material("red", "#c63a36", ["secondary"]),
+    accent: material("lava_light", "#ff9a3d", ["accent"]),
+  },
+  cool: {
+    primary: material("glass_block", "#d3f5ff", ["primary"]),
+    secondary: material("cloud", "#f4f7ff", ["secondary"]),
+    accent: material("neon", "#4de8c3", ["accent"]),
+  },
+  magic: {
+    primary: material("jelly", "#ff7cb1", ["primary"]),
+    secondary: material("void", "#40355e", ["secondary"]),
+    accent: material("neon", "#4de8c3", ["accent"]),
+  },
+  neutral: {
+    primary: material("cloud", "#f4f7ff", ["primary"]),
+    secondary: material("wood", "#8f6745", ["secondary"]),
+    accent: material("glass_block", "#d3f5ff", ["accent"]),
+  },
 } as const;
 
 const sizeScale: Record<CreatePlan["size_tier"], number> = {
-  tiny: 0.7,
-  small: 1,
-  medium: 1.35,
-  large: 1.75,
+  tiny: 0.9,
+  small: 1.2,
+  medium: 1.7,
+  large: 2.3,
 };
 
 export function buildCreateResponse(
@@ -57,6 +81,12 @@ function buildVoxelSpec(
   const baseId = `${slug(plan.object_category)}_${shortHash(request.source_prompt)}`;
   const palette = palettes[plan.palette];
   const scale = sizeScale[plan.size_tier];
+  const materialIds = {
+    primary: palette.primary.material_id,
+    secondary: palette.secondary.material_id,
+    accent: palette.accent.material_id,
+  };
+  const operations = groundOperations(operationsForPlan(plan, scale, materialIds));
 
   return {
     spec_version: "0.1",
@@ -70,7 +100,7 @@ function buildVoxelSpec(
     style_tags: unique(plan.style_tags.map(slug)).slice(0, 6),
     behaviors: unique(plan.behaviors.map(slug)).slice(0, 3),
     grid: {
-      unit_meters: 0.25,
+      unit_meters: 0.5,
       up_axis: "y",
       rotation_step_degrees: 90,
     },
@@ -80,16 +110,12 @@ function buildVoxelSpec(
       relation: null,
       offset: [0, 0, 0],
     },
-    materials: [
-      material("primary", palette.primary, ["primary"]),
-      material("secondary", palette.secondary, ["secondary"]),
-      material("accent", palette.accent, ["accent"]),
-    ],
+    materials: [palette.primary, palette.secondary, palette.accent],
     anchors: [
       { anchor_id: "base", position: [0, 0, 0], tags: ["placement"] },
       { anchor_id: "focus", position: [0, 2 * scale, 0], tags: ["camera"] },
     ],
-    operations: operationsForPlan(plan, scale),
+    operations,
     compile_hints: {
       preferred_runtime: "primitive_parts",
       preserve_edit_regions: true,
@@ -103,41 +129,54 @@ function buildVoxelSpec(
   };
 }
 
-function operationsForPlan(plan: CreatePlan, scale: number): VoxelOp[] {
+function operationsForPlan(
+  plan: CreatePlan,
+  scale: number,
+  materials: { primary: string; secondary: string; accent: string },
+): VoxelOp[] {
   if (plan.shape === "tree" || plan.object_category.toLowerCase().includes("tree")) {
     return [
       box(
         "trunk",
         [0, 0.8 * scale, 0],
         [0.35 * scale, 1.6 * scale, 0.35 * scale],
-        "secondary",
+        materials.secondary,
         ["trunk"],
       ),
-      sphere("canopy_low", [0, 1.75 * scale, 0], 0.95 * scale, "primary", ["foliage"]),
-      sphere("canopy_high", [0, 2.45 * scale, 0], 0.65 * scale, "primary", ["foliage"]),
-      sphere("glow", [0.45 * scale, 2.2 * scale, 0.1 * scale], 0.16 * scale, "accent", [
+      sphere("canopy_low", [0, 1.75 * scale, 0], 0.95 * scale, materials.primary, [
+        "foliage",
+      ]),
+      sphere("canopy_high", [0, 2.45 * scale, 0], 0.65 * scale, materials.primary, [
+        "foliage",
+      ]),
+      sphere("glow", [0.45 * scale, 2.2 * scale, 0.1 * scale], 0.16 * scale, materials.accent, [
         "detail",
+        "soft_glow",
       ]),
     ];
   }
 
   if (plan.shape === "structure") {
     return [
-      box("base", [0, 0.5 * scale, 0], [1.5 * scale, 1 * scale, 1.2 * scale], "primary", [
-        "body",
-      ]),
+      box(
+        "base",
+        [0, 0.5 * scale, 0],
+        [1.5 * scale, 1 * scale, 1.2 * scale],
+        materials.primary,
+        ["body"],
+      ),
       box(
         "roof",
         [0, 1.2 * scale, 0],
         [1.8 * scale, 0.35 * scale, 1.4 * scale],
-        "secondary",
+        materials.secondary,
         ["roof"],
       ),
       box(
         "door",
         [0, 0.35 * scale, 0.62 * scale],
         [0.35 * scale, 0.6 * scale, 0.08 * scale],
-        "accent",
+        materials.accent,
         ["detail"],
       ),
     ];
@@ -145,14 +184,14 @@ function operationsForPlan(plan: CreatePlan, scale: number): VoxelOp[] {
 
   if (plan.shape === "creature") {
     return [
-      sphere("body", [0, 0.9 * scale, 0], 0.7 * scale, "primary", ["body"]),
-      sphere("head", [0, 1.65 * scale, 0.12 * scale], 0.42 * scale, "primary", ["head"]),
+      sphere("body", [0, 0.9 * scale, 0], 0.7 * scale, materials.primary, ["body"]),
+      sphere("head", [0, 1.65 * scale, 0.12 * scale], 0.42 * scale, materials.primary, ["head"]),
       line(
         "left_leg",
         [-0.25 * scale, 0.25 * scale, 0],
         [-0.45 * scale, 0, 0],
         0.08 * scale,
-        "secondary",
+        materials.secondary,
         ["leg"],
       ),
       line(
@@ -160,48 +199,105 @@ function operationsForPlan(plan: CreatePlan, scale: number): VoxelOp[] {
         [0.25 * scale, 0.25 * scale, 0],
         [0.45 * scale, 0, 0],
         0.08 * scale,
-        "secondary",
+        materials.secondary,
         ["leg"],
       ),
-      sphere("accent", [0.18 * scale, 1.72 * scale, 0.46 * scale], 0.09 * scale, "accent", ["detail"]),
+      sphere(
+        "accent",
+        [0.18 * scale, 1.72 * scale, 0.46 * scale],
+        0.09 * scale,
+        materials.accent,
+        ["detail", "soft_glow"],
+      ),
     ];
   }
 
   if (plan.shape === "cluster") {
     return [
-      sphere("cluster_a", [-0.45 * scale, 0.55 * scale, 0], 0.55 * scale, "primary", [
+      sphere("cluster_a", [-0.45 * scale, 0.55 * scale, 0], 0.55 * scale, materials.primary, [
         "cluster",
       ]),
       sphere(
         "cluster_b",
         [0.35 * scale, 0.75 * scale, 0.15 * scale],
         0.7 * scale,
-        "secondary",
+        materials.secondary,
         ["cluster"],
       ),
       sphere(
         "cluster_c",
         [0.05 * scale, 1.15 * scale, -0.25 * scale],
         0.42 * scale,
-        "accent",
+        materials.accent,
         ["detail"],
       ),
     ];
   }
 
   return [
-    box("body", [0, 0.55 * scale, 0], [1 * scale, 1.1 * scale, 1 * scale], "primary", ["body"]),
+    box(
+      "body",
+      [0, 0.55 * scale, 0],
+      [1 * scale, 1.1 * scale, 1 * scale],
+      materials.primary,
+      ["body"],
+    ),
     box(
       "cap",
       [0, 1.25 * scale, 0],
       [0.75 * scale, 0.35 * scale, 0.75 * scale],
-      "secondary",
+      materials.secondary,
       ["top"],
     ),
-    sphere("accent", [0.35 * scale, 1.45 * scale, 0.35 * scale], 0.16 * scale, "accent", [
+    sphere("accent", [0.35 * scale, 1.45 * scale, 0.35 * scale], 0.16 * scale, materials.accent, [
       "detail",
     ]),
   ];
+}
+
+function groundOperations(operations: VoxelOp[]) {
+  const minY = operations.reduce(
+    (lowest, operation) => Math.min(lowest, minOperationY(operation)),
+    0,
+  );
+  if (minY >= 0) {
+    return operations;
+  }
+  return operations.map((operation) => translateOperationY(operation, -minY));
+}
+
+function minOperationY(operation: VoxelOp) {
+  switch (operation.kind) {
+    case "add_box":
+      return operation.position[1] - operation.size[1] / 2;
+    case "add_sphere":
+      return operation.center[1] - operation.radius;
+    case "add_line":
+      return Math.min(operation.from[1], operation.to[1]) - operation.radius;
+    default:
+      return 0;
+  }
+}
+
+function translateOperationY(operation: VoxelOp, offsetY: number): VoxelOp {
+  switch (operation.kind) {
+    case "add_box":
+      return { ...operation, position: translateY(operation.position, offsetY) };
+    case "add_sphere":
+      return { ...operation, center: translateY(operation.center, offsetY) };
+    case "add_line":
+      return {
+        ...operation,
+        from: translateY(operation.from, offsetY),
+        to: translateY(operation.to, offsetY),
+      };
+    default:
+      return operation;
+  }
+}
+
+function translateY(vector: VoxelVector3, offsetY: number): VoxelVector3 {
+  return [vector[0], vector[1] + offsetY, vector[2]];
 }
 
 function material(material_id: string, color_hint: string, tags: string[]) {

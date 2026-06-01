@@ -43,6 +43,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Runtime demo live browser smokes now cover `VITE_AI_WORKER_URL` by running the fake external AI worker through the HTTP create path.
 - AI worker now has an optional Gemini live smoke that loads local `.env` and has passed a keyed real-LLM create call.
 - Runtime demo now has an optional live Gemini browser smoke that sends a prompt through `VITE_AI_WORKER_URL`, waits for backend grace state, releases the object, and verifies the backend create job completed.
+- AI worker create specs now use renderer-known materials, fixture-scale dimensions, and y-grounding so real LLM outputs do not spawn tiny or under the scene plane.
 - Root `phase3:smoke` now aggregates the backend, AI-worker, and live browser Phase 3 gates.
 - The most visible live HUD labels now use object/world wording instead of avatar-editor wording.
 - World backend now has create/join-by-id reducers and a multi-world hosting smoke covering host-created worlds, selected joins, role assignment, object isolation, and cross-world edit rejection.
@@ -93,6 +94,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - `pnpm --filter @3dvibegame/ai-worker test`: passing as of 2026-06-01.
 - AI worker fake-create smoke: `pnpm --filter @3dvibegame/ai-worker smoke:fake-create` passing as of 2026-06-01.
 - AI worker Gemini live smoke: `pnpm --filter @3dvibegame/ai-worker smoke:gemini-live` passing with a local `.env` key as of 2026-06-01.
+- AI worker visibility regression: guardian create specs now compile to minY `0`, height about `1.83m`, and `moss_stone`/`wood`/`neon` materials as of 2026-06-01.
 - `pnpm typecheck`: passing as of 2026-06-01.
 - Live HTTP AI worker browser smoke: `pnpm --filter @3dvibegame/scene-runtime-demo smoke:live-http-ai-worker` passing as of 2026-06-01.
 - Live Gemini AI worker browser smoke: `pnpm --filter @3dvibegame/scene-runtime-demo smoke:live-gemini-ai-worker` passing with a local `.env` key as of 2026-06-01.
