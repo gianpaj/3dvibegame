@@ -15,6 +15,7 @@ export async function runLiveDemoBrowserSmoke({
   dbPrefix,
   nickname = "Browser Smoke",
   setupBackend,
+  viteEnv = {},
   run,
 }) {
   const harness = await createPublishedSmokeHarness({ dbPrefix });
@@ -26,7 +27,7 @@ export async function runLiveDemoBrowserSmoke({
     await setupBackend?.(harness);
 
     const vitePort = await findOpenPort();
-    const vite = startVite(vitePort, harness, nickname);
+    const vite = startVite(vitePort, harness, nickname, viteEnv);
     processes.push(vite);
     await waitForHttp(
       `http://127.0.0.1:${vitePort}/`,
@@ -72,7 +73,7 @@ export function waitForLiveBackendHud(page, timeoutMs = 20_000) {
   );
 }
 
-function startVite(port, harness, nickname) {
+function startVite(port, harness, nickname, viteEnv) {
   const child = spawn(
     "pnpm",
     [
@@ -92,6 +93,7 @@ function startVite(port, harness, nickname) {
         VITE_PLAYER_NICKNAME: nickname,
         VITE_SPACETIMEDB_DATABASE: harness.database,
         VITE_SPACETIMEDB_URI: harness.serverUrl,
+        ...viteEnv,
       },
       stdio: ["ignore", "pipe", "pipe"],
     },
@@ -380,7 +382,12 @@ function exceptionText(exceptionDetails) {
   );
 }
 
-async function waitForHttp(url, label, timeoutMs = 15_000, debugOutput = () => "") {
+export async function waitForHttp(
+  url,
+  label,
+  timeoutMs = 15_000,
+  debugOutput = () => "",
+) {
   const deadline = Date.now() + timeoutMs;
   let lastError = null;
   while (Date.now() < deadline) {
@@ -403,7 +410,7 @@ async function waitForHttp(url, label, timeoutMs = 15_000, debugOutput = () => "
   );
 }
 
-function findOpenPort() {
+export function findOpenPort() {
   return new Promise((resolvePort, reject) => {
     const server = net.createServer();
     server.unref();
@@ -419,7 +426,7 @@ function delay(ms) {
   return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
 }
 
-async function stopProcess(child) {
+export async function stopProcess(child) {
   if (child.exitCode !== null || child.signalCode !== null) {
     return;
   }

@@ -40,6 +40,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Runtime demo live browser smokes now share a backend/Vite/Chromium CDP harness, including archive read-only coverage after reset.
 - Phase 3 prompt-to-feel notes now distinguish fixture latency from real AI latency and flag remaining UX feel risks.
 - `@3dvibegame/ai-worker` now provides a create-only external HTTP AI worker with Gemini support, a fake local adapter, tests, and a fake-create smoke.
+- Runtime demo live browser smokes now cover `VITE_AI_WORKER_URL` by running the fake external AI worker through the HTTP create path.
 - Public-room object creation now rejects duplicate pending create jobs and enforces prototype live-object caps per world and per creator.
 - Backend archive/reset reducers now snapshot live objects into immutable archive rows, wipe live objects on reset, clear locks, and fail pending AI jobs.
 - Runtime demo live mode now surfaces backend archive/reset rows in bridge snapshots and the HUD Debug panel.
@@ -66,8 +67,8 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 ## Next Slices
 
-1. Add a live demo browser smoke that runs the fake AI worker over HTTP through `VITE_AI_WORKER_URL`.
-2. Add an optional Gemini live smoke gated by `GOOGLE_GENERATIVE_AI_API_KEY`.
+1. Add an optional Gemini live smoke gated by `GOOGLE_GENERATIVE_AI_API_KEY`.
+2. Add an aggregate Phase 3 smoke command for backend, browser, and fake-worker gates.
 
 ## Later
 
@@ -88,6 +89,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - `pnpm --filter @3dvibegame/ai-worker test`: passing as of 2026-06-01.
 - AI worker fake-create smoke: `pnpm --filter @3dvibegame/ai-worker smoke:fake-create` passing as of 2026-06-01.
 - `pnpm typecheck`: passing as of 2026-06-01.
+- Live HTTP AI worker browser smoke: `pnpm --filter @3dvibegame/scene-runtime-demo smoke:live-http-ai-worker` passing as of 2026-06-01.
 - `pnpm demo:build`: passing as of 2026-05-31.
 - Backend object artifact boundary typecheck/build: passing as of 2026-05-31.
 - Temporary backend artifact-boundary smoke: `submit_ai_draft` accepted paired `source_spec_json` and `builder_spec_json` and created a grace object as of 2026-05-31.

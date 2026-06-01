@@ -314,6 +314,12 @@ Sub-phases:
 - Added a fake plan generator, unit tests, and `smoke:fake-create` so CI/local verification does not require a Gemini key
 - Runtime demo configuration now uses the HTTP worker for create drafts when `VITE_AI_WORKER_URL` is set while keeping refine fixture-backed for this slice
 
+### Phase 3.9 — HTTP AI Worker Browser Smoke ✅
+- Added `smoke:live-http-ai-worker` to start the fake external AI worker, live SpacetimeDB backend, Vite demo, and Chromium browser together
+- The browser prompt path now verifies `VITE_AI_WORKER_URL` create requests reach the external worker and return to backend grace state
+- The smoke releases the generated object and asserts backend rows show a completed create job and public `pine_tree` object
+- This closes the local no-key path for testing the external worker boundary end to end
+
 ### Phase 4 — Multiplayer Validation (Prototype 2)
 - Multi-host world network (federated worlds model)
 - Trusted builder role (host-elevated players)

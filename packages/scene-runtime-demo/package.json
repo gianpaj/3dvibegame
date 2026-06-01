@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "smoke:live-archive-readonly": "node scripts/smoke-live-archive-readonly-browser.mjs",
     "smoke:live-first-playable": "node scripts/smoke-live-first-playable-browser.mjs",
+    "smoke:live-http-ai-worker": "node scripts/smoke-live-http-ai-worker-browser.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "preview": "vite preview"
   },
