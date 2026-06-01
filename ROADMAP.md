@@ -323,6 +323,7 @@ Sub-phases:
 ### Phase 3.10 — Optional Gemini Live Smoke ✅
 - Added `smoke:gemini-live` for `@3dvibegame/ai-worker` to exercise the real Gemini-backed create path when `GOOGLE_GENERATIVE_AI_API_KEY` is present
 - The smoke starts the worker in-process, posts one create prompt, and validates completed source and builder specs
+- The smoke now loads a repo-root `.env` for local keyed runs; a keyed Gemini create smoke passed on 2026-06-01
 - Without a Gemini key, the smoke exits successfully with an explicit skip message so local and CI runs remain deterministic
 
 ### Phase 3.11 — Aggregate Phase 3 Smoke Suite ✅
@@ -337,6 +338,7 @@ Sub-phases:
 
 ### Phase 4 — Multiplayer Validation (Prototype 2) 🔄 *(current)*
 - Multi-host world network (federated worlds model)
+- Live browser real-LLM create validation through the external worker path
 - Trusted builder role (host-elevated players)
 - World discovery — surface engaging worlds using player count, retention, and moderation stability
 - Archive UX — visually distinct read-only historical snapshot presentation

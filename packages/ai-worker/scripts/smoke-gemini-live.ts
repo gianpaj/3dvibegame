@@ -1,9 +1,19 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+
+import { config as loadDotenv } from "dotenv";
 
 import {
   createGeminiPlanGenerator,
   startAiWorkerServer,
 } from "../src/index.ts";
+
+const repoEnvPath = resolve(import.meta.dirname, "../../..", ".env");
+if (existsSync(repoEnvPath)) {
+  loadDotenv({ path: repoEnvPath, quiet: true });
+}
+loadDotenv({ quiet: true });
 
 if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
   console.log("ai-worker Gemini live smoke skipped: GOOGLE_GENERATIVE_AI_API_KEY is not set");

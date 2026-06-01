@@ -41,7 +41,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Phase 3 prompt-to-feel notes now distinguish fixture latency from real AI latency and flag remaining UX feel risks.
 - `@3dvibegame/ai-worker` now provides a create-only external HTTP AI worker with Gemini support, a fake local adapter, tests, and a fake-create smoke.
 - Runtime demo live browser smokes now cover `VITE_AI_WORKER_URL` by running the fake external AI worker through the HTTP create path.
-- AI worker now has an optional Gemini live smoke that runs only when `GOOGLE_GENERATIVE_AI_API_KEY` is set and otherwise skips cleanly.
+- AI worker now has an optional Gemini live smoke that loads local `.env` and has passed a keyed real-LLM create call.
 - Root `phase3:smoke` now aggregates the backend, AI-worker, and live browser Phase 3 gates.
 - The most visible live HUD labels now use object/world wording instead of avatar-editor wording.
 - World backend now has create/join-by-id reducers and a multi-world hosting smoke covering host-created worlds, selected joins, role assignment, object isolation, and cross-world edit rejection.
@@ -70,8 +70,9 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 ## Next Slices
 
-1. Add a minimal world discovery/read model so clients can list hosted worlds and join one without hard-coded ids.
-2. Keep direct-manipulation move/rotate/scale polish as a playtest-driven follow-up, not a Phase 3 blocker.
+1. Add a live browser real-Gemini create smoke/playtest so a prompt reaches the actual LLM worker through `VITE_AI_WORKER_URL` and lands as a backend object.
+2. Add a minimal world discovery/read model so clients can list hosted worlds and join one without hard-coded ids.
+3. Keep direct-manipulation move/rotate/scale polish as a playtest-driven follow-up, not a Phase 3 blocker.
 
 ## Later
 
@@ -91,7 +92,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - `pnpm --filter @3dvibegame/ai-worker typecheck`: passing as of 2026-06-01.
 - `pnpm --filter @3dvibegame/ai-worker test`: passing as of 2026-06-01.
 - AI worker fake-create smoke: `pnpm --filter @3dvibegame/ai-worker smoke:fake-create` passing as of 2026-06-01.
-- AI worker Gemini live smoke: `pnpm --filter @3dvibegame/ai-worker smoke:gemini-live` skipping cleanly without `GOOGLE_GENERATIVE_AI_API_KEY` as of 2026-06-01.
+- AI worker Gemini live smoke: `pnpm --filter @3dvibegame/ai-worker smoke:gemini-live` passing with a local `.env` key as of 2026-06-01.
 - `pnpm typecheck`: passing as of 2026-06-01.
 - Live HTTP AI worker browser smoke: `pnpm --filter @3dvibegame/scene-runtime-demo smoke:live-http-ai-worker` passing as of 2026-06-01.
 - Phase 3 aggregate smoke: `pnpm phase3:smoke` passing as of 2026-06-01.
