@@ -342,6 +342,13 @@ Sub-phases:
 - Archive UX — visually distinct read-only historical snapshot presentation
 - Expanded permission model (moderator, builder tiers)
 
+### Phase 4.1 — Multi-World Hosting Backend Smoke ✅
+- Added `create_world` so a player can create a public or private hosted world and enter it as host
+- Added `join_world_by_id` so a player can join a selected world instead of always joining the default world
+- Refactored anonymous join handling so default joins, selected joins, and host-created sessions share the same capacity and session update path
+- Added `smoke:multi-world-hosting` for two host-created worlds, selected visitor join, default-world join preservation, host role assignment, per-world object creation, and cross-world edit rejection
+- This proves the first multi-host backend slice while leaving persistent ownership, discovery ranking, and room-management UI for the next Phase 4 increments
+
 ### Phase 5 — V1 Hardening & Launch
 - Rate limiting and abuse guardrails
 - World settings UI for hosts (presets, reset schedules, permission toggles)

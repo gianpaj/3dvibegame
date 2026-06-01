@@ -44,6 +44,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - AI worker now has an optional Gemini live smoke that runs only when `GOOGLE_GENERATIVE_AI_API_KEY` is set and otherwise skips cleanly.
 - Root `phase3:smoke` now aggregates the backend, AI-worker, and live browser Phase 3 gates.
 - The most visible live HUD labels now use object/world wording instead of avatar-editor wording.
+- World backend now has create/join-by-id reducers and a multi-world hosting smoke covering host-created worlds, selected joins, role assignment, object isolation, and cross-world edit rejection.
 - Public-room object creation now rejects duplicate pending create jobs and enforces prototype live-object caps per world and per creator.
 - Backend archive/reset reducers now snapshot live objects into immutable archive rows, wipe live objects on reset, clear locks, and fail pending AI jobs.
 - Runtime demo live mode now surfaces backend archive/reset rows in bridge snapshots and the HUD Debug panel.
@@ -65,11 +66,11 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 ## In Progress
 
 - Phase 4 multiplayer validation planning.
-- Decide the first Phase 4 implementation slice: multi-host world network, trusted builder role, or discovery/archive validation.
+- Multi-host world network validation, starting with backend-created hosted worlds before discovery UI.
 
 ## Next Slices
 
-1. Plan Phase 4.1 around the smallest multiplayer-validation increment.
+1. Add a minimal world discovery/read model so clients can list hosted worlds and join one without hard-coded ids.
 2. Keep direct-manipulation move/rotate/scale polish as a playtest-driven follow-up, not a Phase 3 blocker.
 
 ## Later
@@ -106,6 +107,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Multiplayer backend replay smoke: `pnpm --filter @3dvibegame/world-backend smoke:multiplayer-replay` passing as of 2026-05-31.
 - 20-player backend replay smoke: `pnpm --filter @3dvibegame/world-backend smoke:multiplayer-20` passing as of 2026-06-01.
 - First-playable backend flow smoke: `pnpm --filter @3dvibegame/world-backend smoke:first-playable-flow` passing as of 2026-06-01.
+- Multi-world hosting smoke: `pnpm --filter @3dvibegame/world-backend smoke:multi-world-hosting` passing as of 2026-06-01.
 - Private destructive editing smoke: `pnpm --filter @3dvibegame/world-backend smoke:private-destructive-edit` passing as of 2026-06-01.
 - Live first-playable browser smoke: `pnpm --filter @3dvibegame/scene-runtime-demo smoke:live-first-playable` passing with object-worded HUD actions as of 2026-06-01.
 - Live archive read-only browser smoke: `pnpm --filter @3dvibegame/scene-runtime-demo smoke:live-archive-readonly` passing as of 2026-06-01.

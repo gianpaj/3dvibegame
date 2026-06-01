@@ -16,6 +16,7 @@ const maxAllowedObjectsPerPlayer = 100;
 const maxAllowedPendingCreateJobsPerPlayer = 5;
 const maxAllowedObjectCooldownSeconds = 300;
 const maxAllowedGracePeriodSeconds = 120;
+const maxWorldNameLength = 48;
 const maxNicknameLength = 24;
 const maxIdLength = 80;
 const maxSnapshotObjectIdLength = 180;
@@ -47,41 +48,37 @@ export const onDisconnect = spacetimedb.clientDisconnected((ctx) => {
 export const join_world = spacetimedb.reducer(
   { nickname: t.string() },
   (ctx, { nickname }) => {
-    const world = ensureDefaultWorld(ctx);
-    const normalizedNickname = normalizeNickname(nickname);
-    const existing = ctx.db.playerSession.identity.find(ctx.sender);
+    joinWorld(ctx, ensureDefaultWorld(ctx), nickname, "player");
+  },
+);
 
-    if (!existing && activePlayersInWorld(ctx, world.worldId) >= world.maxPlayers) {
-      throw new SenderError("world is full");
-    }
+export const join_world_by_id = spacetimedb.reducer(
+  { worldId: t.u64(), nickname: t.string() },
+  (ctx, { worldId, nickname }) => {
+    joinWorld(ctx, requireWorld(ctx, worldId), nickname, "player");
+  },
+);
 
-    if (existing) {
-      ctx.db.playerSession.identity.update({
-        ...existing,
-        connectionId: currentConnectionId(ctx),
-        worldId: world.worldId,
-        nickname: normalizedNickname,
-        presenceState: "active",
-        lastSeenAt: ctx.timestamp,
-      });
-      return;
-    }
-
-    ctx.db.playerSession.insert({
-      identity: ctx.sender,
-      worldId: world.worldId,
-      connectionId: currentConnectionId(ctx),
-      nickname: normalizedNickname,
-      role: "player",
-      presenceState: "active",
-      positionX: 0,
-      positionY: 0,
-      positionZ: 0,
-      rotationYaw: 0,
-      rotationPitch: 0,
-      joinedAt: ctx.timestamp,
-      lastSeenAt: ctx.timestamp,
+export const create_world = spacetimedb.reducer(
+  { name: t.string(), visibility: t.string(), nickname: t.string() },
+  (ctx, { name, visibility, nickname }) => {
+    const normalizedVisibility = normalizeWorldVisibility(visibility);
+    const world = ctx.db.world.insert({
+      worldId: nextWorldId(ctx),
+      name: normalizeWorldName(name),
+      visibility: normalizedVisibility,
+      maxPlayers: defaultMaxPlayers,
+      maxLiveObjects: defaultMaxLiveObjectsPerPublicWorld,
+      maxObjectsPerPlayer: defaultMaxLiveObjectsPerPublicPlayer,
+      maxPendingCreateJobsPerPlayer: defaultMaxPendingCreateJobsPerPublicPlayer,
+      destructiveEditsEnabled: false,
+      objectCooldownSeconds: defaultObjectCooldownSeconds,
+      gracePeriodSeconds: defaultGracePeriodSeconds,
+      createdAt: ctx.timestamp,
+      updatedAt: ctx.timestamp,
     });
+
+    joinWorld(ctx, world, nickname, "host");
   },
 );
 
@@ -667,7 +664,7 @@ export const reset_world = spacetimedb.reducer(
 );
 
 function ensureDefaultWorld(ctx: BackendCtx) {
-  const existing = firstWorld(ctx);
+  const existing = findDefaultWorld(ctx);
   if (existing) {
     return existing;
   }
@@ -688,11 +685,67 @@ function ensureDefaultWorld(ctx: BackendCtx) {
   });
 }
 
-function firstWorld(ctx: BackendCtx) {
+function findDefaultWorld(ctx: BackendCtx) {
   for (const world of ctx.db.world.iter()) {
-    return world;
+    if (world.name === defaultWorldName && world.visibility === defaultWorldVisibility) {
+      return world;
+    }
   }
   return null;
+}
+
+function nextWorldId(ctx: BackendCtx) {
+  let maxWorldId = -1n;
+  for (const world of ctx.db.world.iter()) {
+    if (world.worldId > maxWorldId) {
+      maxWorldId = world.worldId;
+    }
+  }
+  return maxWorldId + 1n;
+}
+
+function joinWorld(
+  ctx: BackendCtx,
+  world: ReturnType<typeof requireWorld>,
+  nickname: string,
+  role: string,
+) {
+  const normalizedNickname = normalizeNickname(nickname);
+  const existing = ctx.db.playerSession.identity.find(ctx.sender);
+  const movingWorlds = existing ? existing.worldId !== world.worldId : true;
+
+  if (movingWorlds && activePlayersInWorld(ctx, world.worldId) >= world.maxPlayers) {
+    throw new SenderError("world is full");
+  }
+
+  if (existing) {
+    ctx.db.playerSession.identity.update({
+      ...existing,
+      connectionId: currentConnectionId(ctx),
+      worldId: world.worldId,
+      nickname: normalizedNickname,
+      role: existing.worldId === world.worldId ? existing.role : role,
+      presenceState: "active",
+      lastSeenAt: ctx.timestamp,
+    });
+    return;
+  }
+
+  ctx.db.playerSession.insert({
+    identity: ctx.sender,
+    worldId: world.worldId,
+    connectionId: currentConnectionId(ctx),
+    nickname: normalizedNickname,
+    role,
+    presenceState: "active",
+    positionX: 0,
+    positionY: 0,
+    positionZ: 0,
+    rotationYaw: 0,
+    rotationPitch: 0,
+    joinedAt: ctx.timestamp,
+    lastSeenAt: ctx.timestamp,
+  });
 }
 
 function activePlayersInWorld(ctx: BackendCtx, worldId: bigint) {
@@ -1153,6 +1206,17 @@ function normalizeWorldVisibility(visibility: string) {
   const normalized = visibility.trim();
   if (normalized !== "public" && normalized !== "private") {
     throw new SenderError("world visibility must be public or private");
+  }
+  return normalized;
+}
+
+function normalizeWorldName(name: string) {
+  const normalized = name.trim().replace(/\s+/g, " ");
+  if (!normalized) {
+    throw new SenderError("world name is required");
+  }
+  if (normalized.length > maxWorldNameLength) {
+    throw new SenderError(`world name must be ${maxWorldNameLength} characters or fewer`);
   }
   return normalized;
 }
