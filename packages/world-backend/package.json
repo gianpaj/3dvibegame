@@ -11,6 +11,7 @@
     "smoke:lock-contention": "node scripts/smoke-lock-contention.mjs",
     "smoke:multiplayer-20": "VIBE_WORLD_SMOKE_PLAYERS=20 node scripts/smoke-multiplayer-replay.mjs",
     "smoke:multiplayer-replay": "node scripts/smoke-multiplayer-replay.mjs",
+    "smoke:private-destructive-edit": "node scripts/smoke-private-destructive-edit.mjs",
     "smoke:world-settings": "node scripts/smoke-world-settings.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

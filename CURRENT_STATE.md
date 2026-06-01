@@ -35,6 +35,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - World backend now has a configurable multiplayer replay smoke for joins, movement presence, reconnect, object deltas, and lock contention.
 - World backend now has an explicit 20-player replay smoke for the Phase 3 target concurrency gate.
 - World backend now has a first-playable flow smoke for prompt request, draft, release, remix, cooldown, and non-destructive public safety.
+- World backend now has an explicit private destructive editing smoke covering public rejection, private-disabled rejection, and private-enabled delete.
 - Runtime demo live mode now has a first-playable browser smoke for backend connection, prompt-to-grace latency, release, remix to v2, and browser runtime error checks.
 - Runtime demo live browser smokes now share a backend/Vite/Chromium CDP harness, including archive read-only coverage after reset.
 - Public-room object creation now rejects duplicate pending create jobs and enforces prototype live-object caps per world and per creator.
@@ -63,8 +64,8 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 ## Next Slices
 
-1. Add private-room destructive editing coverage for the Phase 3 success criteria.
-2. Add subjective prompt-to-feel playtest notes around rough draft, grace timing, and remix feel.
+1. Add subjective prompt-to-feel playtest notes around rough draft, grace timing, and remix feel.
+2. Add an aggregate Phase 3 smoke command once the remaining gates are stable.
 
 ## Later
 
@@ -93,6 +94,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Multiplayer backend replay smoke: `pnpm --filter @3dvibegame/world-backend smoke:multiplayer-replay` passing as of 2026-05-31.
 - 20-player backend replay smoke: `pnpm --filter @3dvibegame/world-backend smoke:multiplayer-20` passing as of 2026-06-01.
 - First-playable backend flow smoke: `pnpm --filter @3dvibegame/world-backend smoke:first-playable-flow` passing as of 2026-06-01.
+- Private destructive editing smoke: `pnpm --filter @3dvibegame/world-backend smoke:private-destructive-edit` passing as of 2026-06-01.
 - Live first-playable browser smoke: `pnpm --filter @3dvibegame/scene-runtime-demo smoke:live-first-playable` passing as of 2026-06-01.
 - Live archive read-only browser smoke: `pnpm --filter @3dvibegame/scene-runtime-demo smoke:live-archive-readonly` passing as of 2026-06-01.
 - Backend archive/reset smoke: `pnpm --filter @3dvibegame/world-backend smoke:archive-reset` passing as of 2026-05-31.

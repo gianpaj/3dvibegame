@@ -294,6 +294,12 @@ Sub-phases:
 - The smoke checks that archived objects expose no edit action buttons and that the HUD reports the archived object as read-only
 - Backend assertions confirm the live object is deleted while the snapshot row keeps archived state and captured public state
 
+### Phase 3.6 — Private Destructive Editing Smoke ✅
+- Added `smoke:private-destructive-edit` as an explicit Phase 3 gate for private-room destructive editing
+- Public rooms and private rooms without destructive edits enabled reject released-object deletes
+- Private rooms with destructive edits enabled allow a non-creator player to delete a released object
+- This separates the V1 private-room success criterion from the broader world-settings smoke
+
 ### Phase 4 — Multiplayer Validation (Prototype 2)
 - Multi-host world network (federated worlds model)
 - Trusted builder role (host-elevated players)
