@@ -307,6 +307,13 @@ Sub-phases:
 - Main feel risks remain: avatar-specific copy still dominates the world-object flow, transforms are button-level rather than direct manipulation, and prompt variety is still fixture-limited
 - The next product-risk slice should connect a real create-only external AI worker or run human playtests with varied prompt outputs before treating prompt-to-feel as validated
 
+### Phase 3.8 — Create-Only External AI Worker ✅
+- Added `@3dvibegame/ai-worker` as an external Node TypeScript service with `POST /generate`, `GET /healthz`, and CORS preflight support
+- The first worker slice supports create only; refine and remix return `unsupported_request` so reducers remain authoritative and no worker writes to SpacetimeDB
+- Gemini integration uses the current AI SDK structured-output path to produce a constrained create plan, then the worker deterministically converts that plan into `VoxelBuilderSpec` and compiled `BuilderSpec`
+- Added a fake plan generator, unit tests, and `smoke:fake-create` so CI/local verification does not require a Gemini key
+- Runtime demo configuration now uses the HTTP worker for create drafts when `VITE_AI_WORKER_URL` is set while keeping refine fixture-backed for this slice
+
 ### Phase 4 — Multiplayer Validation (Prototype 2)
 - Multi-host world network (federated worlds model)
 - Trusted builder role (host-elevated players)

@@ -3,15 +3,20 @@ import { createFixtureAiWorkerClient } from "./fixtureAiWorkerClient";
 import { createHttpAiWorkerClient } from "./httpAiWorkerClient";
 
 export function createConfiguredAiWorkerClient(): AiWorkerClient {
+  const fixtureClient = createFixtureAiWorkerClient();
   const workerUrl = stringEnv("VITE_AI_WORKER_URL");
   if (!workerUrl) {
-    return createFixtureAiWorkerClient();
+    return fixtureClient;
   }
 
-  return createHttpAiWorkerClient({
+  const httpClient = createHttpAiWorkerClient({
     url: workerUrl,
     timeoutMs: numberEnv("VITE_AI_WORKER_TIMEOUT_MS") ?? undefined,
   });
+  return {
+    createDraft: httpClient.createDraft,
+    createEdit: fixtureClient.createEdit,
+  };
 }
 
 function stringEnv(key: string) {

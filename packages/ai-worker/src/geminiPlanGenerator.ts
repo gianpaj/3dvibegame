@@ -1,0 +1,70 @@
+import { google } from "@ai-sdk/google";
+import { generateText, Output } from "ai";
+
+import {
+  createPlanSchema,
+  type CreatePlanGenerator,
+} from "./contracts.ts";
+
+export interface GeminiPlanGeneratorConfig {
+  model?: string;
+  temperature?: number;
+}
+
+export function createGeminiPlanGenerator({
+  model = process.env.AI_WORKER_MODEL ?? "gemini-2.5-flash",
+  temperature = 0.25,
+}: GeminiPlanGeneratorConfig = {}): CreatePlanGenerator {
+  return {
+    async generateCreatePlan({ sourcePrompt, signal }) {
+      const { output, warnings } = await generateText({
+        model: google(model),
+        abortSignal: signal,
+        maxOutputTokens: 900,
+        output: Output.object({ schema: createPlanSchema }),
+        prompt: `Player prompt: ${sourcePrompt}`,
+        system:
+          "You plan simple voxel objects for Vibe World. Return a small, safe, world-native create plan only. Do not request terrain edits, accounts, economy, combat, scripting, raw meshes, or destructive actions.",
+        temperature,
+      });
+
+      return {
+        plan: output,
+        warnings: warnings?.map(warningText) ?? [],
+      };
+    },
+  };
+}
+
+function warningText(warning: unknown) {
+  if (typeof warning === "object" && warning && "message" in warning) {
+    return String(warning.message);
+  }
+  if (typeof warning === "object" && warning && "details" in warning) {
+    return String(warning.details);
+  }
+  return JSON.stringify(warning);
+}
+
+export function createStaticPlanGenerator(): CreatePlanGenerator {
+  return {
+    async generateCreatePlan({ sourcePrompt }) {
+      const normalized = sourcePrompt.toLowerCase();
+      const treeish = normalized.includes("tree") || normalized.includes("forest");
+      return {
+        plan: {
+          object_category: treeish ? "pine_tree" : "prompt_object",
+          size_tier: treeish ? "medium" : "small",
+          shape: treeish ? "tree" : "prop",
+          palette: treeish ? "forest" : "magic",
+          style_tags: treeish ? ["forest", "chunky", "soft_glow"] : ["chunky", "playful"],
+          behaviors: [],
+          key_features: treeish
+            ? ["blocky trunk", "layered canopy", "small glow detail"]
+            : ["solid silhouette", "single accent detail"],
+        },
+        warnings: ["static fake model adapter"],
+      };
+    },
+  };
+}

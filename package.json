@@ -3,10 +3,12 @@
   "private": true,
   "packageManager": "pnpm@10.21.0",
   "scripts": {
+    "ai-worker:dev": "pnpm --filter @3dvibegame/ai-worker dev",
+    "ai-worker:typecheck": "pnpm --filter @3dvibegame/ai-worker typecheck",
     "backend:build": "pnpm --filter @3dvibegame/world-backend build",
     "demo:dev": "pnpm --filter @3dvibegame/scene-runtime-demo dev",
     "demo:build": "pnpm --filter @3dvibegame/scene-runtime-demo build",
     "runtime:build": "pnpm --filter @3dvibegame/scene-runtime-ts build",
-    "typecheck": "pnpm -r --filter @3dvibegame/scene-runtime-ts --filter @3dvibegame/scene-authority-ts --filter @3dvibegame/scene-runtime-demo --filter @3dvibegame/world-backend typecheck"
+    "typecheck": "pnpm -r --filter @3dvibegame/ai-worker --filter @3dvibegame/scene-runtime-ts --filter @3dvibegame/scene-authority-ts --filter @3dvibegame/scene-runtime-demo --filter @3dvibegame/world-backend typecheck"
   }
 }
