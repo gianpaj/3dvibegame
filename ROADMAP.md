@@ -320,6 +320,11 @@ Sub-phases:
 - The smoke releases the generated object and asserts backend rows show a completed create job and public `pine_tree` object
 - This closes the local no-key path for testing the external worker boundary end to end
 
+### Phase 3.10 — Optional Gemini Live Smoke ✅
+- Added `smoke:gemini-live` for `@3dvibegame/ai-worker` to exercise the real Gemini-backed create path when `GOOGLE_GENERATIVE_AI_API_KEY` is present
+- The smoke starts the worker in-process, posts one create prompt, and validates completed source and builder specs
+- Without a Gemini key, the smoke exits successfully with an explicit skip message so local and CI runs remain deterministic
+
 ### Phase 4 — Multiplayer Validation (Prototype 2)
 - Multi-host world network (federated worlds model)
 - Trusted builder role (host-elevated players)

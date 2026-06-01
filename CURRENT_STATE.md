@@ -41,6 +41,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Phase 3 prompt-to-feel notes now distinguish fixture latency from real AI latency and flag remaining UX feel risks.
 - `@3dvibegame/ai-worker` now provides a create-only external HTTP AI worker with Gemini support, a fake local adapter, tests, and a fake-create smoke.
 - Runtime demo live browser smokes now cover `VITE_AI_WORKER_URL` by running the fake external AI worker through the HTTP create path.
+- AI worker now has an optional Gemini live smoke that runs only when `GOOGLE_GENERATIVE_AI_API_KEY` is set and otherwise skips cleanly.
 - Public-room object creation now rejects duplicate pending create jobs and enforces prototype live-object caps per world and per creator.
 - Backend archive/reset reducers now snapshot live objects into immutable archive rows, wipe live objects on reset, clear locks, and fail pending AI jobs.
 - Runtime demo live mode now surfaces backend archive/reset rows in bridge snapshots and the HUD Debug panel.
@@ -67,8 +68,8 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 
 ## Next Slices
 
-1. Add an optional Gemini live smoke gated by `GOOGLE_GENERATIVE_AI_API_KEY`.
-2. Add an aggregate Phase 3 smoke command for backend, browser, and fake-worker gates.
+1. Add an aggregate Phase 3 smoke command for backend, browser, and fake-worker gates.
+2. Decide whether Phase 3 is ready to close or needs a small UX copy/direct-manipulation polish pass.
 
 ## Later
 
@@ -88,6 +89,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - `pnpm --filter @3dvibegame/ai-worker typecheck`: passing as of 2026-06-01.
 - `pnpm --filter @3dvibegame/ai-worker test`: passing as of 2026-06-01.
 - AI worker fake-create smoke: `pnpm --filter @3dvibegame/ai-worker smoke:fake-create` passing as of 2026-06-01.
+- AI worker Gemini live smoke: `pnpm --filter @3dvibegame/ai-worker smoke:gemini-live` skipping cleanly without `GOOGLE_GENERATIVE_AI_API_KEY` as of 2026-06-01.
 - `pnpm typecheck`: passing as of 2026-06-01.
 - Live HTTP AI worker browser smoke: `pnpm --filter @3dvibegame/scene-runtime-demo smoke:live-http-ai-worker` passing as of 2026-06-01.
 - `pnpm demo:build`: passing as of 2026-05-31.
