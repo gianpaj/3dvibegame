@@ -31,6 +31,7 @@ try {
     dbPrefix: "vibe-world-live-http-ai-worker-browser",
     nickname: "HTTP Worker Browser",
     viteEnv: {
+      VITE_AI_CLIENT_MODE: "http-worker",
       VITE_AI_WORKER_TIMEOUT_MS: "10000",
       VITE_AI_WORKER_URL: `${workerUrl}/generate`,
     },

@@ -164,7 +164,7 @@ Players enter a shared world, type a natural-language prompt, watch a blocky vox
 - Final assertions confirm the object advances to version 2 cooldown and the active `object_lock` row is cleared
 
 ### Phase 2.17 — HTTP AI Worker Client Boundary ✅
-- Added an HTTP-backed `AiWorkerClient` implementation selected with `VITE_AI_WORKER_URL`
+- Added an HTTP-backed `AiWorkerClient` implementation selected with `VITE_AI_CLIENT_MODE=http-worker` plus `VITE_AI_WORKER_URL`
 - The HTTP client posts one create/refine request shape with prompt, target object, base version, and object-context fields
 - Worker responses are normalized into canonical `source_spec_json` and derived `builder_spec_json` before reducer submission
 - `VITE_AI_WORKER_TIMEOUT_MS` controls request timeout, and worker failure responses surface as HUD/backend action errors
@@ -312,11 +312,11 @@ Sub-phases:
 - The first worker slice supports create only; refine and remix return `unsupported_request` so reducers remain authoritative and no worker writes to SpacetimeDB
 - Gemini integration uses the current AI SDK structured-output path to produce a constrained create plan, then the worker deterministically converts that plan into `VoxelBuilderSpec` and compiled `BuilderSpec`
 - Added a fake plan generator, unit tests, and `smoke:fake-create` so CI/local verification does not require a Gemini key
-- Runtime demo configuration now uses the HTTP worker for create drafts when `VITE_AI_WORKER_URL` is set; edit/remix UI is deferred until it can use the same external worker boundary
+- Runtime demo configuration now uses the HTTP worker for create drafts only when `VITE_AI_CLIENT_MODE=http-worker` and `VITE_AI_WORKER_URL` are set; edit/remix UI is deferred until it can use the same external worker boundary
 
 ### Phase 3.9 — HTTP AI Worker Browser Smoke ✅
 - Added `smoke:live-http-ai-worker` to start the fake external AI worker, live SpacetimeDB backend, Vite demo, and Chromium browser together
-- The browser prompt path now verifies `VITE_AI_WORKER_URL` create requests reach the external worker and return to backend grace state
+- The browser prompt path now verifies explicitly enabled HTTP-worker create requests reach the external worker and return to backend grace state
 - The smoke releases the generated object and asserts backend rows show a completed create job and public `pine_tree` object
 - This closes the local no-key path for testing the external worker boundary end to end
 
@@ -366,7 +366,7 @@ Sub-phases:
 
 ### Phase 4.4 — Prompt-Only Demo UI Cleanup ✅
 - Removed quick prompt chips, canned recipe labels, and fixed creative action buttons from the runtime demo HUD
-- The prompt box now starts empty so create intent comes from the player and, in live mode, flows through `VITE_AI_WORKER_URL`
+- The prompt box now starts empty so create intent comes from the player and, in live mode, flows through fixture, browser-Gemini, or explicitly enabled HTTP-worker generation
 - The only remaining object button is `Release`, treated as a lifecycle reducer action rather than an LLM-authored creative action
 - Live browser smokes now assert released objects do not expose fixed move/rotate/scale/refine buttons or the old `data-refine` / `data-prompt` affordances
 

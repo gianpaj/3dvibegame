@@ -11,8 +11,10 @@ export function createConfiguredAiWorkerClient({
   getBrowserGeminiApiKey,
 }: ConfiguredAiWorkerClientOptions = {}): AiWorkerClient {
   const fixtureClient = createFixtureAiWorkerClient();
+  const clientMode = stringEnv("VITE_AI_CLIENT_MODE");
   const workerUrl = stringEnv("VITE_AI_WORKER_URL");
-  const httpClient = workerUrl
+  const httpWorkerRequested = clientMode === "http-worker";
+  const httpClient = httpWorkerRequested && workerUrl
     ? createHttpAiWorkerClient({
         url: workerUrl,
         timeoutMs: numberEnv("VITE_AI_WORKER_TIMEOUT_MS") ?? undefined,
@@ -31,7 +33,10 @@ export function createConfiguredAiWorkerClient({
       if (browserGeminiClient && getBrowserGeminiApiKey?.()?.trim()) {
         return browserGeminiClient.createDraft(input);
       }
-      if (httpClient) {
+      if (httpWorkerRequested) {
+        if (!httpClient) {
+          throw new Error("VITE_AI_CLIENT_MODE=http-worker requires VITE_AI_WORKER_URL.");
+        }
         return httpClient.createDraft(input);
       }
       return fixtureClient.createDraft(input);

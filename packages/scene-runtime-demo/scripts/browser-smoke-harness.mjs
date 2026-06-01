@@ -90,6 +90,7 @@ function startVite(port, harness, nickname, viteEnv) {
       cwd: repoRoot,
       env: {
         ...process.env,
+        VITE_AI_CLIENT_MODE: "",
         VITE_AI_WORKER_TIMEOUT_MS: "",
         VITE_AI_WORKER_URL: "",
         VITE_PLAYER_NICKNAME: nickname,

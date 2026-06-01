@@ -40,6 +40,7 @@ try {
     dbPrefix: "vibe-world-live-gemini-ai-worker-browser",
     nickname: "Gemini Worker Browser",
     viteEnv: {
+      VITE_AI_CLIENT_MODE: "http-worker",
       VITE_AI_WORKER_TIMEOUT_MS: process.env.VITE_AI_WORKER_TIMEOUT_MS ?? "45000",
       VITE_AI_WORKER_URL: `${workerUrl}/generate`,
     },

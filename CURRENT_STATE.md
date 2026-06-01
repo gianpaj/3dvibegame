@@ -28,7 +28,7 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Runtime demo live mode now routes HUD prompts and release actions through backend lifecycle reducers using fixture-backed or HTTP AI-worker create specs.
 - Runtime demo live HUD now shows backend lifecycle status for grace windows, edit locks, cooldowns, archived/deleted rows, and reducer errors.
 - Runtime demo now has an explicit fixture-backed `AiWorkerClient` boundary that returns canonical source specs plus derived builder artifacts before reducer submission.
-- Runtime demo can swap that boundary to an HTTP AI worker with `VITE_AI_WORKER_URL`, while fixture generation remains the offline default.
+- Runtime demo can swap that boundary to an HTTP AI worker only when `VITE_AI_CLIENT_MODE=http-worker` and `VITE_AI_WORKER_URL` are set; fixture generation remains the offline default.
 - Runtime demo now records backend create-job failures/timeouts when the HTTP AI worker fails or returns invalid artifacts.
 - Runtime demo Debug panel now exposes backend canonical source specs and derived renderer artifacts for the selected live object without feeding them back into render authority state.
 - World backend now has a repeatable two-client lock-contention smoke that uses separate server-issued anonymous identities for Alice and Bob.
@@ -40,9 +40,9 @@ Use this file as the short project tracker. Keep long reasoning in `docs/plans/`
 - Runtime demo live browser smokes now share a backend/Vite/Chromium CDP harness, including archive read-only coverage after reset.
 - Phase 3 prompt-to-feel notes now distinguish fixture latency from real AI latency and flag remaining UX feel risks.
 - `@3dvibegame/ai-worker` now provides a create-only external HTTP AI worker with Gemini support, a fake local adapter, tests, and a fake-create smoke.
-- Runtime demo live browser smokes now cover `VITE_AI_WORKER_URL` by running the fake external AI worker through the HTTP create path.
+- Runtime demo live browser smokes now cover explicitly enabled `VITE_AI_WORKER_URL` usage by running the fake external AI worker through the HTTP create path.
 - AI worker now has an optional Gemini live smoke that loads local `.env` and has passed a keyed real-LLM create call.
-- Runtime demo now has an optional live Gemini browser smoke that sends a prompt through `VITE_AI_WORKER_URL`, waits for backend grace state, releases the object, and verifies the backend create job completed.
+- Runtime demo now has an optional live Gemini browser smoke that sends a prompt through an explicitly enabled HTTP worker, waits for backend grace state, releases the object, and verifies the backend create job completed.
 - AI worker create specs now use renderer-known materials, fixture-scale dimensions, and y-grounding so real LLM outputs do not spawn tiny or under the scene plane.
 - Runtime demo HUD no longer exposes quick prompt chips or fixed move/rotate/scale/refine buttons; the prompt/AI-worker path owns creative actions and `Release` remains lifecycle-only.
 - `@3dvibegame/ai-planning` now owns the shared create-plan schema, Gemini structured-output schema, system prompt, and deterministic plan-to-builder conversion for both Node and browser generation paths.
