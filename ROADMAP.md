@@ -325,6 +325,11 @@ Sub-phases:
 - The smoke starts the worker in-process, posts one create prompt, and validates completed source and builder specs
 - Without a Gemini key, the smoke exits successfully with an explicit skip message so local and CI runs remain deterministic
 
+### Phase 3.11 — Aggregate Phase 3 Smoke Suite ✅
+- Added root `phase3:smoke` to run the Phase 3 backend, AI-worker, and live browser gates in a fixed order
+- The suite covers first-playable flow, 20-player replay, lock contention, private destructive editing, archive/reset, AI job failure, world settings, fake AI worker create, optional Gemini live smoke, and live browser flows
+- This gives Phase 3 one command for pre-close regression checks while preserving the focused smoke scripts for debugging
+
 ### Phase 4 — Multiplayer Validation (Prototype 2)
 - Multi-host world network (federated worlds model)
 - Trusted builder role (host-elevated players)

@@ -8,6 +8,7 @@
     "backend:build": "pnpm --filter @3dvibegame/world-backend build",
     "demo:dev": "pnpm --filter @3dvibegame/scene-runtime-demo dev",
     "demo:build": "pnpm --filter @3dvibegame/scene-runtime-demo build",
+    "phase3:smoke": "node scripts/smoke-phase3.mjs",
     "runtime:build": "pnpm --filter @3dvibegame/scene-runtime-ts build",
     "typecheck": "pnpm -r --filter @3dvibegame/ai-worker --filter @3dvibegame/scene-runtime-ts --filter @3dvibegame/scene-authority-ts --filter @3dvibegame/scene-runtime-demo --filter @3dvibegame/world-backend typecheck"
   }
