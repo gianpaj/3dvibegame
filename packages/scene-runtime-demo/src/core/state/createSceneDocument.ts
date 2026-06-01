@@ -57,7 +57,7 @@ export function createEmptySceneDocument(
         previousSession,
         stage: "idle",
         matchedScenarioKey: "avatar_forge",
-        lastMessage: "Enter a prompt to generate the first avatar draft.",
+        lastMessage: "Enter a prompt to generate the first world object.",
         stageEvents: [],
         plannedIntent: null,
         availableActions: [],

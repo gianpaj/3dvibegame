@@ -4,7 +4,6 @@ import {
   buildSceneDocument,
   aiWorkerFailureCodeFromUnknown,
   aiWorkerFailureLabel,
-  scenarios,
   type GenerationActionId,
   type GenerationSnapshot,
 } from "../core";
@@ -133,15 +132,10 @@ export function backendAvailableActions(
     object.state === "edit_locked" && object.lock_owner_id === localPlayerId;
 
   if (isGraceOwner || isLockOwner) {
-    return ["nudge_draft", "rotate_draft", "scale_draft", "release_object"];
+    return isGraceOwner ? ["release_object"] : [];
   }
 
-  if (object.state !== "public") {
-    return [];
-  }
-
-  const nextStep = scenarios.avatar_forge.refineSteps[object.version - 1];
-  return nextStep ? [nextStep.actionId] : ["nudge_draft", "rotate_draft", "scale_draft"];
+  return [];
 }
 
 function stageForBackendObject(
@@ -198,7 +192,7 @@ function backendMessageForObject(
     case "cooldown":
       return `Backend edit accepted. ${object.cooldown_remaining_seconds}s cooldown remain.`;
     case "public":
-      return `Backend object version ${object.version} is public and ready to remix.`;
+      return `Backend object version ${object.version} is public.`;
     case "archived":
       return `Backend object version ${object.version} is archived read-only.`;
     case "deleted":

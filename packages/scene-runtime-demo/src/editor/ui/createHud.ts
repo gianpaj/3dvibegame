@@ -1,13 +1,5 @@
 import type { GenerationActionId, GenerationSnapshot } from "../../core";
-import type { ScenarioKey } from "../../core";
 import type { BackendPresenceSnapshot } from "../../backend";
-
-interface ScenarioOption {
-  key: ScenarioKey;
-  label: string;
-  description: string;
-  sourcePrompt: string;
-}
 
 type HudPanel = "build" | "chat" | "players" | "debug" | "settings";
 type FeedbackVote = "up" | "down" | null;
@@ -63,31 +55,12 @@ export interface HudWorldLifecycleInput {
 
 interface HudConfig {
   root: HTMLElement;
-  scenarios: ScenarioOption[];
   onPromptSubmit(prompt: string): void;
   onAction(actionId: GenerationActionId): void;
   onWorldSettingsSubmit?(input: HudWorldSettingsInput): void;
   onWorldLifecycleAction?(input: HudWorldLifecycleInput): void;
   onInteractionStateChange?(state: HudInteractionState): void;
 }
-
-const actionLabels: Record<GenerationActionId, string> = {
-  refine_silhouette: "Refine silhouette",
-  add_ornament: "Add ornament",
-  nudge_draft: "Move",
-  rotate_draft: "Rotate",
-  scale_draft: "Scale",
-  release_object: "Release",
-};
-
-const actionDescriptions: Record<GenerationActionId, string> = {
-  refine_silhouette: "Broaden the stance and make the character read clearly at distance.",
-  add_ornament: "Add the chest rune and shoulder details for stronger identity.",
-  nudge_draft: "Shift the draft object slightly in the preview.",
-  rotate_draft: "Turn the draft object to inspect its silhouette.",
-  scale_draft: "Increase the draft object scale a little.",
-  release_object: "Publish the draft so refine steps can start.",
-};
 
 const stageLabels = {
   idle: "Ready",
@@ -114,14 +87,12 @@ const workflowLabels: Record<HudWorkflowState, string> = {
 
 export function createHud({
   root,
-  scenarios,
   onPromptSubmit,
   onAction,
   onWorldSettingsSubmit,
   onWorldLifecycleAction,
   onInteractionStateChange,
 }: HudConfig) {
-  const initialPrompt = scenarios[0]?.sourcePrompt ?? "";
   let activePanel: HudPanel | null = null;
   let feedbackVote: FeedbackVote = null;
   let feedbackNote = "";
@@ -182,7 +153,7 @@ export function createHud({
           id="creator-prompt"
           rows="1"
           data-role="prompt-input"
-          placeholder="Ask Savi to add, refine, or explain something in the world..."
+          placeholder="Ask Savi to create something in the world..."
         ></textarea>
         <button class="send-button" type="submit">Send</button>
       </form>
@@ -204,8 +175,6 @@ export function createHud({
   const presencePill = required<HTMLElement>(root, '[data-role="presence-pill"]');
   const roomSubtitle = required<HTMLElement>(root, '[data-role="room-subtitle"]');
   const contextMessage = required<HTMLElement>(root, '[data-role="context-message"]');
-
-  promptInput.value = initialPrompt;
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -257,8 +226,9 @@ export function createHud({
 
     const panel = button.dataset.panel as HudPanel | undefined;
     const action = button.dataset.action;
-    const prompt = button.dataset.prompt;
-    const refineAction = button.dataset.refine as GenerationActionId | undefined;
+    const objectLifecycleAction = button.dataset.objectLifecycleAction as
+      | GenerationActionId
+      | undefined;
     const worldLifecycle = button.dataset.worldLifecycle as
       | HudWorldLifecycleInput["action"]
       | undefined;
@@ -270,16 +240,8 @@ export function createHud({
       return;
     }
 
-    if (prompt !== undefined) {
-      promptInput.value = prompt;
-      promptInput.focus();
-      activePanel = "chat";
-      render();
-      return;
-    }
-
-    if (refineAction) {
-      onAction(refineAction);
+    if (objectLifecycleAction === "release_object") {
+      onAction(objectLifecycleAction);
       return;
     }
 
@@ -433,31 +395,10 @@ export function createHud({
 
     return `
       <section class="sheet-section">
-        <h2>Quick prompts</h2>
-        <div class="prompt-chip-grid">
-          ${scenarios
-            .map(
-              (scenario) => `
-                <button
-                  class="prompt-chip"
-                  type="button"
-                  data-prompt="${escapeHtml(scenario.sourcePrompt)}"
-                >
-                  <span>${escapeHtml(scenario.label)}</span>
-                  <small>${escapeHtml(scenario.description)}</small>
-                </button>
-              `,
-            )
-            .join("")}
-        </div>
-      </section>
-
-      <section class="sheet-section">
         <h2>Generation status</h2>
         <div class="metric-grid">
           ${metric("State", workflowLabels[workflowState])}
           ${metric("Stage", stageLabels[snapshot.stage])}
-          ${metric("Recipe", snapshot.matchedScenarioLabel)}
           ${metric("Version", snapshot.object ? `v${snapshot.object.version}` : "none")}
           ${metric("Lifecycle", lifecycleStatusLabel(snapshot))}
           ${metric("Parts", partCountLabel(snapshot))}
@@ -598,6 +539,9 @@ export function createHud({
 
   function renderActionDock(snapshot: GenerationSnapshot) {
     const workflowState = resolveWorkflowState(snapshot);
+    const visibleActions = snapshot.availableActions.filter(
+      (actionId) => actionId === "release_object",
+    );
 
     if (workflowState === "failed") {
       return `
@@ -622,7 +566,7 @@ export function createHud({
     if (workflowState === "refining" && snapshot.stage === "cooldown") {
       return `
         <div class="dock-card dock-card--busy">
-          <span>Refinement cooldown</span>
+          <span>Object cooldown</span>
           <strong>${escapeHtml(stageLabels[snapshot.stage])}</strong>
           <p>${escapeHtml(snapshot.lastMessage)}</p>
         </div>
@@ -633,7 +577,7 @@ export function createHud({
       return "";
     }
 
-    if (!snapshot.availableActions.length) {
+    if (!visibleActions.length) {
       return `
         <div class="dock-card">
           <span>${escapeHtml(unavailableActionKicker(snapshot))}</span>
@@ -646,16 +590,14 @@ export function createHud({
     return `
       <div class="dock-card dock-card--actions">
         <div>
-          <span>Object actions</span>
-          <strong>${escapeHtml(actionLabels[snapshot.availableActions[0]])}</strong>
-          <p>${escapeHtml(actionDescriptions[snapshot.availableActions[0]])}</p>
+          <span>Draft lifecycle</span>
+          <strong>Release</strong>
+          <p>Publish this draft to the shared world.</p>
         </div>
-        ${snapshot.availableActions
+        ${visibleActions
           .map(
             (actionId) => `
-              <button type="button" data-refine="${actionId}">
-                ${escapeHtml(actionLabels[actionId])}
-              </button>
+              <button type="button" data-object-lifecycle-action="${actionId}">Release</button>
             `,
           )
           .join("")}

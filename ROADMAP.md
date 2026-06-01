@@ -303,8 +303,8 @@ Sub-phases:
 ### Phase 3.7 — Prompt-to-Feel Playtest Notes ✅
 - Live browser smokes show the fixture-backed path is mechanically responsive: recent local runs reached grace in roughly 115-123 ms
 - That latency is not real AI latency; it only validates browser, reducer, fixture-worker, and sync overhead
-- The grace/release/remix loop is legible in the HUD: draft ready, release, public refine, and v2 public return all have visible states
-- Main feel risks remain: transforms are button-level rather than direct manipulation, prompt variety is still fixture-limited, and the avatar-specific copy needs a world-object pass
+- The grace/release loop is legible in the HUD: draft ready, release, and public object return all have visible states
+- Main feel risks remain: edit/remix still needs the real AI-worker path, prompt variety is still fixture-limited in offline mode, and some prototype copy still needs a world-object pass
 - The next product-risk slice should connect a real create-only external AI worker or run human playtests with varied prompt outputs before treating prompt-to-feel as validated
 
 ### Phase 3.8 — Create-Only External AI Worker ✅
@@ -312,7 +312,7 @@ Sub-phases:
 - The first worker slice supports create only; refine and remix return `unsupported_request` so reducers remain authoritative and no worker writes to SpacetimeDB
 - Gemini integration uses the current AI SDK structured-output path to produce a constrained create plan, then the worker deterministically converts that plan into `VoxelBuilderSpec` and compiled `BuilderSpec`
 - Added a fake plan generator, unit tests, and `smoke:fake-create` so CI/local verification does not require a Gemini key
-- Runtime demo configuration now uses the HTTP worker for create drafts when `VITE_AI_WORKER_URL` is set while keeping refine fixture-backed for this slice
+- Runtime demo configuration now uses the HTTP worker for create drafts when `VITE_AI_WORKER_URL` is set; edit/remix UI is deferred until it can use the same external worker boundary
 
 ### Phase 3.9 — HTTP AI Worker Browser Smoke ✅
 - Added `smoke:live-http-ai-worker` to start the fake external AI worker, live SpacetimeDB backend, Vite demo, and Chromium browser together
@@ -332,9 +332,9 @@ Sub-phases:
 - This gives Phase 3 one command for pre-close regression checks while preserving the focused smoke scripts for debugging
 
 ### Phase 3.12 — World-Object HUD Copy Polish ✅
-- Replaced the most visible avatar-specific HUD labels with object/world wording in the room title, action dock, build panel subtitle, local room status, and player status copy
-- Live first-playable browser smoke now reaches the released remix state with `Object actions`, keeping the first playable framed as world object creation rather than avatar editing
-- Direct manipulation remains a later playtest polish candidate, but Phase 3 now has the reducer, browser, AI-worker, and copy gates needed to close the prototype
+- Replaced the most visible avatar-specific HUD labels with object/world wording in the room title, lifecycle dock, build panel subtitle, local room status, and player status copy
+- Live first-playable browser smoke now reaches the released-object state with lifecycle wording, keeping the first playable framed as world object creation rather than avatar editing
+- Direct manipulation and edit/remix controls remain later playtest polish candidates, but Phase 3 now has the reducer, browser, AI-worker, and copy gates needed to close the prototype
 
 ### Phase 4 — Multiplayer Validation (Prototype 2) 🔄 *(current)*
 - Multi-host world network (federated worlds model)
@@ -363,6 +363,12 @@ Sub-phases:
 - Generated operations are y-grounded before compilation so line/sphere bounds do not dip below the scene plane
 - Palette conversion now emits renderer-known material ids such as `moss_stone`, `wood`, and `neon`
 - Regression coverage verifies a mossy guardian compiles to a grounded, visible-height builder spec with distinct runtime materials
+
+### Phase 4.4 — Prompt-Only Demo UI Cleanup ✅
+- Removed quick prompt chips, canned recipe labels, and fixed creative action buttons from the runtime demo HUD
+- The prompt box now starts empty so create intent comes from the player and, in live mode, flows through `VITE_AI_WORKER_URL`
+- The only remaining object button is `Release`, treated as a lifecycle reducer action rather than an LLM-authored creative action
+- Live browser smokes now assert released objects do not expose fixed move/rotate/scale/refine buttons or the old `data-refine` / `data-prompt` affordances
 
 ### Phase 5 — V1 Hardening & Launch
 - Rate limiting and abuse guardrails

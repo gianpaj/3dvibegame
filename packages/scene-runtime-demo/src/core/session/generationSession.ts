@@ -84,7 +84,7 @@ interface CachedObjectArtifacts {
 }
 
 export function createGenerationSessionController(
-  initialPrompt = scenarios.avatar_forge.sourcePrompt,
+  initialPrompt = "",
 ) {
   const playerId = "player_1";
   let world = buildInitialWorld();
@@ -93,7 +93,7 @@ export function createGenerationSessionController(
   let sourcePrompt = initialPrompt;
   let stage: GenerationStage = "idle";
   let matchedScenarioKey = resolveScenarioFromPrompt(initialPrompt).key;
-  let lastMessage = "Enter a prompt to generate the first avatar draft.";
+  let lastMessage = "Enter a prompt to generate the first world object.";
   let stageEvents: GenerationStageEvent[] = [];
   let plannedIntent: GenerationIntent | null = null;
   let voxelArtifact: VoxelSourceArtifact | null = null;
@@ -132,7 +132,7 @@ export function createGenerationSessionController(
         plannedIntent,
         voxelArtifact,
         compiledArtifact,
-        availableActions: resolveAvailableActions(currentObject, scenario),
+        availableActions: resolveAvailableActions(currentObject),
       };
     },
     submitPrompt(prompt: string) {
@@ -184,7 +184,7 @@ export function createGenerationSessionController(
       if (!trimmed) {
         sourcePrompt = "";
         stage = "failed";
-        lastMessage = "Prompt is empty. Enter a request to generate your avatar.";
+        lastMessage = "Prompt is empty. Enter a request to generate an object.";
         pushStageEvent("failed", lastMessage, "error");
         syncDocument();
         notify();
@@ -206,7 +206,7 @@ export function createGenerationSessionController(
         });
         world = queued.world;
         stage = "queued";
-        lastMessage = `Queued your avatar prompt and matched the ${scenario.label.toLowerCase()} recipe.`;
+        lastMessage = "Queued your object prompt for generation.";
         pushStageEvent("queued", lastMessage, "complete");
         syncDocument();
         notify();
@@ -261,7 +261,7 @@ export function createGenerationSessionController(
               diagnostics: [...derivedSpec.diagnostics],
             };
             stage = "voxel_source_ready";
-            lastMessage = `Cache hit: derived avatar ${intent!.object_category} from stored template (${derivedSpec.operations.length} ops).`;
+            lastMessage = `Cache hit: derived ${intent!.object_category} object from stored template (${derivedSpec.operations.length} ops).`;
           } else {
             // Cache miss: use the fixture/AI worker path, then store for future reuse.
             specTemplateCache.store(scenario.voxelSource);
@@ -272,7 +272,7 @@ export function createGenerationSessionController(
               diagnostics: [...scenario.voxelSource.diagnostics],
             };
             stage = "voxel_source_ready";
-            lastMessage = `Avatar voxel source ready with ${scenario.voxelSource.operations.length} ordered operations.`;
+            lastMessage = `Object voxel source ready with ${scenario.voxelSource.operations.length} ordered operations.`;
           }
 
           pushStageEvent("voxel_source_ready", lastMessage, "complete");
@@ -289,7 +289,7 @@ export function createGenerationSessionController(
           };
           pushStageEvent(
             "compiled_artifact_ready",
-            `Compiled the avatar draft into ${scenario.draftBuilder.complexity.part_count} runtime parts.`,
+            `Compiled the object draft into ${scenario.draftBuilder.complexity.part_count} runtime parts.`,
             "complete",
           );
 
@@ -331,7 +331,7 @@ export function createGenerationSessionController(
       const scenario = scenarios[matchedScenarioKey];
 
       if (!object) {
-        lastMessage = "Generate an avatar first before editing or submitting a refine step.";
+        lastMessage = "Generate an object first before using a lifecycle action.";
         syncDocument();
         notify();
         return;
@@ -343,7 +343,7 @@ export function createGenerationSessionController(
         const expectedRefineAction = scenario.refineSteps[object.version - 1]?.actionId;
 
         if (expectedRefineAction !== actionId || object.state !== "public") {
-          lastMessage = "That refine step is not currently available for this avatar version.";
+          lastMessage = "That refine step is not currently available for this object version.";
           pushStageEvent("failed", lastMessage, "error");
           syncDocument();
           notify();
@@ -361,7 +361,7 @@ export function createGenerationSessionController(
           });
           world = locked.world;
           stage = "edit_locked";
-          lastMessage = `Locked avatar version ${object.version} for ${nextStep.label.toLowerCase()}.`;
+          lastMessage = `Locked object version ${object.version} for ${nextStep.label.toLowerCase()}.`;
           pushStageEvent("edit_locked", lastMessage, "complete");
 
           const boundVoxel = createBoundVoxelArtifact(nextStep, object);
@@ -386,7 +386,7 @@ export function createGenerationSessionController(
             ],
           };
           stage = "cooldown";
-          lastMessage = `${nextStep.label} accepted as avatar version ${object.version + 1}.`;
+          lastMessage = `${nextStep.label} accepted as object version ${object.version + 1}.`;
           pushStageEvent("cooldown", submitted.event.message, "complete");
 
           const cooledDown = expireCooldown(world, {
@@ -394,7 +394,7 @@ export function createGenerationSessionController(
           });
           world = cooledDown.world;
           stage = "released";
-          lastMessage = `Avatar version ${object.version + 1} is now public and ready for the next refine step.`;
+          lastMessage = `Object version ${object.version + 1} is now public.`;
           pushStageEvent("released", cooledDown.event.message, "complete");
           persistArtifactsForObject(object.object_id);
         } catch (error) {
@@ -409,7 +409,7 @@ export function createGenerationSessionController(
       }
 
       if (!isTransformAction(actionId)) {
-        lastMessage = "That action is not currently available for this avatar.";
+        lastMessage = "That action is not currently available for this object.";
         pushStageEvent("failed", lastMessage, "error");
         syncDocument();
         notify();
@@ -448,7 +448,7 @@ export function createGenerationSessionController(
             world = result.world;
             lastMessage =
               editableObject.state === "edit_locked"
-                ? "Moved the selected avatar during the edit lock."
+                ? "Moved the selected object during the edit lock."
                 : "Moved the draft within the grace window.";
             pushStageEvent(
               editableObject.state === "edit_locked" ? "edit_locked" : "grace",
@@ -479,7 +479,7 @@ export function createGenerationSessionController(
             world = result.world;
             lastMessage =
               editableObject.state === "edit_locked"
-                ? "Rotated the selected avatar during the edit lock."
+                ? "Rotated the selected object during the edit lock."
                 : "Rotated the draft to inspect its silhouette before release.";
             pushStageEvent(
               editableObject.state === "edit_locked" ? "edit_locked" : "grace",
@@ -512,7 +512,7 @@ export function createGenerationSessionController(
             world = result.world;
             lastMessage =
               editableObject.state === "edit_locked"
-                ? "Scaled the selected avatar during the edit lock."
+                ? "Scaled the selected object during the edit lock."
                 : "Scaled the draft up during grace.";
             pushStageEvent(
               editableObject.state === "edit_locked" ? "edit_locked" : "grace",
@@ -538,7 +538,7 @@ export function createGenerationSessionController(
             lastMessage =
               editableObject.state === "edit_locked"
                 ? result.event.message
-                : "Published avatar version 1 to the player profile.";
+                : "Published object version 1 to the shared world.";
             activeObjectId = editableObject.object_id;
             clearEditLockTimer();
             pushStageEvent("released", lastMessage, "complete");
@@ -546,7 +546,7 @@ export function createGenerationSessionController(
             break;
           }
           default:
-            lastMessage = "That action is not currently available for this avatar.";
+            lastMessage = "That action is not currently available for this object.";
             pushStageEvent("failed", lastMessage, "error");
         }
       } catch (error) {
@@ -683,7 +683,7 @@ export function createGenerationSessionController(
     objectArtifactsById = {};
     objectSessionsById = {};
     stage = "idle";
-    lastMessage = "Enter a prompt to generate the first avatar draft.";
+    lastMessage = "Enter a prompt to generate the first world object.";
   }
 
   function schedule(delayMs: number, callback: () => void) {
@@ -749,10 +749,7 @@ export function createGenerationSessionController(
       plannedIntent,
       voxelArtifact,
       compiledArtifact,
-      availableActions: resolveAvailableActions(
-        resolveCurrentObject(),
-        scenarios[matchedScenarioKey],
-      ),
+      availableActions: resolveAvailableActions(resolveCurrentObject()),
     });
 
     const nextFocusTarget =
@@ -941,22 +938,16 @@ function buildInitialWorld(): AuthorityWorld {
 
 function resolveAvailableActions(
   object: AuthorityWorld["objects"][number] | null,
-  scenario: LifecycleScenario,
 ): GenerationActionId[] {
   if (!object) {
     return [];
   }
 
   if (object.state === "grace" || object.state === "edit_locked") {
-    return ["nudge_draft", "rotate_draft", "scale_draft", "release_object"];
+    return object.state === "grace" ? ["release_object"] : [];
   }
 
-  if (object.state !== "public") {
-    return [];
-  }
-
-  const nextStep = scenario.refineSteps[object.version - 1];
-  return nextStep ? [nextStep.actionId] : ["nudge_draft", "rotate_draft", "scale_draft"];
+  return [];
 }
 
 function isTransformAction(

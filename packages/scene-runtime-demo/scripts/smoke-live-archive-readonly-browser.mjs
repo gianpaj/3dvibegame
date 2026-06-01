@@ -28,7 +28,11 @@ await runLiveDemoBrowserSmoke({
         const stage = document.querySelector('[data-role="stage-pill"]');
         const room = document.querySelector('[data-role="room-subtitle"]');
         const actionDock = document.querySelector('[data-role="action-dock"]');
-        const hasActionButton = Boolean(document.querySelector('[data-refine]'));
+        const hasActionButton = Boolean(
+          document.querySelector('[data-object-lifecycle-action]') ||
+            document.querySelector('[data-refine]') ||
+            document.querySelector('[data-prompt]'),
+        );
         const actionText = actionDock?.textContent?.replace(/\\s+/g, " ").trim() ?? "";
         if (
           shell?.dataset.multiplayer !== "live" ||

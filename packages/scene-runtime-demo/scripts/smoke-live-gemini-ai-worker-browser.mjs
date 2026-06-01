@@ -64,7 +64,7 @@ try {
       const draftResult = await page.waitForExpression(
         `(() => {
           const stage = document.querySelector('[data-role="stage-pill"]');
-          const release = document.querySelector('button[data-refine="release_object"]');
+          const release = document.querySelector('button[data-object-lifecycle-action="release_object"]');
           if (stage?.dataset.workflow !== "grace" || !(release instanceof HTMLButtonElement)) {
             return null;
           }
@@ -77,15 +77,28 @@ try {
         60_000,
       );
 
-      await page.click('button[data-refine="release_object"]', "Release");
+      await page.click('button[data-object-lifecycle-action="release_object"]', "Release");
       await page.waitForExpression(
         `(() => {
           const stage = document.querySelector('[data-role="stage-pill"]');
           const room = document.querySelector('[data-role="room-subtitle"]');
+          const fixedActionSelectors = [
+            'button[data-object-lifecycle-action="refine_silhouette"]',
+            'button[data-object-lifecycle-action="add_ornament"]',
+            'button[data-object-lifecycle-action="nudge_draft"]',
+            'button[data-object-lifecycle-action="rotate_draft"]',
+            'button[data-object-lifecycle-action="scale_draft"]',
+            'button[data-refine]',
+            'button[data-prompt]',
+          ];
+          const hasFixedAction = fixedActionSelectors.some((selector) =>
+            document.querySelector(selector),
+          );
           return stage?.dataset.workflow === "released" &&
-            room?.textContent?.includes("1 object");
+            room?.textContent?.includes("1 object") &&
+            !hasFixedAction;
         })()`,
-        "Gemini AI worker draft releases publicly",
+        "Gemini AI worker draft releases publicly without fixed demo actions",
         20_000,
       );
 

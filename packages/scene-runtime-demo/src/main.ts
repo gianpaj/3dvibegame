@@ -8,7 +8,6 @@ import type {
 import {
   createConfiguredAiWorkerClient,
   createGenerationSessionController,
-  scenarioCatalog,
 } from "./core";
 import { createEditorCommands, createHud } from "./editor";
 import {
@@ -76,7 +75,6 @@ let renderBackendSnapshot: ((
 const editorCommands = createEditorCommands(generation);
 const hud = createHud({
   root: hudRoot,
-  scenarios: scenarioCatalog,
   onPromptSubmit(prompt) {
     if (backendCommands?.canHandle()) {
       hud.setContextMessage("");
