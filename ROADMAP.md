@@ -288,6 +288,12 @@ Sub-phases:
 - Browser prompt-to-draft elapsed time is logged so local playtest runs have a repeatable latency signal
 - The gate fails on browser runtime or console errors while avoiding a new browser automation dependency
 
+### Phase 3.5 — Archive Browser Read-Only Smoke ✅
+- Extracted the live browser smoke lifecycle into a shared script harness for temporary backend, Vite, Chromium, CDP, and cleanup
+- Added `smoke:live-archive-readonly` to seed a reset world, open the live runtime demo, and verify archive `#1` renders as frozen read-only state
+- The smoke checks that archived objects expose no edit action buttons and that the HUD reports the archived object as read-only
+- Backend assertions confirm the live object is deleted while the snapshot row keeps archived state and captured public state
+
 ### Phase 4 — Multiplayer Validation (Prototype 2)
 - Multi-host world network (federated worlds model)
 - Trusted builder role (host-elevated players)
