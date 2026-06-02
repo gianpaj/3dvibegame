@@ -40,6 +40,7 @@ const DISABLED_BACKEND_SNAPSHOT: BackendPresenceSnapshot = {
 export function App() {
   // --- Gemini key ---
   const [geminiKey, setGeminiKey] = useState<string | null>(() => loadStoredGeminiKey());
+  const [viewerMode, setViewerMode] = useState(false);
   const geminiKeyRef = useRef(geminiKey);
   useEffect(() => {
     geminiKeyRef.current = geminiKey;
@@ -142,8 +143,8 @@ export function App() {
     ? selectedObjectId
     : (displaySnapshot.document.player_sessions_by_id["player_1"]?.selection.selected_object_id ?? null);
 
-  const needsApiKey = resolveAiClientMode() === "browser-gemini" && !geminiKey;
-  const inputDisabled = GENERATING_STAGES.has(displaySnapshot.stage);
+  const needsApiKey = resolveAiClientMode() === "browser-gemini" && !geminiKey && !viewerMode;
+  const inputDisabled = viewerMode || GENERATING_STAGES.has(displaySnapshot.stage);
 
   // A manually-clicked object in a live room (we hold its lock) → the prompt box
   // edits that object with AI instead of creating a new one.
@@ -151,7 +152,7 @@ export function App() {
 
   // WASD moves the object when one is selected (local or live), else moves the camera.
   const hasSelectedObjectRef = useRef(false);
-  hasSelectedObjectRef.current = displaySnapshot.object !== null;
+  hasSelectedObjectRef.current = !viewerMode && displaySnapshot.object !== null;
 
   const handleMoveObject = useCallback((dx: number, dz: number) => {
     if (backendCommandsRef.current?.canHandle()) {
@@ -274,6 +275,11 @@ export function App() {
   function handleApiKeySave(key: string) {
     setGeminiKey(key);
     geminiKeyRef.current = key;
+    setViewerMode(false);
+  }
+
+  function handleJoinAsViewer() {
+    setViewerMode(true);
   }
 
   function handleNameSave(name: string) {
@@ -287,7 +293,7 @@ export function App() {
         <GameCanvas
           document={displaySnapshot.document}
           selectedObjectId={effectiveSelectedId}
-          onSelectObject={handleSelectObject}
+          onSelectObject={viewerMode ? undefined : handleSelectObject}
           hasSelectedObjectRef={hasSelectedObjectRef}
           onMoveObject={handleMoveObject}
           onDeselect={handleDeselect}
@@ -321,7 +327,7 @@ export function App() {
       {!playerName ? (
         <NameModal onSave={handleNameSave} />
       ) : needsApiKey ? (
-        <GeminiKeyModal onSave={handleApiKeySave} />
+        <GeminiKeyModal onSave={handleApiKeySave} onDismiss={handleJoinAsViewer} />
       ) : null}
     </div>
   );
