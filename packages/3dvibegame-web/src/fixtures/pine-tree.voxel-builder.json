@@ -1,0 +1,58 @@
+{
+  "spec_version": "0.1",
+  "request_id": "add_pine_tree_left_of_cabin_001::prompt_0",
+  "intent_id": "add_pine_tree_left_of_cabin_001::prompt_0::intent_0",
+  "operation": "create",
+  "target_object_id": null,
+  "base_object_version": null,
+  "object_category": "tree",
+  "size_tier": "medium",
+  "style_tags": ["pine", "chunky"],
+  "behaviors": [],
+  "grid": {
+    "unit_meters": 0.5,
+    "up_axis": "y",
+    "rotation_step_degrees": 90
+  },
+  "placement": {
+    "mode": "relative",
+    "reference_object": "cabin_1",
+    "relation": "left_of",
+    "offset": [6, 0, 0]
+  },
+  "materials": [
+    {
+      "material_id": "wood",
+      "tags": ["natural"]
+    },
+    {
+      "material_id": "moss_stone",
+      "tags": ["natural", "canopy"]
+    }
+  ],
+  "anchors": [],
+  "operations": [
+    {
+      "op_id": "trunk",
+      "kind": "add_line",
+      "from": [0, 0, 0],
+      "to": [0, 4, 0],
+      "radius": 1,
+      "shape": "rounded",
+      "material_id": "wood",
+      "tags": ["pine", "trunk"]
+    },
+    {
+      "op_id": "canopy",
+      "kind": "add_sphere",
+      "center": [0, 5, 0],
+      "radius": 2,
+      "material_id": "moss_stone",
+      "tags": ["pine", "canopy"]
+    }
+  ],
+  "compile_hints": {
+    "preferred_runtime": "primitive_parts"
+  },
+  "diagnostics": []
+}

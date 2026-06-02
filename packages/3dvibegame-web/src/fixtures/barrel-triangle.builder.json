@@ -1,0 +1,57 @@
+{
+  "builder_version": "0.1",
+  "request_id": "three_red_barrels_around_campfire_001::prompt_0",
+  "intent_id": "three_red_barrels_around_campfire_001::prompt_0::intent_0",
+  "operation": "create",
+  "target_object_id": null,
+  "base_object_version": null,
+  "object_category": "barrel",
+  "size_tier": "small",
+  "parts": [
+    {
+      "part_id": "main",
+      "primitive": "column",
+      "material": "red",
+      "dimensions": [1, 1.25, 1],
+      "modifiers": []
+    }
+  ],
+  "instances": [
+    {
+      "instance_id": "instance_0",
+      "anchor_mode": "relative",
+      "reference_object": "campfire_1",
+      "relation": "around",
+      "offset": [2.5, 0, 0]
+    },
+    {
+      "instance_id": "instance_1",
+      "anchor_mode": "relative",
+      "reference_object": "campfire_1",
+      "relation": "around",
+      "offset": [-1.25, 0, 2.165]
+    },
+    {
+      "instance_id": "instance_2",
+      "anchor_mode": "relative",
+      "reference_object": "campfire_1",
+      "relation": "around",
+      "offset": [-1.25, 0, -2.165]
+    }
+  ],
+  "attachments": [],
+  "materials": ["red"],
+  "behaviors": [],
+  "placement": {
+    "mode": "relative",
+    "reference_object": "campfire_1",
+    "relation": "around",
+    "offset_meters": 2.5
+  },
+  "complexity": {
+    "part_count": 1,
+    "instance_count": 3,
+    "behavior_count": 0
+  },
+  "diagnostics": []
+}

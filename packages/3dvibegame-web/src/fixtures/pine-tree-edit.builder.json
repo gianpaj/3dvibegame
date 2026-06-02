@@ -1,0 +1,50 @@
+{
+  "builder_version": "0.1",
+  "request_id": "refine_tree_soft_glow_001::prompt_0",
+  "intent_id": "refine_tree_soft_glow_001::prompt_0::intent_0",
+  "operation": "refine",
+  "target_object_id": "object_tree_1",
+  "base_object_version": 1,
+  "object_category": "tree",
+  "size_tier": "medium",
+  "parts": [
+    {
+      "part_id": "main",
+      "primitive": "column",
+      "material": "wood",
+      "dimensions": [1, 2, 1],
+      "modifiers": ["pine"]
+    },
+    {
+      "part_id": "canopy",
+      "primitive": "blob",
+      "material": "neon",
+      "dimensions": [2.2, 2.2, 2.2],
+      "modifiers": ["pine", "soft_glow"]
+    }
+  ],
+  "instances": [
+    {
+      "instance_id": "instance_0",
+      "anchor_mode": "relative",
+      "reference_object": "cabin_1",
+      "relation": "left_of",
+      "offset": [3, 0, 0]
+    }
+  ],
+  "attachments": [],
+  "materials": ["neon", "wood"],
+  "behaviors": ["glow"],
+  "placement": {
+    "mode": "relative",
+    "reference_object": "cabin_1",
+    "relation": "left_of",
+    "offset_meters": 3
+  },
+  "complexity": {
+    "part_count": 2,
+    "instance_count": 1,
+    "behavior_count": 1
+  },
+  "diagnostics": []
+}

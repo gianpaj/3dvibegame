@@ -1,0 +1,211 @@
+import { useEffect, useRef, useState } from "react";
+import {
+  createConfiguredAiWorkerClient,
+  isMissingBrowserGeminiKeyError,
+  resolveAiClientMode,
+} from "./core";
+import { createAiSession } from "./core/session/createAiSession";
+import type { AiSessionSnapshot } from "./core/session/createAiSession";
+import type { GenerationActionId } from "./core/session/generationSession";
+import type { BackendLifecycleCommands } from "./backend/createBackendLifecycleCommands";
+import type { BackendPresenceBridge, BackendPresenceSnapshot } from "./backend/createBackendPresenceBridge";
+import type { createBackendGenerationSnapshot } from "./backend/createBackendGenerationSnapshot";
+import { GameCanvas } from "./scene/GameCanvas";
+import { GenerationCard } from "./components/GenerationCard";
+import { GeminiKeyModal, loadStoredGeminiKey } from "./components/GeminiKeyModal";
+import { PlayerList } from "./components/PlayerList";
+import { ConnectionStatus } from "./components/ConnectionStatus";
+import { PromptInput } from "./components/PromptInput";
+import { useSession } from "./hooks/useGenerationSession";
+
+const GENERATING_STAGES = new Set(["queued", "planning", "compiled_artifact_ready"]);
+
+const DISABLED_BACKEND_SNAPSHOT: BackendPresenceSnapshot = {
+  enabled: false,
+  status: "disabled",
+  message: "Local room",
+  nickname: "You",
+  onlineCount: 0,
+  world: null,
+  players: [],
+  authorityWorld: null,
+  archiveAuthorityWorld: null,
+  objectArtifacts: [],
+  aiJobs: [],
+  worldSnapshots: [],
+  snapshotObjects: [],
+};
+
+export function App() {
+  // --- Gemini key ---
+  const [geminiKey, setGeminiKey] = useState<string | null>(() => loadStoredGeminiKey());
+  const geminiKeyRef = useRef(geminiKey);
+  useEffect(() => {
+    geminiKeyRef.current = geminiKey;
+  }, [geminiKey]);
+
+  // --- AI session (stable, never recreated) ---
+  const sessionRef = useRef<ReturnType<typeof createAiSession> | null>(null);
+  if (!sessionRef.current) {
+    const aiClient = createConfiguredAiWorkerClient({
+      getBrowserGeminiApiKey: () => geminiKeyRef.current,
+    });
+    sessionRef.current = createAiSession(aiClient);
+  }
+  const snapshot = useSession(sessionRef.current);
+
+  // --- Backend presence ---
+  const [backendSnap, setBackendSnap] = useState<BackendPresenceSnapshot>(DISABLED_BACKEND_SNAPSHOT);
+  const [contextMsg, setContextMsg] = useState("");
+  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+  const selectedObjectIdRef = useRef<string | null>(null);
+  const backendCommandsRef = useRef<BackendLifecycleCommands | null>(null);
+  const backendSnapshotFnRef = useRef<typeof createBackendGenerationSnapshot | null>(null);
+  const bridgeRef = useRef<BackendPresenceBridge | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+
+    if (hasBackendConfig()) {
+      void import("./backend").then(
+        ({
+          createBackendPresenceBridge,
+          createBackendLifecycleCommands,
+          createBackendGenerationSnapshot: createSnapshotFn,
+        }) => {
+          if (!alive) return;
+          const aiClient = createConfiguredAiWorkerClient({
+            getBrowserGeminiApiKey: () => geminiKeyRef.current,
+          });
+          const bridge = createBackendPresenceBridge({ onSnapshot: setBackendSnap });
+          bridgeRef.current = bridge;
+          backendCommandsRef.current = createBackendLifecycleCommands(bridge, aiClient, {
+            getSelectedObjectId: () => selectedObjectIdRef.current,
+          });
+          backendSnapshotFnRef.current = createSnapshotFn;
+        },
+      );
+    }
+
+    return () => {
+      alive = false;
+      sessionRef.current?.dispose();
+      bridgeRef.current?.dispose();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // --- Derive display state ---
+  const isLive = backendSnap.status === "connected";
+
+  // In backend mode wrap into a compatible AiSessionSnapshot shape
+  const displaySnapshot: AiSessionSnapshot = (() => {
+    if (isLive && backendSnapshotFnRef.current) {
+      const merged = backendSnapshotFnRef.current(backendSnap, snapshot as never, selectedObjectId);
+      return {
+        document: merged.document,
+        world: merged.world,
+        stage: merged.stage,
+        lastMessage: merged.lastMessage,
+        object: merged.object,
+        availableActions: merged.availableActions,
+      };
+    }
+    return snapshot;
+  })();
+
+  const effectiveSelectedId = isLive
+    ? selectedObjectId
+    : (displaySnapshot.document.player_sessions_by_id["player_1"]?.selection.selected_object_id ?? null);
+
+  const needsApiKey = resolveAiClientMode() === "browser-gemini" && !geminiKey;
+  const inputDisabled = GENERATING_STAGES.has(displaySnapshot.stage);
+
+  // --- Handlers ---
+  function handlePromptSubmit(prompt: string) {
+    setContextMsg("");
+    if (backendCommandsRef.current?.canHandle()) {
+      void backendCommandsRef.current.submitPrompt(prompt).catch((err: unknown) => {
+        if (isMissingBrowserGeminiKeyError(err)) {
+          setGeminiKey(null);
+          return;
+        }
+        setContextMsg(errorMessage(err, "Prompt failed"));
+      });
+      return;
+    }
+    void sessionRef.current?.submitPrompt(prompt).catch((err: unknown) => {
+      if (isMissingBrowserGeminiKeyError(err)) setGeminiKey(null);
+      else setContextMsg(errorMessage(err, "Generation failed"));
+    });
+  }
+
+  function handleDispatch(actionId: GenerationActionId) {
+    setContextMsg("");
+    const usingBackend = backendCommandsRef.current?.canHandle() ?? false;
+    console.log("[handleDispatch] actionId=%s usingBackend=%s", actionId, usingBackend);
+    if (usingBackend) {
+      void backendCommandsRef.current!.dispatchAction(actionId).catch((err: unknown) => {
+        setContextMsg(errorMessage(err, "Action failed"));
+      });
+      return;
+    }
+    sessionRef.current?.dispatch(actionId);
+    console.log("[handleDispatch] local session snapshot after dispatch:", sessionRef.current?.getSnapshot());
+  }
+
+  function handleSelectObject(objectId: string) {
+    if (isLive) {
+      setSelectedObjectId(objectId);
+      selectedObjectIdRef.current = objectId;
+    } else {
+      sessionRef.current?.selectObject(objectId);
+    }
+  }
+
+  function handleApiKeySave(key: string) {
+    setGeminiKey(key);
+    geminiKeyRef.current = key;
+  }
+
+  return (
+    <div className="app-root">
+      <div className="canvas-wrapper">
+        <GameCanvas
+          document={displaySnapshot.document}
+          selectedObjectId={effectiveSelectedId}
+          onSelectObject={handleSelectObject}
+        />
+      </div>
+
+      <div className="hud-overlay">
+        <div className="hud-top-left">
+          <ConnectionStatus status={backendSnap.status} message={backendSnap.message} />
+          <PlayerList players={backendSnap.players} />
+          {contextMsg && <p className="context-msg">{contextMsg}</p>}
+        </div>
+
+        <div className="hud-top-right">
+          <GenerationCard snapshot={displaySnapshot} onDispatch={handleDispatch} />
+        </div>
+
+        <div className="hud-bottom">
+          <PromptInput onSubmit={handlePromptSubmit} disabled={inputDisabled} />
+        </div>
+      </div>
+
+      {needsApiKey && <GeminiKeyModal onSave={handleApiKeySave} />}
+    </div>
+  );
+}
+
+function hasBackendConfig() {
+  return Boolean(
+    import.meta.env.VITE_SPACETIMEDB_URI && import.meta.env.VITE_SPACETIMEDB_DATABASE,
+  );
+}
+
+function errorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return `${fallback}: ${error.message}`;
+  return fallback;
+}
