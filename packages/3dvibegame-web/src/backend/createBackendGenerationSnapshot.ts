@@ -79,12 +79,10 @@ function selectBackendAiJob(
     ? backendSnapshot.aiJobs.filter((job) => job.playerId === localPlayerId)
     : backendSnapshot.aiJobs;
 
-  return (
-    jobs.find((job) => job.status === "pending") ??
-    jobs.find((job) => job.status === "failed") ??
-    jobs[0] ??
-    null
-  );
+  // Only surface an in-progress generation. Failures are shown transiently by the
+  // client when they happen; stale `failed` rows from past attempts shouldn't keep
+  // haunting the HUD after a later success.
+  return jobs.find((job) => job.status === "pending") ?? null;
 }
 
 export function selectBackendObject(

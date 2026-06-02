@@ -86,13 +86,29 @@ The player app expects a Gemini key (entered in-app) and, for shared geometry co
 
 ## Manual deploy
 
-The player app (`packages/3dvibegame-web`) ships a `vercel.json` SPA rewrite and is built for Vercel (`pnpm web:build`). The dev harness deploy is documented below.
+Both browser clients are Vite SPAs that build to `dist/` and deploy to the same Cloudflare Pages project `3dvibegame` (account `f993cefa62ff85589a32173f0813fbad`) → <https://3dvibegame.com>. Pages uses `packages/3dvibegame-web/public/_redirects` for SPA fallback; the player app also ships a `vercel.json` if you'd rather host it on Vercel.
 
 For the multiplayer backend (SpacetimeDB + AI worker) on a VPS with Coolify, see [`docs/deploy-backend.md`](docs/deploy-backend.md) (compose: `deploy/spacetimedb/`, Dockerfile: `packages/ai-worker/Dockerfile`).
 
-`packages/scene-runtime-demo` is deployed as a Cloudflare Pages project named `3dvibegame` in account `f993cefa62ff85589a32173f0813fbad`.
+### Player app (`3dvibegame-web`)
 
-Build and deploy it manually from the repo root:
+`VITE_*` values are baked at **build time**, so set the production backend before building. The Gemini key is entered in-app at runtime (not an env var). Run from the repo root:
+
+```bash
+VITE_SPACETIMEDB_URI=https://stdb.3dvibegame.com \
+VITE_SPACETIMEDB_DATABASE=3dvibegame \
+VITE_AI_CLIENT_MODE=browser-gemini \
+pnpm web:build
+
+CLOUDFLARE_ACCOUNT_ID=f993cefa62ff85589a32173f0813fbad \
+  wrangler pages deploy packages/3dvibegame-web/dist \
+  --project-name 3dvibegame \
+  --branch master
+```
+
+Deploying to `--project-name 3dvibegame` serves the player app on `3dvibegame.com`, **replacing the dev harness**. To keep both, use a different `--project-name` (new `*.pages.dev`, attach a custom domain separately). Optional: add `VITE_AI_WORKER_URL=https://ai.3dvibegame.com` to compile geometry on the worker instead of in the browser. Without `VITE_SPACETIMEDB_*` the app runs local-only (no multiplayer).
+
+### Dev harness (`scene-runtime-demo`)
 
 ```bash
 pnpm demo:build

@@ -121,13 +121,17 @@ File: [`packages/ai-worker/Dockerfile`](../packages/ai-worker/Dockerfile).
 In Coolify → **New Resource → Dockerfile** (or a Git-based app with Build Pack =
 Dockerfile):
 
-- **Dockerfile location:** `packages/ai-worker/Dockerfile`
-- **Base Directory (build context):** `/` — the **repo root**, NOT
-  `/packages/ai-worker`. It's a pnpm workspace, so the build needs the root
-  `pnpm-lock.yaml` + `pnpm-workspace.yaml` + every package's `package.json`. Pointing
-  the context at the package dir fails with
-  `[ERR_PNPM_NO_LOCKFILE] ... pnpm-lock.yaml is absent` (and corepack pulls the wrong
-  pnpm version, since `packageManager` is in the root `package.json`).
+- **Build settings** — both paths are relative to the **repo root**, and they must be
+  set together:
+  - **Base Directory (build context):** `/` — the repo root, NOT `/packages/ai-worker`.
+    It's a pnpm workspace, so the build needs the root `pnpm-lock.yaml` +
+    `pnpm-workspace.yaml` + every package's `package.json`.
+  - **Dockerfile Location:** `/packages/ai-worker/Dockerfile` (the Dockerfile isn't at
+    the root, so this must include the full path).
+  - Symptoms of getting these wrong: base dir at the package →
+    `[ERR_PNPM_NO_LOCKFILE] ... pnpm-lock.yaml is absent` (+ corepack pulls the wrong
+    pnpm version); Dockerfile Location left at the root →
+    `failed to read dockerfile: open Dockerfile: no such file or directory`.
 - **Port:** `8787`
 - **Domain:** e.g. `ai.3dvibegame.com` (TLS via Coolify)
 - **Env:**
