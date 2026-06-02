@@ -142,7 +142,14 @@ async function requestVoxelCore(
       );
     }
 
-    const parsed = voxelCoreSchema.safeParse(parseJsonObject(text));
+    const raw = parseJsonObject(text);
+    if (typeof (raw as Record<string, unknown>).rejection === "string") {
+      throw new AiWorkerError(
+        "invalid_prompt",
+        (raw as Record<string, unknown>).rejection as string,
+      );
+    }
+    const parsed = voxelCoreSchema.safeParse(raw);
     if (!parsed.success) {
       throw new AiWorkerError(
         "validation_failed",

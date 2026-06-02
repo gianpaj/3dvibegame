@@ -32,6 +32,10 @@ export function createGeminiPlanGenerator({
         temperature,
       });
 
+      if (output.rejection) {
+        throw Object.assign(new Error(output.rejection), { code: "invalid_prompt" });
+      }
+
       return {
         plan: output,
         warnings: warnings?.map(warningText) ?? [],

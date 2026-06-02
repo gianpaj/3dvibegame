@@ -50,6 +50,14 @@ try {
     "over-length messages should be rejected",
   );
 
+  // Moderation: profanity is rejected server-side (glin-profanity, leetspeak on).
+  harness.activatePlayers();
+  expectReducerFailure(
+    () => harness.callAs(alice, "send_chat_message", ["you are an 4ss"]),
+    "chat message contains blocked language",
+    "profane messages should be rejected",
+  );
+
   // Authorization: a logged-in identity that never joined cannot chat.
   expectReducerFailure(
     () => harness.callAs(carol, "send_chat_message", ["sneaking in"]),
