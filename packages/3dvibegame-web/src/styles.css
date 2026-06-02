@@ -1,4 +1,10 @@
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 :root {
   --mint: #4de8c3;
@@ -7,7 +13,7 @@
   --red: #e05050;
   --surface: rgba(255, 255, 255, 0.82);
   --surface-dark: rgba(20, 20, 20, 0.72);
-  --border: rgba(0, 0, 0, 0.10);
+  --border: rgba(0, 0, 0, 0.1);
   --text: #1a1a1a;
   --text-muted: #666;
   --radius: 10px;
@@ -15,7 +21,11 @@
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-body { overflow: hidden; background: #ebe4d7; color: var(--text); }
+body {
+  overflow: hidden;
+  background: #ebe4d7;
+  color: var(--text);
+}
 
 /* ── Layout ─────────────────────────────────── */
 .app-root {
@@ -80,12 +90,30 @@ body { overflow: hidden; background: #ebe4d7; color: var(--text); }
   border: 1px solid var(--border);
 }
 
-.badge-idle    { background: var(--surface); color: #555; }
-.badge-busy    { background: rgba(255, 211, 106, 0.85); color: #7a5800; }
-.badge-grace   { background: rgba(255, 211, 106, 0.85); color: #7a5800; }
-.badge-ready   { background: rgba(77, 232, 195, 0.85); color: #0a4f3a; }
-.badge-cooldown { background: rgba(169, 240, 255, 0.85); color: #075070; }
-.badge-error   { background: rgba(224, 80, 80, 0.85); color: #fff; }
+.badge-idle {
+  background: var(--surface);
+  color: #555;
+}
+.badge-busy {
+  background: rgba(255, 211, 106, 0.85);
+  color: #7a5800;
+}
+.badge-grace {
+  background: rgba(255, 211, 106, 0.85);
+  color: #7a5800;
+}
+.badge-ready {
+  background: rgba(77, 232, 195, 0.85);
+  color: #0a4f3a;
+}
+.badge-cooldown {
+  background: rgba(169, 240, 255, 0.85);
+  color: #075070;
+}
+.badge-error {
+  background: rgba(224, 80, 80, 0.85);
+  color: #fff;
+}
 
 /* ── Connection badge ────────────────────────── */
 .conn-badge {
@@ -109,11 +137,21 @@ body { overflow: hidden; background: #ebe4d7; color: var(--text); }
   flex-shrink: 0;
 }
 
-.conn-local .conn-dot    { background: #aaa; }
-.conn-busy .conn-dot     { background: var(--gold); }
-.conn-live .conn-dot     { background: var(--mint); }
-.conn-offline .conn-dot  { background: #bbb; }
-.conn-error .conn-dot    { background: var(--red); }
+.conn-local .conn-dot {
+  background: #aaa;
+}
+.conn-busy .conn-dot {
+  background: var(--gold);
+}
+.conn-live .conn-dot {
+  background: var(--mint);
+}
+.conn-offline .conn-dot {
+  background: #bbb;
+}
+.conn-error .conn-dot {
+  background: var(--red);
+}
 
 /* ── Player list ─────────────────────────────── */
 .player-list {
@@ -134,7 +172,9 @@ body { overflow: hidden; background: #ebe4d7; color: var(--text); }
   backdrop-filter: blur(8px);
 }
 
-.player-chip-local { border-color: var(--mint); }
+.player-chip-local {
+  border-color: var(--mint);
+}
 
 .player-dot {
   width: 6px;
@@ -144,7 +184,10 @@ body { overflow: hidden; background: #ebe4d7; color: var(--text); }
   flex-shrink: 0;
 }
 
-.player-name { color: var(--text); font-weight: 500; }
+.player-name {
+  color: var(--text);
+  font-weight: 500;
+}
 
 /* ── Generation card ─────────────────────────── */
 .generation-card {
@@ -201,7 +244,9 @@ body { overflow: hidden; background: #ebe4d7; color: var(--text); }
   font-weight: 600;
   font-size: 12px;
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
 }
 
 .btn-action:hover {
@@ -255,7 +300,9 @@ body { overflow: hidden; background: #ebe4d7; color: var(--text); }
   transition: opacity 0.12s;
 }
 
-.btn-release:hover { opacity: 0.85; }
+.btn-release:hover {
+  opacity: 0.85;
+}
 
 /* ── Prompt form ─────────────────────────────── */
 .prompt-form {
@@ -283,8 +330,12 @@ body { overflow: hidden; background: #ebe4d7; color: var(--text); }
   max-height: 120px;
 }
 
-.prompt-input::placeholder { color: var(--text-muted); }
-.prompt-input:disabled { opacity: 0.5; }
+.prompt-input::placeholder {
+  color: var(--text-muted);
+}
+.prompt-input:disabled {
+  opacity: 0.5;
+}
 
 .prompt-submit {
   flex-shrink: 0;
@@ -299,8 +350,13 @@ body { overflow: hidden; background: #ebe4d7; color: var(--text); }
   transition: opacity 0.12s;
 }
 
-.prompt-submit:disabled { opacity: 0.4; cursor: not-allowed; }
-.prompt-submit:not(:disabled):hover { opacity: 0.8; }
+.prompt-submit:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.prompt-submit:not(:disabled):hover {
+  opacity: 0.8;
+}
 
 /* ── Gemini key modal ────────────────────────── */
 .modal-overlay {
@@ -328,8 +384,15 @@ body { overflow: hidden; background: #ebe4d7; color: var(--text); }
   gap: 12px;
 }
 
-.modal-title { font-size: 18px; font-weight: 700; }
-.modal-description { font-size: 14px; color: var(--text-muted); line-height: 1.5; }
+.modal-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+.modal-description {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
 
 .modal-input {
   width: 100%;
@@ -341,9 +404,14 @@ body { overflow: hidden; background: #ebe4d7; color: var(--text); }
   transition: border-color 0.12s;
 }
 
-.modal-input:focus { border-color: var(--mint); }
+.modal-input:focus {
+  border-color: var(--mint);
+}
 
-.modal-error { font-size: 13px; color: var(--red); }
+.modal-error {
+  font-size: 13px;
+  color: var(--red);
+}
 
 .modal-submit {
   width: 100%;
@@ -359,7 +427,9 @@ body { overflow: hidden; background: #ebe4d7; color: var(--text); }
   transition: opacity 0.12s;
 }
 
-.modal-submit:hover { opacity: 0.85; }
+.modal-submit:hover {
+  opacity: 0.85;
+}
 
 .modal-hint {
   font-size: 12px;
@@ -367,7 +437,9 @@ body { overflow: hidden; background: #ebe4d7; color: var(--text); }
   text-align: center;
 }
 
-.modal-hint a { color: var(--text); }
+.modal-hint a {
+  color: var(--text);
+}
 
 .modal-dismiss {
   width: 100%;
@@ -382,7 +454,9 @@ body { overflow: hidden; background: #ebe4d7; color: var(--text); }
   text-underline-offset: 2px;
 }
 
-.modal-dismiss:hover { color: var(--text); }
+.modal-dismiss:hover {
+  color: var(--text);
+}
 
 /* ── Viewer card ─────────────────────────────── */
 .viewer-card {
@@ -416,7 +490,9 @@ body { overflow: hidden; background: #ebe4d7; color: var(--text); }
   align-self: flex-start;
 }
 
-.viewer-card-cta:hover { opacity: 0.8; }
+.viewer-card-cta:hover {
+  opacity: 0.8;
+}
 
 /* ── Context message ────────────────────────── */
 .context-msg {

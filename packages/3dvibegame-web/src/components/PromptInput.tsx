@@ -8,11 +8,16 @@ interface Props {
   placeholder?: string;
 }
 
-export function PromptInput({ onSubmit, disabled, editing = false, placeholder }: Props) {
+export function PromptInput({
+  onSubmit,
+  disabled,
+  editing = false,
+  placeholder,
+}: Props) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.SubmitEvent) {
     e.preventDefault();
     const trimmed = value.trim();
     if (!trimmed || disabled) return;
@@ -23,7 +28,7 @@ export function PromptInput({ onSubmit, disabled, editing = false, placeholder }
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e as unknown as React.FormEvent);
+      handleSubmit(e as unknown as React.SubmitEvent);
     }
   }
 
@@ -44,7 +49,11 @@ export function PromptInput({ onSubmit, disabled, editing = false, placeholder }
         disabled={disabled}
         rows={1}
       />
-      <button className="prompt-submit" type="submit" disabled={disabled || !value.trim()}>
+      <button
+        className="prompt-submit"
+        type="submit"
+        disabled={disabled || !value.trim()}
+      >
         {editing ? "Edit" : "Generate"}
       </button>
     </form>
