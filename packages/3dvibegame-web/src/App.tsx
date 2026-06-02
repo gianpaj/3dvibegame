@@ -161,6 +161,9 @@ export function App() {
 
   const handleDeselect = useCallback(() => {
     if (backendCommandsRef.current?.canHandle()) {
+      // releaseSelectedLock captures the current selection synchronously before its
+      // first await, so clearing the refs right after is safe.
+      void backendCommandsRef.current.releaseSelectedLock().catch(() => {});
       setSelectedObjectId(null);
       selectedObjectIdRef.current = null;
     } else {
@@ -215,9 +218,16 @@ export function App() {
   }
 
   function handleSelectObject(objectId: string) {
-    if (isLive) {
+    if (backendCommandsRef.current?.canHandle()) {
       setSelectedObjectId(objectId);
       selectedObjectIdRef.current = objectId;
+      setContextMsg("");
+      // Acquire an exclusive edit lock; if another player holds it, undo selection.
+      void backendCommandsRef.current.lockSelectedObject().catch((err: unknown) => {
+        setSelectedObjectId(null);
+        selectedObjectIdRef.current = null;
+        setContextMsg(errorMessage(err, "Can't edit that object"));
+      });
     } else {
       sessionRef.current?.selectObject(objectId);
     }

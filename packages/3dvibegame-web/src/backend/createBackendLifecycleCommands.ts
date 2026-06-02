@@ -26,6 +26,8 @@ export interface BackendLifecycleCommands {
   canHandle(): boolean;
   submitPrompt(prompt: string): Promise<void>;
   dispatchAction(actionId: GenerationActionId): Promise<void>;
+  lockSelectedObject(): Promise<void>;
+  releaseSelectedLock(): Promise<void>;
   moveSelectedObject(dx: number, dz: number): Promise<void>;
   deleteSelectedObject(): Promise<void>;
   updateWorldSettings(input: BackendUpdateWorldSettingsInput): Promise<void>;
@@ -112,16 +114,16 @@ export function createBackendLifecycleCommands(
     }
 
     if (object.state === "public") {
-      console.log("[backend.move] public -> requestEditLock");
+      // Acquire and HOLD the lock (released on deselect/Done/expiry) so the object
+      // stays exclusively ours between moves instead of being free for other players.
+      console.log("[backend.move] public -> requestEditLock (hold)");
       await bridge.requestEditLock({
         objectId: object.object_id,
         baseVersion: object.version,
       });
       console.log("[backend.move] public -> updateLockedTransform");
       await bridge.updateLockedTransform({ objectId: object.object_id, ...transform });
-      console.log("[backend.move] public -> cancelEdit");
-      await bridge.cancelEdit({ objectId: object.object_id });
-      console.log("[backend.move] public -> done");
+      console.log("[backend.move] public -> done (lock held)");
       return;
     }
 
@@ -276,6 +278,45 @@ export function createBackendLifecycleCommands(
       });
       await bridge.expireCooldown({ objectId: object.object_id });
     },
+    // Acquire an exclusive edit lock on the selected object so other players can't
+    // move it. Public objects get locked (held until release); grace drafts are
+    // already exclusive to their owner. Throws if another player holds it.
+    async lockSelectedObject() {
+      const snapshot = bridge.getSnapshot();
+      const object = selectBackendObject(snapshot, selectedObjectId());
+      if (!object) return;
+
+      const localPlayerId = localBackendPlayerId(snapshot);
+      if (object.state === "edit_locked" && object.lock_owner_id !== localPlayerId) {
+        throw new Error("Object is locked by another player.");
+      }
+      if (object.state === "grace" && object.grace_owner_id !== localPlayerId) {
+        throw new Error("Object is in another player's grace window.");
+      }
+      // grace(mine) / edit_locked(mine) are already exclusive — only public needs a lock.
+      if (object.state !== "public") return;
+
+      console.log("[backend.lock] requestEditLock id=%s version=%s", object.object_id, object.version);
+      await bridge.requestEditLock({
+        objectId: object.object_id,
+        baseVersion: object.version,
+      });
+    },
+
+    // Release the edit lock we hold on the selected object (on deselect / Done /
+    // 30s expiry). Reads the selection synchronously before any await so the caller
+    // can clear it immediately after.
+    async releaseSelectedLock() {
+      const snapshot = bridge.getSnapshot();
+      const object = selectBackendObject(snapshot, selectedObjectId());
+      if (!object) return;
+      const localPlayerId = localBackendPlayerId(snapshot);
+      if (object.state === "edit_locked" && object.lock_owner_id === localPlayerId) {
+        console.log("[backend.lock] cancelEdit id=%s", object.object_id);
+        await bridge.cancelEdit({ objectId: object.object_id });
+      }
+    },
+
     async moveSelectedObject(dx: number, dz: number) {
       movePending = movePending
         ? { dx: movePending.dx + dx, dz: movePending.dz + dz }

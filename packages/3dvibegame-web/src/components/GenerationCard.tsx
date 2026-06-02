@@ -10,6 +10,7 @@ interface Props {
 export function GenerationCard({ snapshot, onDispatch }: Props) {
   const { stage, lastMessage, object, availableActions } = snapshot;
 
+  console.log("[GenerationCard] stage=%s activeObject=%s availableActions=%o", stage, object?.object_id ?? "null", availableActions);
   const isGenerating =
     stage === "queued" || stage === "planning" || stage === "compiled_artifact_ready";
 
