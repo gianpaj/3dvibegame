@@ -1,4 +1,5 @@
 import { SenderError, t, type InferSchema, type ReducerCtx } from "spacetimedb/server";
+import { checkProfanity } from "glin-profanity";
 
 import spacetimedb from "./schema";
 
@@ -155,6 +156,9 @@ export const send_chat_message = spacetimedb.reducer(
     }
     if (trimmed.length > maxChatBodyLength) {
       throw new SenderError("chat message is too long");
+    }
+    if (checkProfanity(trimmed, { detectLeetspeak: true }).containsProfanity) {
+      throw new SenderError("chat message contains blocked language");
     }
 
     ctx.db.chatMessage.insert({
