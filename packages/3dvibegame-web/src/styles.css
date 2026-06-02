@@ -261,7 +261,7 @@ body { overflow: hidden; background: #ebe4d7; color: var(--text); }
 .prompt-form {
   display: flex;
   gap: 8px;
-  align-items: flex-end;
+  align-items: baseline;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
