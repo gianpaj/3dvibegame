@@ -30,6 +30,7 @@ function makeSnapshot(
     world: {} as AiSessionSnapshot["world"],
     stage,
     lastMessage: "status message",
+    stageEvents: [],
     object,
     availableActions,
   };

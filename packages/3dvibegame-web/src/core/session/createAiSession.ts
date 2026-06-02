@@ -12,6 +12,7 @@ import {
   updateLockedTransform,
   type AuthorityWorld,
   type GenerationStage,
+  type GenerationStageEvent,
 } from "@3dvibegame/scene-authority-ts";
 
 import type { AiWorkerClient, AiWorkerDraftResult } from "../aiWorker/fixtureAiWorkerClient";
@@ -23,6 +24,7 @@ export interface AiSessionSnapshot {
   world: AuthorityWorld;
   stage: GenerationStage;
   lastMessage: string;
+  stageEvents: GenerationStageEvent[];
   object: AuthorityWorld["objects"][number] | null;
   availableActions: GenerationActionId[];
 }
@@ -34,9 +36,32 @@ export function createAiSession(aiClient: AiWorkerClient) {
   let lastMessage = "Type a prompt to generate an object with Gemini.";
   let activeObjectId: string | null = null;
   let requestCounter = 0;
+  let stageEvents: GenerationStageEvent[] = [];
+  let eventSequence = 0;
+  let lastRecordedMessage = "";
   const listeners = new Set<() => void>();
 
+  // Capture each distinct status message as a stage event so the chat panel can
+  // replay the session's progress. Hooked into notify() so every state change is seen.
+  function recordEvent() {
+    if (lastMessage === lastRecordedMessage) return;
+    lastRecordedMessage = lastMessage;
+    eventSequence += 1;
+    const status: GenerationStageEvent["status"] = stage === "failed" ? "error" : "complete";
+    stageEvents = [
+      ...stageEvents,
+      {
+        id: `ai_event_${eventSequence}`,
+        stage,
+        message: lastMessage,
+        status,
+        timestamp: new Date().toISOString(),
+      },
+    ].slice(-32);
+  }
+
   function notify() {
+    recordEvent();
     listeners.forEach((fn) => fn());
   }
 
@@ -131,6 +156,7 @@ export function createAiSession(aiClient: AiWorkerClient) {
         world,
         stage,
         lastMessage,
+        stageEvents,
         object,
         availableActions: resolveAvailableActions(object),
       };

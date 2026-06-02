@@ -16,8 +16,10 @@ import { GeminiKeyModal, loadStoredGeminiKey } from "./components/GeminiKeyModal
 import { NameModal, loadStoredPlayerName } from "./components/NameModal";
 import { PlayerList } from "./components/PlayerList";
 import { ConnectionStatus } from "./components/ConnectionStatus";
+import { ChatPanel } from "./components/ChatPanel";
 import { PromptInput } from "./components/PromptInput";
 import { useSession } from "./hooks/useGenerationSession";
+import { useChatTranscript } from "./hooks/useChatTranscript";
 
 const GENERATING_STAGES = new Set(["queued", "planning", "compiled_artifact_ready"]);
 
@@ -132,12 +134,15 @@ export function App() {
         world: merged.world,
         stage: merged.stage,
         lastMessage: merged.lastMessage,
+        stageEvents: merged.stageEvents,
         object: merged.object,
         availableActions: merged.availableActions,
       };
     }
     return snapshot;
   })();
+
+  const { messages: chatMessages, appendPlayerMessage } = useChatTranscript(displaySnapshot);
 
   const effectiveSelectedId = isLive
     ? selectedObjectId
@@ -198,6 +203,7 @@ export function App() {
   // --- Handlers ---
   function handlePromptSubmit(prompt: string) {
     setContextMsg("");
+    appendPlayerMessage(prompt);
     if (backendCommandsRef.current?.canHandle()) {
       // A manually-selected object → edit it; otherwise create a new object.
       const editingNow = selectedObjectIdRef.current !== null;
@@ -305,14 +311,29 @@ export function App() {
           <ConnectionStatus status={backendSnap.status} message={backendSnap.message} />
           <PlayerList players={backendSnap.players} />
           {contextMsg && <p className="context-msg">{contextMsg}</p>}
+          <ChatPanel messages={chatMessages} lastMessage={displaySnapshot.lastMessage} />
         </div>
 
         <div className="hud-top-right">
-          <GenerationCard
-            snapshot={displaySnapshot}
-            onDispatch={handleDispatch}
-            onDelete={handleDelete}
-          />
+          {viewerMode ? (
+            <div className="viewer-card">
+              <p className="viewer-card-message">
+                You&apos;re viewing as a guest. Add your Gemini API key to create and edit objects.
+              </p>
+              <button
+                className="viewer-card-cta"
+                onClick={() => setViewerMode(false)}
+              >
+                Add Gemini key
+              </button>
+            </div>
+          ) : (
+            <GenerationCard
+              snapshot={displaySnapshot}
+              onDispatch={handleDispatch}
+              onDelete={handleDelete}
+            />
+          )}
         </div>
 
         <div className="hud-bottom">
@@ -320,6 +341,7 @@ export function App() {
             onSubmit={handlePromptSubmit}
             disabled={inputDisabled}
             editing={editing}
+            placeholder={viewerMode ? "Add a Gemini key to create objects…" : undefined}
           />
         </div>
       </div>

@@ -5,9 +5,10 @@ interface Props {
   disabled: boolean;
   /** When an object is selected, the prompt edits it instead of creating. */
   editing?: boolean;
+  placeholder?: string;
 }
 
-export function PromptInput({ onSubmit, disabled, editing = false }: Props) {
+export function PromptInput({ onSubmit, disabled, editing = false, placeholder }: Props) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -35,9 +36,10 @@ export function PromptInput({ onSubmit, disabled, editing = false }: Props) {
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={
-          editing
+          placeholder ??
+          (editing
             ? "Describe a change to the selected object…"
-            : "Describe an object to generate…"
+            : "Describe an object to generate…")
         }
         disabled={disabled}
         rows={1}
