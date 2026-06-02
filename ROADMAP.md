@@ -398,6 +398,12 @@ Sub-phases:
 - Exclusive editing: selecting an object holds its backend edit lock for 30s (released on Esc, click-away, Done, or expiry) so other players cannot move it
 - Object deletion with a confirmation modal; the shared "Vibe Test Room" is now private + destructive, with a 90-second window in which only the creator can delete a freshly created object
 
+### Phase 4.10 — AI Chat Editing of Objects ✅
+- Selecting an object and typing a change in the prompt box ("make it red", "add a glowing top") edits it with the LLM and submits a new object version — the create pipeline reused (browser Gemini → voxel core → worker `/compile`)
+- New `voxelEditSystemPrompt` feeds the LLM the object's current voxel core + the change request and returns the full edited core; the browser clients' `createEdit` (previously create-only) now performs the edit
+- Backend `editSelectedObject` runs `createEdit → submit_object_edit → expire_cooldown` under the existing 30s exclusive lock, with server-side `lock_owner` + `base_version` checks rejecting stale edits
+- Scope is the live/backend path; local-only edit, a chat transcript, and edit attribution are follow-ups
+
 ### Phase 5 — V1 Hardening & Launch
 - Rate limiting and abuse guardrails (the private shared room currently skips per-player create/object caps)
 - World settings UI for hosts (presets, reset schedules, permission toggles)

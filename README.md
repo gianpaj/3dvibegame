@@ -5,7 +5,7 @@
 - <https://3dvibegame.com>
 
 Current vertical slice:
-`text prompt -> browser Gemini -> voxel operations -> worker compile -> live object -> shared-room editing`
+`text prompt -> browser Gemini -> voxel operations -> worker compile -> live object -> select + AI edit / move / delete`
 
 https://github.com/user-attachments/assets/17322171-449d-4279-a8c7-0218190edb77
 
@@ -13,7 +13,7 @@ https://github.com/user-attachments/assets/17322171-449d-4279-a8c7-0218190edb77
 
 There are two browser clients:
 
-- **`packages/3dvibegame-web`** — the deployable player app (React + React Three Fiber). Real-time multiplayer via SpacetimeDB, LLM-authored voxel geometry (the browser calls Gemini directly with a player-supplied key, then the AI worker compiles the result), and shared-room editing: prompt to create, then select / move (WASD) / rotate / scale / delete with exclusive 30s edit locks.
+- **`packages/3dvibegame-web`** — the deployable player app (React + React Three Fiber). Real-time multiplayer via SpacetimeDB, LLM-authored voxel geometry (the browser calls Gemini directly with a player-supplied key, then the AI worker compiles the result), and shared-room editing: prompt to create, then select an object to **AI-edit it via chat** ("make it red") or move (WASD) / rotate / scale / delete — all under exclusive 30s edit locks.
 - **`packages/scene-runtime-demo`** — the original plain Three.js dev harness for inspecting runtime fixtures and exercising the full HUD.
 
 ## Architecture (dev harness)
