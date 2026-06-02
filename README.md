@@ -88,6 +88,8 @@ The player app expects a Gemini key (entered in-app) and, for shared geometry co
 
 The player app (`packages/3dvibegame-web`) ships a `vercel.json` SPA rewrite and is built for Vercel (`pnpm web:build`). The dev harness deploy is documented below.
 
+For the multiplayer backend (SpacetimeDB + AI worker) on a VPS with Coolify, see [`docs/deploy-backend.md`](docs/deploy-backend.md) (compose: `deploy/spacetimedb/`, Dockerfile: `packages/ai-worker/Dockerfile`).
+
 `packages/scene-runtime-demo` is deployed as a Cloudflare Pages project named `3dvibegame` in account `f993cefa62ff85589a32173f0813fbad`.
 
 Build and deploy it manually from the repo root:

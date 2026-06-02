@@ -1,0 +1,13 @@
+# Keep Docker build contexts small and avoid copying host artifacts/secrets.
+# Note: do NOT exclude whole workspace packages — `pnpm install --frozen-lockfile`
+# needs every package.json referenced by pnpm-lock.yaml.
+**/node_modules
+**/dist
+**/.turbo
+.git
+.github
+*.log
+.env
+**/.env
+**/.env.*
+!**/.env.example

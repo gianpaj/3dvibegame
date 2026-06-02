@@ -1,0 +1,38 @@
+# SpacetimeDB standalone server for the Vibe World backend.
+#
+# Deploy as a Coolify "Docker Compose" resource and point a domain at port 3000.
+# Coolify terminates TLS and forwards the WebSocket upgrade the SDK needs.
+#
+# The image tag MUST match the `spacetimedb` version in the workspace (2.0.3),
+# otherwise publishing/connecting fails with ABI errors. Confirm the tag exists:
+#   docker pull clockworklabs/spacetime:v2.0.3
+services:
+  spacetimedb:
+    image: clockworklabs/spacetime:v2.0.3
+    restart: unless-stopped
+    # The image runs as a non-root user, but a fresh named volume mounts in
+    # root-owned, so the server can't write /data ("Permission denied (os error
+    # 13)"). Run as root so it can own/write the data directory.
+    user: "0:0"
+    # --data-dir holds world data AND the server's identity (JWT) keys.
+    command: start --listen-addr 0.0.0.0:3000 --data-dir /data
+    volumes:
+      - stdb-data:/data
+    # Optional health check. SpacetimeDB answers GET /v1/ping with 200. This needs
+    # `curl` OR `wget` to exist in the image — verify first:
+    #   docker exec <container> sh -c 'command -v curl wget'
+    # If neither is present, leave this commented (a failing probe would mark the
+    # container unhealthy). Coolify works fine with no health check.
+    # healthcheck:
+    #   test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3000/v1/ping || wget -qO- http://127.0.0.1:3000/v1/ping || exit 1"]
+    #   interval: 15s
+    #   timeout: 5s
+    #   retries: 5
+    #   start_period: 20s
+    ports:
+      # Coolify maps your HTTPS domain -> container:3000 (keep the volume or
+      # every redeploy wipes the world and resets identities).
+      - "3000"
+
+volumes:
+  stdb-data:
