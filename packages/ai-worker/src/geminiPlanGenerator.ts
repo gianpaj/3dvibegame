@@ -1,5 +1,5 @@
 import { google } from "@ai-sdk/google";
-import { generateText, Output } from "ai";
+import { generateText, Output, type LanguageModel } from "ai";
 
 import {
   createPlanSystemPrompt,
@@ -9,17 +9,21 @@ import {
 
 export interface GeminiPlanGeneratorConfig {
   model?: string;
+  /** Override the language model (e.g. a MockLanguageModelV3 in tests). */
+  languageModel?: LanguageModel;
   temperature?: number;
 }
 
 export function createGeminiPlanGenerator({
   model = process.env.AI_WORKER_MODEL ?? "gemini-2.5-flash",
+  languageModel,
   temperature = 0.25,
 }: GeminiPlanGeneratorConfig = {}): CreatePlanGenerator {
+  const resolvedModel = languageModel ?? google(model);
   return {
     async generateCreatePlan({ sourcePrompt, signal }) {
       const { output, warnings } = await generateText({
-        model: google(model),
+        model: resolvedModel,
         abortSignal: signal,
         maxOutputTokens: 900,
         output: Output.object({ schema: createPlanSchema }),
