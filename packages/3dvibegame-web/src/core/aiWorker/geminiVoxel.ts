@@ -11,6 +11,7 @@ interface GeminiGenerateContentResponse {
     content?: {
       parts?: Array<{ text?: string }>;
     };
+    finishReason?: string;
   }>;
   error?: {
     code?: number;
@@ -68,17 +69,20 @@ export async function generateVoxelCore({
         // union can't be expressed in Gemini's responseSchema subset, so the schema
         // lives in the system prompt and we validate the result with zod below.
         generationConfig: {
-          maxOutputTokens: 2048,
+          // Voxel specs with many ops are large; a low cap truncates the JSON.
+          maxOutputTokens: 8192,
           responseMimeType: "application/json",
           temperature,
+          // gemini-2.5-flash is a thinking model — turn on dynamic thinking
+          thinkingConfig: { thinkingBudget: -1 },
         },
       }),
       signal: controller.signal,
     });
 
-    const payload = (await response.json().catch(() => null)) as
-      | GeminiGenerateContentResponse
-      | null;
+    const payload = (await response
+      .json()
+      .catch(() => null)) as GeminiGenerateContentResponse | null;
 
     if (!response.ok) {
       throw new AiWorkerError(
@@ -87,25 +91,40 @@ export async function generateVoxelCore({
       );
     }
 
-    const text = payload?.candidates?.[0]?.content?.parts
+    const candidate = payload?.candidates?.[0];
+    const finishReason = candidate?.finishReason;
+    const text = candidate?.content?.parts
       ?.map((part) => part.text ?? "")
       .join("")
       .trim();
+    if (finishReason === "MAX_TOKENS") {
+      throw new AiWorkerError(
+        "validation_failed",
+        "Gemini ran out of output tokens before finishing the object. Try a simpler object or retry.",
+      );
+    }
     if (!text) {
-      throw new AiWorkerError("validation_failed", "Gemini returned an empty voxel spec.");
+      throw new AiWorkerError(
+        "validation_failed",
+        "Gemini returned an empty voxel spec.",
+      );
     }
 
     const parsed = voxelCoreSchema.safeParse(parseJsonObject(text));
     if (!parsed.success) {
       throw new AiWorkerError(
         "validation_failed",
-        parsed.error.issues[0]?.message ?? "Gemini returned an invalid voxel spec.",
+        parsed.error.issues[0]?.message ??
+          "Gemini returned an invalid voxel spec.",
       );
     }
     return parsed.data;
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
-      throw new AiWorkerError("timeout", `Gemini timed out after ${timeoutMs}ms`);
+      throw new AiWorkerError(
+        "timeout",
+        `Gemini timed out after ${timeoutMs}ms`,
+      );
     }
     throw error;
   } finally {
@@ -124,12 +143,18 @@ function parseJsonObject(text: string) {
   } catch {
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) {
-      throw new AiWorkerError("validation_failed", "Gemini response was not JSON.");
+      throw new AiWorkerError(
+        "validation_failed",
+        "Gemini response was not JSON.",
+      );
     }
     try {
       return JSON.parse(match[0]);
     } catch {
-      throw new AiWorkerError("validation_failed", "Gemini response JSON could not be parsed.");
+      throw new AiWorkerError(
+        "validation_failed",
+        "Gemini response JSON could not be parsed.",
+      );
     }
   }
 }
