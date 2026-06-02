@@ -26,6 +26,7 @@ export interface BackendLifecycleCommands {
   canHandle(): boolean;
   submitPrompt(prompt: string): Promise<void>;
   dispatchAction(actionId: GenerationActionId): Promise<void>;
+  moveSelectedObject(dx: number, dz: number): Promise<void>;
   deleteSelectedObject(): Promise<void>;
   updateWorldSettings(input: BackendUpdateWorldSettingsInput): Promise<void>;
   createSnapshot(reason?: string): Promise<void>;
@@ -190,6 +191,44 @@ export function createBackendLifecycleCommands(
         builderSpecJson: edit.builderSpecJson,
       });
       await bridge.expireCooldown({ objectId: object.object_id });
+    },
+    async moveSelectedObject(dx: number, dz: number) {
+      const snapshot = bridge.getSnapshot();
+      const object = selectBackendObject(snapshot, selectedObjectId());
+      if (!object) {
+        throw new Error("Select an object before moving it.");
+      }
+
+      const [px, py, pz] = object.transform.position;
+      const [rx, ry, rz] = object.transform.rotation;
+      const [sx, sy, sz] = object.transform.scale;
+      const transform = {
+        positionX: px + dx,
+        positionY: py,
+        positionZ: pz + dz,
+        rotationX: rx,
+        rotationY: ry,
+        rotationZ: rz,
+        scaleX: sx,
+        scaleY: sy,
+        scaleZ: sz,
+      };
+
+      if (object.state === "grace") {
+        await bridge.updateDraftTransform({ objectId: object.object_id, ...transform });
+        return;
+      }
+
+      // Public objects can only be mutated under an edit lock; apply then cancel so
+      // the move persists without bumping the version or starting a cooldown.
+      if (object.state === "public") {
+        await bridge.requestEditLock({
+          objectId: object.object_id,
+          baseVersion: object.version,
+        });
+      }
+      await bridge.updateLockedTransform({ objectId: object.object_id, ...transform });
+      await bridge.cancelEdit({ objectId: object.object_id });
     },
     async deleteSelectedObject() {
       const snapshot = bridge.getSnapshot();

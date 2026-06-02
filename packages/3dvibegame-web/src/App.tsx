@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createConfiguredAiWorkerClient,
   isMissingBrowserGeminiKeyError,
@@ -121,6 +121,20 @@ export function App() {
   const needsApiKey = resolveAiClientMode() === "browser-gemini" && !geminiKey;
   const inputDisabled = GENERATING_STAGES.has(displaySnapshot.stage);
 
+  // WASD moves the object when one is selected (local or live), else moves the camera.
+  const hasSelectedObjectRef = useRef(false);
+  hasSelectedObjectRef.current = displaySnapshot.object !== null;
+
+  const handleMoveObject = useCallback((dx: number, dz: number) => {
+    if (backendCommandsRef.current?.canHandle()) {
+      void backendCommandsRef.current
+        .moveSelectedObject(dx, dz)
+        .catch((err: unknown) => setContextMsg(errorMessage(err, "Move failed")));
+      return;
+    }
+    sessionRef.current?.moveSelected(dx, dz);
+  }, []);
+
   // --- Handlers ---
   function handlePromptSubmit(prompt: string) {
     setContextMsg("");
@@ -175,6 +189,8 @@ export function App() {
           document={displaySnapshot.document}
           selectedObjectId={effectiveSelectedId}
           onSelectObject={handleSelectObject}
+          hasSelectedObjectRef={hasSelectedObjectRef}
+          onMoveObject={handleMoveObject}
         />
       </div>
 

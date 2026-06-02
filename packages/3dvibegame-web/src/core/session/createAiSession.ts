@@ -248,6 +248,20 @@ export function createAiSession(aiClient: AiWorkerClient) {
       notify();
     },
 
+    moveSelected(dx: number, dz: number) {
+      const object = currentObject();
+      if (!object) return;
+      try {
+        const [px, , pz] = object.transform.position;
+        const patch = { position: { x: px + dx, z: pz + dz } };
+        world = applyTransform(world, object, playerId, patch);
+        lastMessage = "Object moved.";
+      } catch (error) {
+        lastMessage = error instanceof Error ? error.message : "Move failed.";
+      }
+      notify();
+    },
+
     selectObject(objectId: string | null) {
       const obj = objectId
         ? (world.objects.find((o) => o.object_id === objectId) ?? null)

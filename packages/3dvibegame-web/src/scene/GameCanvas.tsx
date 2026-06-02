@@ -1,17 +1,32 @@
+import { useEffect, useRef, type ComponentRef, type RefObject } from "react";
 import * as THREE from "three";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import type { SceneDocument } from "../core";
 import { ReferenceWorld } from "./ReferenceWorld";
 import { SceneObjects } from "./SceneObjects";
 
+type OrbitControlsRef = ComponentRef<typeof OrbitControls>;
+
 interface Props {
   document: SceneDocument;
   selectedObjectId: string | null;
   onSelectObject?: (objectId: string) => void;
+  /** True while a movable object is selected (object moves) vs. not (camera moves). */
+  hasSelectedObjectRef: RefObject<boolean>;
+  /** Moves the selected object by a world-axis delta (X, Z). */
+  onMoveObject: (dx: number, dz: number) => void;
 }
 
-export function GameCanvas({ document, selectedObjectId, onSelectObject }: Props) {
+export function GameCanvas({
+  document,
+  selectedObjectId,
+  onSelectObject,
+  hasSelectedObjectRef,
+  onMoveObject,
+}: Props) {
+  const controlsRef = useRef<OrbitControlsRef>(null);
+
   return (
     <Canvas
       shadows={{ type: THREE.PCFSoftShadowMap }}
@@ -46,6 +61,7 @@ export function GameCanvas({ document, selectedObjectId, onSelectObject }: Props
         onSelectObject={onSelectObject}
       />
       <OrbitControls
+        ref={controlsRef}
         enableDamping
         maxPolarAngle={Math.PI * 0.47}
         minDistance={2.8}
@@ -53,6 +69,85 @@ export function GameCanvas({ document, selectedObjectId, onSelectObject }: Props
         target={[0, 2.2, 0]}
         enablePan={false}
       />
+      <KeyboardController
+        controlsRef={controlsRef}
+        hasSelectedObjectRef={hasSelectedObjectRef}
+        onMoveObject={onMoveObject}
+      />
     </Canvas>
   );
+}
+
+interface KeyboardControllerProps {
+  controlsRef: RefObject<OrbitControlsRef | null>;
+  hasSelectedObjectRef: RefObject<boolean>;
+  onMoveObject: (dx: number, dz: number) => void;
+  step?: number;
+}
+
+/**
+ * WASD keyboard handling. When an object is selected, WASD moves it on the world
+ * X/Z plane; otherwise WASD pans the camera (and its orbit target) along the
+ * camera-relative ground plane.
+ */
+function KeyboardController({
+  controlsRef,
+  hasSelectedObjectRef,
+  onMoveObject,
+  step = 0.5,
+}: KeyboardControllerProps) {
+  const camera = useThree((state) => state.camera);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const key = event.key.toLowerCase();
+      if (key !== "w" && key !== "a" && key !== "s" && key !== "d") return;
+
+      // Don't hijack typing in the prompt box or other inputs.
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) {
+        return;
+      }
+      event.preventDefault();
+
+      if (hasSelectedObjectRef.current) {
+        // World-axis object move: A/D = ∓X, W/S = ∓Z.
+        let dx = 0;
+        let dz = 0;
+        if (key === "a") dx = -step;
+        else if (key === "d") dx = step;
+        else if (key === "w") dz = -step;
+        else if (key === "s") dz = step;
+        onMoveObject(dx, dz);
+        return;
+      }
+
+      const controls = controlsRef.current;
+      if (!controls) return;
+
+      // Camera-relative ground pan: move both the camera and its orbit target.
+      const forward = new THREE.Vector3();
+      camera.getWorldDirection(forward);
+      forward.y = 0;
+      if (forward.lengthSq() < 1e-6) return;
+      forward.normalize();
+      const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
+
+      const move = new THREE.Vector3();
+      if (key === "w") move.add(forward);
+      else if (key === "s") move.addScaledVector(forward, -1);
+      else if (key === "a") move.addScaledVector(right, -1);
+      else if (key === "d") move.add(right);
+      move.multiplyScalar(step);
+
+      camera.position.add(move);
+      controls.target.add(move);
+      controls.update();
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [camera, controlsRef, hasSelectedObjectRef, onMoveObject, step]);
+
+  return null;
 }
