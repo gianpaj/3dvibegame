@@ -46,6 +46,7 @@ export type GenerationActionId =
   | "nudge_draft"
   | "rotate_draft"
   | "scale_draft"
+  | "scale_down_draft"
   | "release_object";
 
 export interface GenerationSnapshot {

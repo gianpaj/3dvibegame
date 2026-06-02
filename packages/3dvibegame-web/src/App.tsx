@@ -179,6 +179,17 @@ export function App() {
     return () => window.clearTimeout(timer);
   }, [effectiveSelectedId, handleDeselect]);
 
+  // Esc deselects the current object.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && hasSelectedObjectRef.current) {
+        handleDeselect();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleDeselect]);
+
   // --- Handlers ---
   function handlePromptSubmit(prompt: string) {
     setContextMsg("");
@@ -264,6 +275,7 @@ export function App() {
           onSelectObject={handleSelectObject}
           hasSelectedObjectRef={hasSelectedObjectRef}
           onMoveObject={handleMoveObject}
+          onDeselect={handleDeselect}
         />
       </div>
 

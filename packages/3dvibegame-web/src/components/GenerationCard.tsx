@@ -23,7 +23,8 @@ export function GenerationCard({ snapshot, onDispatch, onDelete }: Props) {
 
   const showMove = availableActions.includes("nudge_draft");
   const showRotate = availableActions.includes("rotate_draft");
-  const showScale = availableActions.includes("scale_draft");
+  const showScaleUp = availableActions.includes("scale_draft");
+  const showScaleDown = availableActions.includes("scale_down_draft");
   const showRelease = availableActions.includes("release_object");
 
   return (
@@ -36,7 +37,7 @@ export function GenerationCard({ snapshot, onDispatch, onDelete }: Props) {
       </div>
       <p className="generation-card-message">{lastMessage}</p>
 
-      {(showMove || showRotate || showScale || showRelease) && (
+      {(showMove || showRotate || showScaleUp || showScaleDown || showRelease) && (
         <div className="action-buttons">
           {showMove && (
             <button className="btn-action" onClick={() => onDispatch("nudge_draft")}>
@@ -48,9 +49,14 @@ export function GenerationCard({ snapshot, onDispatch, onDelete }: Props) {
               Rotate
             </button>
           )}
-          {showScale && (
+          {showScaleUp && (
             <button className="btn-action" onClick={() => onDispatch("scale_draft")}>
               Scale ↑
+            </button>
+          )}
+          {showScaleDown && (
+            <button className="btn-action" onClick={() => onDispatch("scale_down_draft")}>
+              Scale ↓
             </button>
           )}
           {showRelease && (

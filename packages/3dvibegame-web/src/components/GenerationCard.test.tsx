@@ -11,6 +11,7 @@ const allActions: GenerationActionId[] = [
   "nudge_draft",
   "rotate_draft",
   "scale_draft",
+  "scale_down_draft",
   "release_object",
 ];
 
@@ -63,7 +64,8 @@ describe("GenerationCard", () => {
     );
     expect(screen.getByRole("button", { name: "Move" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rotate" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Scale/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Scale ↑" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Scale ↓" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Release to world" })).toBeInTheDocument();
   });
 

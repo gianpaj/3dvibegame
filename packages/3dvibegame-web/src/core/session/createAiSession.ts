@@ -51,13 +51,31 @@ export function createAiSession(aiClient: AiWorkerClient) {
   ): GenerationActionId[] {
     if (!object) return [];
     if (object.state === "grace") {
-      return ["nudge_draft", "rotate_draft", "scale_draft", "release_object"];
+      return [
+        "nudge_draft",
+        "rotate_draft",
+        "scale_draft",
+        "scale_down_draft",
+        "release_object",
+      ];
     }
     if (object.state === "edit_locked") {
-      return ["nudge_draft", "rotate_draft", "scale_draft", "release_object"];
+      return [
+        "nudge_draft",
+        "rotate_draft",
+        "scale_draft",
+        "scale_down_draft",
+        "release_object",
+      ];
     }
     if (object.state === "public") {
-      return ["nudge_draft", "rotate_draft", "scale_draft", "release_object"];
+      return [
+        "nudge_draft",
+        "rotate_draft",
+        "scale_draft",
+        "scale_down_draft",
+        "release_object",
+      ];
     }
     return [];
   }
@@ -239,6 +257,13 @@ export function createAiSession(aiClient: AiWorkerClient) {
             const patch = { scale: { x: sx * 1.12, y: sy * 1.12, z: sz * 1.12 } };
             world = applyTransform(world, object, playerId, patch);
             lastMessage = "Object scaled up.";
+            break;
+          }
+          case "scale_down_draft": {
+            const [sx, sy, sz] = object.transform.scale;
+            const patch = { scale: { x: sx / 1.12, y: sy / 1.12, z: sz / 1.12 } };
+            world = applyTransform(world, object, playerId, patch);
+            lastMessage = "Object scaled down.";
             break;
           }
           default:

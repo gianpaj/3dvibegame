@@ -411,16 +411,17 @@ function isBackendReady(bridge: BackendPresenceBridge) {
 
 function isTransformAction(
   actionId: GenerationActionId,
-): actionId is "nudge_draft" | "rotate_draft" | "scale_draft" {
+): actionId is "nudge_draft" | "rotate_draft" | "scale_draft" | "scale_down_draft" {
   return (
     actionId === "nudge_draft" ||
     actionId === "rotate_draft" ||
-    actionId === "scale_draft"
+    actionId === "scale_draft" ||
+    actionId === "scale_down_draft"
   );
 }
 
 function transformForAction(
-  actionId: "nudge_draft" | "rotate_draft" | "scale_draft",
+  actionId: "nudge_draft" | "rotate_draft" | "scale_draft" | "scale_down_draft",
   transform: {
     position: [number, number, number];
     rotation: [number, number, number];
@@ -467,6 +468,18 @@ function transformForAction(
         scaleX: scaleX * 1.12,
         scaleY: scaleY * 1.12,
         scaleZ: scaleZ * 1.12,
+      };
+    case "scale_down_draft":
+      return {
+        positionX,
+        positionY,
+        positionZ,
+        rotationX,
+        rotationY,
+        rotationZ,
+        scaleX: scaleX / 1.12,
+        scaleY: scaleY / 1.12,
+        scaleZ: scaleZ / 1.12,
       };
     default:
       actionId satisfies never;

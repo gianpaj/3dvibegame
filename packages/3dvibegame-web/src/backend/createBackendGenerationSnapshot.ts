@@ -142,15 +142,15 @@ export function backendAvailableActions(
     object.state === "edit_locked" && object.lock_owner_id === localPlayerId;
 
   if (isGraceOwner) {
-    return ["nudge_draft", "rotate_draft", "scale_draft", "release_object"];
+    return ["nudge_draft", "rotate_draft", "scale_draft", "scale_down_draft", "release_object"];
   }
 
   if (isLockOwner) {
-    return ["nudge_draft", "rotate_draft", "scale_draft"];
+    return ["nudge_draft", "rotate_draft", "scale_draft", "scale_down_draft"];
   }
 
   if (object.state === "public") {
-    return ["nudge_draft", "rotate_draft", "scale_draft"];
+    return ["nudge_draft", "rotate_draft", "scale_draft", "scale_down_draft"];
   }
 
   return [];
