@@ -94,18 +94,21 @@ try {
   harness.callAs(remixer, "expire_cooldown", [playableObjectId]);
   harness.activatePlayers();
 
-  expectReducerFailure(
-    () => harness.callAs(creator, "delete_object", [playableObjectId]),
-    "cannot delete released objects in this world",
-    "Public first-playable flow should stay non-destructive",
-  );
-  harness.activatePlayers();
-
   const finalOutput = harness.query(
     `SELECT object_id, state, version FROM world_object WHERE object_id = '${playableObjectId}'`,
   );
   expectIncludes(finalOutput, '"public"', "Cooldown expiry should return the remix to public");
   expectIncludes(finalOutput, " 2 ", "Final public object should keep version 2");
+
+  // The shared room is now private + destructive, so the creator can delete their
+  // released object.
+  harness.callAs(creator, "delete_object", [playableObjectId]);
+  harness.activatePlayers();
+
+  const deletedOutput = harness.query(
+    `SELECT object_id, state FROM world_object WHERE object_id = '${playableObjectId}'`,
+  );
+  expectIncludes(deletedOutput, '"deleted"', "Creator can delete their released object in the destructive room");
 
   console.log("first-playable flow smoke passed");
   console.log(`database: ${harness.database}`);

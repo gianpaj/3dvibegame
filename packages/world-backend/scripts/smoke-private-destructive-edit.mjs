@@ -39,6 +39,20 @@ try {
   harness.callAs(host, "release_object", [destructiveObjectId]);
   harness.activatePlayers();
 
+  // The default room is now private + destructive, so switch it to public first to
+  // verify public rooms reject deletion of released objects.
+  harness.callAs(host, "update_world_settings", [
+    "public",
+    "20",
+    "50",
+    "10",
+    "1",
+    "false",
+    "30",
+    "12",
+  ]);
+  harness.activatePlayers();
+
   expectReducerFailure(
     () => harness.callAs(player, "delete_object", [destructiveObjectId]),
     "cannot delete released objects in this world",
@@ -77,13 +91,22 @@ try {
   ]);
   harness.activatePlayers();
 
-  harness.callAs(player, "delete_object", [destructiveObjectId]);
+  // Within 90s of creation, a non-creator cannot delete the object.
+  expectReducerFailure(
+    () => harness.callAs(player, "delete_object", [destructiveObjectId]),
+    "object is protected from deletion for 90 seconds after creation",
+    "Non-creator should not delete a freshly created object within 90s",
+  );
+  harness.activatePlayers();
+
+  // The creator can delete their own object immediately.
+  harness.callAs(host, "delete_object", [destructiveObjectId]);
   harness.activatePlayers();
 
   const deletedOutput = harness.query(
     `SELECT object_id, state FROM world_object WHERE object_id = '${destructiveObjectId}'`,
   );
-  expectIncludes(deletedOutput, '"deleted"', "Private destructive delete should mark the live object deleted");
+  expectIncludes(deletedOutput, '"deleted"', "Creator can delete their object in the private destructive room");
 
   console.log("private destructive edit smoke passed");
   console.log(`database: ${harness.database}`);

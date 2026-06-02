@@ -1,16 +1,20 @@
+import { useState } from "react";
+
 import type { AiSessionSnapshot } from "../core/session/createAiSession";
 import type { GenerationActionId } from "../core/session/generationSession";
+import { ConfirmModal } from "./ConfirmModal";
 import { StatusBadge } from "./StatusBadge";
 
 interface Props {
   snapshot: AiSessionSnapshot;
   onDispatch: (actionId: GenerationActionId) => void;
+  onDelete: () => void;
 }
 
-export function GenerationCard({ snapshot, onDispatch }: Props) {
+export function GenerationCard({ snapshot, onDispatch, onDelete }: Props) {
   const { stage, lastMessage, object, availableActions } = snapshot;
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  console.log("[GenerationCard] stage=%s activeObject=%s availableActions=%o", stage, object?.object_id ?? "null", availableActions);
   const isGenerating =
     stage === "queued" || stage === "planning" || stage === "compiled_artifact_ready";
 
@@ -55,6 +59,25 @@ export function GenerationCard({ snapshot, onDispatch }: Props) {
             </button>
           )}
         </div>
+      )}
+
+      {object && (
+        <button className="btn-danger btn-delete" onClick={() => setConfirmingDelete(true)}>
+          Delete
+        </button>
+      )}
+
+      {confirmingDelete && (
+        <ConfirmModal
+          title="Delete this object?"
+          message="This permanently removes it from the world for everyone."
+          confirmLabel="Delete"
+          onConfirm={() => {
+            setConfirmingDelete(false);
+            onDelete();
+          }}
+          onCancel={() => setConfirmingDelete(false)}
+        />
       )}
     </div>
   );

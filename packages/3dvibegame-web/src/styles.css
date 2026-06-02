@@ -202,6 +202,39 @@ body { overflow: hidden; background: #ebe4d7; color: var(--text); }
   border-color: #bbb;
 }
 
+.btn-danger {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(224, 80, 80, 0.4);
+  background: rgba(224, 80, 80, 0.12);
+  color: var(--red);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.btn-danger:hover {
+  background: var(--red);
+  color: #fff;
+}
+
+.btn-delete {
+  align-self: flex-start;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.confirm-actions .btn-action,
+.confirm-actions .btn-danger {
+  flex: 1;
+  text-align: center;
+}
+
 /* ── Buttons ─────────────────────────────────── */
 .btn-release {
   padding: 8px 14px;

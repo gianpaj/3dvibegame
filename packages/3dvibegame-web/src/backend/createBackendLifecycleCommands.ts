@@ -330,6 +330,13 @@ export function createBackendLifecycleCommands(
         throw new Error("Select an object before deleting it.");
       }
 
+      // Selecting holds an edit lock, but delete_object requires the object to be
+      // public — release our lock first.
+      const localPlayerId = localBackendPlayerId(snapshot);
+      if (object.state === "edit_locked" && object.lock_owner_id === localPlayerId) {
+        await bridge.cancelEdit({ objectId: object.object_id });
+      }
+
       await bridge.deleteObject({ objectId: object.object_id });
     },
   };

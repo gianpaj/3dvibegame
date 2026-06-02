@@ -233,6 +233,18 @@ export function App() {
     }
   }
 
+  function handleDelete() {
+    setContextMsg("");
+    if (backendCommandsRef.current?.canHandle()) {
+      void backendCommandsRef.current
+        .deleteSelectedObject()
+        .then(() => handleDeselect())
+        .catch((err: unknown) => setContextMsg(errorMessage(err, "Delete failed")));
+      return;
+    }
+    sessionRef.current?.deleteSelected();
+  }
+
   function handleApiKeySave(key: string) {
     setGeminiKey(key);
     geminiKeyRef.current = key;
@@ -263,7 +275,11 @@ export function App() {
         </div>
 
         <div className="hud-top-right">
-          <GenerationCard snapshot={displaySnapshot} onDispatch={handleDispatch} />
+          <GenerationCard
+            snapshot={displaySnapshot}
+            onDispatch={handleDispatch}
+            onDelete={handleDelete}
+          />
         </div>
 
         <div className="hud-bottom">

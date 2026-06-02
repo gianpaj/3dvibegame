@@ -37,14 +37,18 @@ function makeSnapshot(
 describe("GenerationCard", () => {
   it("renders nothing when idle with no object selected", () => {
     const { container } = render(
-      <GenerationCard snapshot={makeSnapshot("idle", [])} onDispatch={vi.fn()} />,
+      <GenerationCard snapshot={makeSnapshot("idle", [])} onDispatch={vi.fn()} onDelete={vi.fn()} />,
     );
     expect(container).toBeEmptyDOMElement();
   });
 
   it("renders nothing when nothing is generating and no object is selected", () => {
     const { container } = render(
-      <GenerationCard snapshot={makeSnapshot("released", allActions)} onDispatch={vi.fn()} />,
+      <GenerationCard
+        snapshot={makeSnapshot("released", allActions)}
+        onDispatch={vi.fn()}
+        onDelete={vi.fn()}
+      />,
     );
     expect(container).toBeEmptyDOMElement();
   });
@@ -54,6 +58,7 @@ describe("GenerationCard", () => {
       <GenerationCard
         snapshot={makeSnapshot("grace", allActions, fakeObject)}
         onDispatch={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
     expect(screen.getByRole("button", { name: "Move" })).toBeInTheDocument();
@@ -67,6 +72,7 @@ describe("GenerationCard", () => {
       <GenerationCard
         snapshot={makeSnapshot("released", allActions, fakeObject)}
         onDispatch={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
     expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
@@ -79,10 +85,39 @@ describe("GenerationCard", () => {
       <GenerationCard
         snapshot={makeSnapshot("grace", allActions, fakeObject)}
         onDispatch={onDispatch}
+        onDelete={vi.fn()}
       />,
     );
 
     await user.click(screen.getByRole("button", { name: "Rotate" }));
     expect(onDispatch).toHaveBeenCalledWith("rotate_draft");
+  });
+
+  it("calls onDelete only after confirming in the modal", async () => {
+    const onDelete = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <GenerationCard
+        snapshot={makeSnapshot("released", allActions, fakeObject)}
+        onDispatch={vi.fn()}
+        onDelete={onDelete}
+      />,
+    );
+
+    // First Delete opens the confirmation; onDelete not called yet.
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    expect(screen.getByText("Delete this object?")).toBeInTheDocument();
+    expect(onDelete).not.toHaveBeenCalled();
+
+    // Cancel closes it without deleting.
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onDelete).not.toHaveBeenCalled();
+
+    // Re-open and confirm.
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    await user.click(
+      screen.getAllByRole("button", { name: "Delete" }).at(-1) as HTMLElement,
+    );
+    expect(onDelete).toHaveBeenCalledTimes(1);
   });
 });

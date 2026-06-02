@@ -24,6 +24,22 @@ try {
   harness.callAs(bob, "join_world", ["Bob"]);
   harness.activatePlayers();
 
+  // The default room is now private (which skips per-player caps); switch it to
+  // public so the create/job guardrails under test apply.
+  harness.query("UPDATE player_session SET role = 'host' WHERE nickname = 'Alice'");
+  harness.activatePlayers();
+  harness.callAs(alice, "update_world_settings", [
+    "public",
+    "20",
+    "120",
+    "12",
+    "1",
+    "false",
+    "30",
+    "12",
+  ]);
+  harness.activatePlayers();
+
   const playersOutput = harness.query(
     "SELECT identity, nickname, presence_state FROM player_session",
   );

@@ -16,7 +16,12 @@ interface Props {
   hasSelectedObjectRef: RefObject<boolean>;
   /** Moves the selected object by a world-axis delta (X, Z). */
   onMoveObject: (dx: number, dz: number) => void;
+  /** Clears the current selection (clicking empty space). */
+  onDeselect: () => void;
 }
+
+// Clicks that move more than this are treated as a camera drag, not a deselect.
+const dragThreshold = 6;
 
 export function GameCanvas({
   document,
@@ -24,8 +29,10 @@ export function GameCanvas({
   onSelectObject,
   hasSelectedObjectRef,
   onMoveObject,
+  onDeselect,
 }: Props) {
   const controlsRef = useRef<OrbitControlsRef>(null);
+  const pointerDownRef = useRef<{ x: number; y: number } | null>(null);
 
   return (
     <Canvas
@@ -36,6 +43,18 @@ export function GameCanvas({
         outputColorSpace: THREE.SRGBColorSpace,
       }}
       style={{ width: "100%", height: "100%" }}
+      onPointerDown={(event) => {
+        pointerDownRef.current = { x: event.clientX, y: event.clientY };
+      }}
+      onPointerMissed={(event) => {
+        // Fired when a click hits no object (empty space / floor). Ignore camera
+        // drags and only deselect when something is actually selected.
+        const down = pointerDownRef.current;
+        pointerDownRef.current = null;
+        if (!down || !hasSelectedObjectRef.current) return;
+        const moved = Math.hypot(event.clientX - down.x, event.clientY - down.y);
+        if (moved <= dragThreshold) onDeselect();
+      }}
     >
       <color attach="background" args={["#ebe4d7"]} />
       <fog attach="fog" args={["#ebe4d7", 14, 26]} />

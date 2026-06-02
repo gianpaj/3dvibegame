@@ -22,6 +22,22 @@ try {
   harness.callAs(bob, "join_world", ["Bob"]);
   harness.activatePlayers();
 
+  // The default room is now private (which skips per-player caps); switch it to
+  // public so the pending-create-job guardrail under test applies.
+  harness.query("UPDATE player_session SET role = 'host' WHERE nickname = 'Alice'");
+  harness.activatePlayers();
+  harness.callAs(alice, "update_world_settings", [
+    "public",
+    "20",
+    "120",
+    "12",
+    "1",
+    "false",
+    "30",
+    "12",
+  ]);
+  harness.activatePlayers();
+
   harness.callAs(alice, "request_create_object", [
     "ai-job-smoke-failed",
     "create a pine tree that fails",

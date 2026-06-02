@@ -3,7 +3,8 @@ import { SenderError, t, type InferSchema, type ReducerCtx } from "spacetimedb/s
 import spacetimedb from "./schema";
 
 const defaultWorldName = "Vibe Test Room";
-const defaultWorldVisibility = "public";
+// The shared test room is private + destructive so players can delete objects.
+const defaultWorldVisibility = "private";
 const defaultMaxPlayers = 20;
 const defaultObjectCooldownSeconds = 30;
 const defaultGracePeriodSeconds = 12;
@@ -16,6 +17,8 @@ const maxAllowedObjectsPerPlayer = 100;
 const maxAllowedPendingCreateJobsPerPlayer = 5;
 const maxAllowedObjectCooldownSeconds = 300;
 const maxAllowedGracePeriodSeconds = 120;
+// Only the creator may delete a freshly created object within this window.
+const deletionProtectionMicros = 90n * 1_000_000n;
 const maxWorldNameLength = 48;
 const maxNicknameLength = 24;
 const maxIdLength = 80;
@@ -566,6 +569,19 @@ export const delete_object = spacetimedb.reducer(
       throw new SenderError("cannot delete released objects in this world");
     }
 
+    // Within the protection window, only the creator may delete a freshly created
+    // object so other players can't immediately wipe someone's new creation.
+    const ageMicros =
+      ctx.timestamp.microsSinceUnixEpoch - object.createdAt.microsSinceUnixEpoch;
+    if (
+      !sameIdentity(object.createdBy, ctx.sender) &&
+      ageMicros < deletionProtectionMicros
+    ) {
+      throw new SenderError(
+        "object is protected from deletion for 90 seconds after creation",
+      );
+    }
+
     ctx.db.worldObject.objectId.update({
       ...object,
       state: "deleted",
@@ -677,7 +693,7 @@ function ensureDefaultWorld(ctx: BackendCtx) {
     maxLiveObjects: defaultMaxLiveObjectsPerPublicWorld,
     maxObjectsPerPlayer: defaultMaxLiveObjectsPerPublicPlayer,
     maxPendingCreateJobsPerPlayer: defaultMaxPendingCreateJobsPerPublicPlayer,
-    destructiveEditsEnabled: false,
+    destructiveEditsEnabled: true,
     objectCooldownSeconds: defaultObjectCooldownSeconds,
     gracePeriodSeconds: defaultGracePeriodSeconds,
     createdAt: ctx.timestamp,

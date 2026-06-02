@@ -1,5 +1,7 @@
 import {
   createAuthorityWorld,
+  deleteObject,
+  discardDraft,
   expireCooldown,
   releaseEditLock,
   releaseObject,
@@ -262,6 +264,28 @@ export function createAiSession(aiClient: AiWorkerClient) {
       notify();
     },
 
+    deleteSelected() {
+      const object = currentObject();
+      if (!object) return;
+      try {
+        if (object.state === "grace") {
+          world = discardDraft(world, { objectId: object.object_id, playerId }).world;
+        } else {
+          if (object.state === "edit_locked") {
+            world = releaseEditLock(world, { objectId: object.object_id, playerId }).world;
+          }
+          world = deleteObject(world, { objectId: object.object_id, playerId }).world;
+        }
+        activeObjectId = null;
+        const hasObjects = world.objects.some((o) => o.state !== "deleted");
+        stage = hasObjects ? "released" : "idle";
+        lastMessage = "Object deleted.";
+      } catch (error) {
+        lastMessage = error instanceof Error ? error.message : "Delete failed.";
+      }
+      notify();
+    },
+
     selectObject(objectId: string | null) {
       const obj = objectId
         ? (world.objects.find((o) => o.object_id === objectId) ?? null)
@@ -338,7 +362,8 @@ function createInitialWorld(): AuthorityWorld {
     worldId: "local_ai_world",
     settings: {
       visibility: "private",
-      destructive_edits_enabled: false,
+      // Enable deletion in the single-player local world.
+      destructive_edits_enabled: true,
       object_cooldown_seconds: 0,
       protected_spawn_enabled: false,
     },
