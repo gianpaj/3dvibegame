@@ -7,7 +7,7 @@
 Current vertical slice:
 `text prompt -> browser Gemini -> voxel operations -> worker compile -> live object -> shared-room editing`
 
-[![Watch the video](https://raw.githubusercontent.com/gianpaj/3dvibegame/master/path/to/thumbnail.jpg)](https://raw.githubusercontent.com/gianpaj/3dvibegame/master/demo-multiplayer-jun-2.mp4)
+https://github.com/user-attachments/assets/17322171-449d-4279-a8c7-0218190edb77
 
 ## Clients
 
