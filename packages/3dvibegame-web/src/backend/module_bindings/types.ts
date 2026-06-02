@@ -24,6 +24,16 @@ export const AiJob = __t.object("AiJob", {
 });
 export type AiJob = __Infer<typeof AiJob>;
 
+export const ChatMessage = __t.object("ChatMessage", {
+  messageId: __t.u64(),
+  worldId: __t.u64(),
+  senderIdentity: __t.identity(),
+  senderNickname: __t.string(),
+  body: __t.string(),
+  createdAt: __t.timestamp(),
+});
+export type ChatMessage = __Infer<typeof ChatMessage>;
+
 export const ObjectLock = __t.object("ObjectLock", {
   objectId: __t.string(),
   worldId: __t.u64(),
@@ -131,3 +141,4 @@ export const WorldSnapshot = __t.object("WorldSnapshot", {
   createdAt: __t.timestamp(),
 });
 export type WorldSnapshot = __Infer<typeof WorldSnapshot>;
+

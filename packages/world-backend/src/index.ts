@@ -24,6 +24,9 @@ const maxNicknameLength = 24;
 const maxIdLength = 80;
 const maxSnapshotObjectIdLength = 180;
 const maxPromptLength = 500;
+const maxChatBodyLength = 280;
+// Cap persisted chat per world; oldest messages beyond this are pruned on send.
+const maxChatHistoryPerWorld = 200;
 const maxSourceSpecJsonLength = 300_000;
 const maxBuilderSpecJsonLength = 200_000;
 const maxHorizontalDistance = 256;
@@ -138,6 +141,32 @@ export const move_player = spacetimedb.reducer(
       rotationPitch,
       lastSeenAt: ctx.timestamp,
     });
+  },
+);
+
+export const send_chat_message = spacetimedb.reducer(
+  { body: t.string() },
+  (ctx, { body }) => {
+    const player = requireActivePlayer(ctx);
+
+    const trimmed = body.trim();
+    if (!trimmed) {
+      throw new SenderError("chat message is empty");
+    }
+    if (trimmed.length > maxChatBodyLength) {
+      throw new SenderError("chat message is too long");
+    }
+
+    ctx.db.chatMessage.insert({
+      messageId: 0n, // autoInc assigns the real id
+      worldId: player.worldId,
+      senderIdentity: ctx.sender,
+      senderNickname: player.nickname,
+      body: trimmed,
+      createdAt: ctx.timestamp,
+    });
+
+    pruneChatHistory(ctx, player.worldId);
   },
 );
 
@@ -1003,6 +1032,16 @@ function failPendingWorldJobs(ctx: BackendCtx, worldId: bigint) {
       errorCode: "world_reset",
     });
   });
+}
+
+function pruneChatHistory(ctx: BackendCtx, worldId: bigint) {
+  const messages = Array.from(ctx.db.chatMessage.iter())
+    .filter((message) => message.worldId === worldId)
+    .sort((a, b) => (a.messageId < b.messageId ? -1 : a.messageId > b.messageId ? 1 : 0));
+  const excess = messages.length - maxChatHistoryPerWorld;
+  for (let i = 0; i < excess; i += 1) {
+    ctx.db.chatMessage.messageId.delete(messages[i].messageId);
+  }
 }
 
 function requireActivePlayer(ctx: BackendCtx) {

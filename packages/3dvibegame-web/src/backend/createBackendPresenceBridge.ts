@@ -3,6 +3,7 @@ import type { AuthorityWorld } from "@3dvibegame/scene-authority-ts";
 import { DbConnection, type SubscriptionHandle } from "./module_bindings";
 import type {
   AiJob,
+  ChatMessage,
   PlayerSession,
   SnapshotObject,
   World,
@@ -80,6 +81,15 @@ export interface BackendSnapshotObjectDebug {
   capturedAt: string;
 }
 
+export interface BackendChatMessage {
+  id: string;
+  senderId: string;
+  senderNickname: string;
+  body: string;
+  createdAt: string;
+  isLocal: boolean;
+}
+
 export interface BackendAiJobDebug {
   jobId: string;
   worldId: string;
@@ -107,6 +117,7 @@ export interface BackendPresenceSnapshot {
   aiJobs: BackendAiJobDebug[];
   worldSnapshots: BackendWorldSnapshotDebug[];
   snapshotObjects: BackendSnapshotObjectDebug[];
+  chatMessages: BackendChatMessage[];
 }
 
 interface BackendPresenceBridgeConfig {
@@ -118,6 +129,7 @@ interface BackendPresenceBridgeConfig {
 export interface BackendPresenceBridge {
   getSnapshot(): BackendPresenceSnapshot;
   updateLocalTransform(transform: BackendPlayerTransform): void;
+  sendChat(body: string): Promise<void>;
   requestCreateObject(input: BackendRequestCreateObjectInput): Promise<void>;
   submitAiDraft(input: BackendSubmitAiDraftInput): Promise<void>;
   updateDraftTransform(input: BackendObjectTransformInput): Promise<void>;
@@ -219,6 +231,7 @@ export function createBackendPresenceBridge({
     return {
       getSnapshot: () => snapshot,
       updateLocalTransform() {},
+      sendChat: rejectDisabledBackend,
       requestCreateObject: rejectDisabledBackend,
       submitAiDraft: rejectDisabledBackend,
       updateDraftTransform: rejectDisabledBackend,
@@ -329,6 +342,7 @@ export function createBackendPresenceBridge({
             "SELECT * FROM world_object",
             "SELECT * FROM world_snapshot",
             "SELECT * FROM snapshot_object",
+            "SELECT * FROM chat_message",
           ]);
       })
       .onConnectError((_ctx, error) => {
@@ -395,6 +409,11 @@ export function createBackendPresenceBridge({
           flushPendingTransform();
         }, movementThrottleMs - elapsed);
       }
+    },
+    sendChat(body) {
+      return callLiveReducer("Chat message rejected", (conn) =>
+        conn.reducers.sendChatMessage({ body }),
+      );
     },
     requestCreateObject(input) {
       return callLiveReducer("Create request rejected", (conn) =>
@@ -570,6 +589,10 @@ function installTableListeners(connection: DbConnection, onChange: () => void) {
   const onSnapshotObjectUpdate: NonNullable<
     Parameters<NonNullable<typeof connection.db.snapshotObject.onUpdate>>[0]
   > = () => onChange();
+  const onChatMessageInsert: Parameters<typeof connection.db.chatMessage.onInsert>[0] =
+    () => onChange();
+  const onChatMessageDelete: Parameters<typeof connection.db.chatMessage.onDelete>[0] =
+    () => onChange();
 
   connection.db.aiJob.onInsert(onAiJobInsert);
   connection.db.aiJob.onDelete(onAiJobDelete);
@@ -589,6 +612,8 @@ function installTableListeners(connection: DbConnection, onChange: () => void) {
   connection.db.snapshotObject.onInsert(onSnapshotObjectInsert);
   connection.db.snapshotObject.onDelete(onSnapshotObjectDelete);
   connection.db.snapshotObject.onUpdate(onSnapshotObjectUpdate);
+  connection.db.chatMessage.onInsert(onChatMessageInsert);
+  connection.db.chatMessage.onDelete(onChatMessageDelete);
 
   return () => {
     connection.db.aiJob.removeOnInsert(onAiJobInsert);
@@ -609,6 +634,8 @@ function installTableListeners(connection: DbConnection, onChange: () => void) {
     connection.db.snapshotObject.removeOnInsert(onSnapshotObjectInsert);
     connection.db.snapshotObject.removeOnDelete(onSnapshotObjectDelete);
     connection.db.snapshotObject.removeOnUpdate(onSnapshotObjectUpdate);
+    connection.db.chatMessage.removeOnInsert(onChatMessageInsert);
+    connection.db.chatMessage.removeOnDelete(onChatMessageDelete);
   };
 }
 
@@ -652,6 +679,12 @@ function readSnapshotFromConnection({
         .filter((object) => object.worldId === world.worldId)
         .sort(compareSnapshotObjects)
     : [];
+  const chatMessages = world
+    ? Array.from(connection.db.chatMessage.iter())
+        .filter((message) => message.worldId === world.worldId)
+        .sort(compareChatMessages)
+        .map((message) => mapChatMessage(message, localIdentityHex))
+    : [];
   const players = Array.from(connection.db.playerSession.iter())
     .filter((player) => !world || player.worldId === world.worldId)
     .sort(comparePlayers)
@@ -675,6 +708,7 @@ function readSnapshotFromConnection({
     aiJobs: aiJobs.map(mapAiJobDebug),
     worldSnapshots: worldSnapshots.map(mapWorldSnapshotDebug),
     snapshotObjects: snapshotObjects.map(mapSnapshotObjectDebug),
+    chatMessages,
   };
 }
 
@@ -703,6 +737,7 @@ function createBaseSnapshot({
     aiJobs: [],
     worldSnapshots: [],
     snapshotObjects: [],
+    chatMessages: [],
   };
 }
 
@@ -793,6 +828,26 @@ function mapPlayer(
     },
     isLocal: localIdentityHex === id,
   };
+}
+
+function mapChatMessage(
+  message: ChatMessage,
+  localIdentityHex: string | null,
+): BackendChatMessage {
+  const senderId = message.senderIdentity.toHexString();
+  return {
+    id: message.messageId.toString(),
+    senderId,
+    senderNickname: message.senderNickname,
+    body: message.body,
+    createdAt: message.createdAt.toString(),
+    isLocal: localIdentityHex === senderId,
+  };
+}
+
+function compareChatMessages(a: ChatMessage, b: ChatMessage) {
+  // messageId is a u64 (bigint) autoInc — strictly increasing with send order.
+  return a.messageId < b.messageId ? -1 : a.messageId > b.messageId ? 1 : 0;
 }
 
 function mapObjectArtifactDebug(object: WorldObject): BackendObjectArtifactDebug {

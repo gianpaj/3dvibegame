@@ -20,6 +20,7 @@ import { ChatPanel } from "./components/ChatPanel";
 import { PromptInput } from "./components/PromptInput";
 import { useSession } from "./hooks/useGenerationSession";
 import { useChatTranscript } from "./hooks/useChatTranscript";
+import { DEBUG } from "./debug";
 
 const GENERATING_STAGES = new Set(["queued", "planning", "compiled_artifact_ready"]);
 
@@ -37,6 +38,7 @@ const DISABLED_BACKEND_SNAPSHOT: BackendPresenceSnapshot = {
   aiJobs: [],
   worldSnapshots: [],
   snapshotObjects: [],
+  chatMessages: [],
 };
 
 export function App() {
@@ -142,7 +144,8 @@ export function App() {
     return snapshot;
   })();
 
-  const { messages: chatMessages, appendPlayerMessage } = useChatTranscript(displaySnapshot);
+  // Local AI generation transcript — kept for DEBUG only (see debug.ts).
+  const { messages: aiTranscript, appendPlayerMessage } = useChatTranscript(displaySnapshot);
 
   const effectiveSelectedId = isLive
     ? selectedObjectId
@@ -293,6 +296,12 @@ export function App() {
     playerNameRef.current = name;
   }
 
+  function handleSendChat(text: string) {
+    void bridgeRef.current
+      ?.sendChat(text)
+      .catch((err: unknown) => setContextMsg(errorMessage(err, "Chat failed")));
+  }
+
   return (
     <div className="app-root">
       <div className="canvas-wrapper">
@@ -311,7 +320,12 @@ export function App() {
           <ConnectionStatus status={backendSnap.status} message={backendSnap.message} />
           <PlayerList players={backendSnap.players} />
           {contextMsg && <p className="context-msg">{contextMsg}</p>}
-          <ChatPanel messages={chatMessages} lastMessage={displaySnapshot.lastMessage} />
+          <ChatPanel
+            messages={backendSnap.chatMessages}
+            onSend={handleSendChat}
+            disabled={!isLive}
+            debugMessages={DEBUG ? aiTranscript : undefined}
+          />
         </div>
 
         <div className="hud-top-right">

@@ -36,6 +36,7 @@ import {
 // Import all reducer arg schemas
 import CancelEditReducer from "./cancel_edit_reducer";
 import CreateSnapshotReducer from "./create_snapshot_reducer";
+import CreateWorldReducer from "./create_world_reducer";
 import DeleteObjectReducer from "./delete_object_reducer";
 import ExpireAiJobReducer from "./expire_ai_job_reducer";
 import ExpireCooldownReducer from "./expire_cooldown_reducer";
@@ -44,12 +45,14 @@ import ExpireGracePeriodReducer from "./expire_grace_period_reducer";
 import FailAiJobReducer from "./fail_ai_job_reducer";
 import HeartbeatPlayerReducer from "./heartbeat_player_reducer";
 import JoinWorldReducer from "./join_world_reducer";
+import JoinWorldByIdReducer from "./join_world_by_id_reducer";
 import LeaveWorldReducer from "./leave_world_reducer";
 import MovePlayerReducer from "./move_player_reducer";
 import ReleaseObjectReducer from "./release_object_reducer";
 import RequestCreateObjectReducer from "./request_create_object_reducer";
 import RequestEditLockReducer from "./request_edit_lock_reducer";
 import ResetWorldReducer from "./reset_world_reducer";
+import SendChatMessageReducer from "./send_chat_message_reducer";
 import SubmitAiDraftReducer from "./submit_ai_draft_reducer";
 import SubmitObjectEditReducer from "./submit_object_edit_reducer";
 import UpdateDraftTransformReducer from "./update_draft_transform_reducer";
@@ -60,6 +63,7 @@ import UpdateWorldSettingsReducer from "./update_world_settings_reducer";
 
 // Import all table schema definitions
 import AiJobRow from "./ai_job_table";
+import ChatMessageRow from "./chat_message_table";
 import ObjectLockRow from "./object_lock_table";
 import PlayerSessionRow from "./player_session_table";
 import SnapshotObjectRow from "./snapshot_object_table";
@@ -88,6 +92,20 @@ const tablesSchema = __schema({
       { name: 'ai_job_job_id_key', constraint: 'unique', columns: ['jobId'] },
     ],
   }, AiJobRow),
+  chatMessage: __table({
+    name: 'chat_message',
+    indexes: [
+      { name: 'messageId', algorithm: 'btree', columns: [
+        'messageId',
+      ] },
+      { name: 'byWorldId', algorithm: 'btree', columns: [
+        'worldId',
+      ] },
+    ],
+    constraints: [
+      { name: 'chat_message_message_id_key', constraint: 'unique', columns: ['messageId'] },
+    ],
+  }, ChatMessageRow),
   objectLock: __table({
     name: 'object_lock',
     indexes: [
@@ -181,6 +199,7 @@ const tablesSchema = __schema({
 const reducersSchema = __reducers(
   __reducerSchema("cancel_edit", CancelEditReducer),
   __reducerSchema("create_snapshot", CreateSnapshotReducer),
+  __reducerSchema("create_world", CreateWorldReducer),
   __reducerSchema("delete_object", DeleteObjectReducer),
   __reducerSchema("expire_ai_job", ExpireAiJobReducer),
   __reducerSchema("expire_cooldown", ExpireCooldownReducer),
@@ -189,12 +208,14 @@ const reducersSchema = __reducers(
   __reducerSchema("fail_ai_job", FailAiJobReducer),
   __reducerSchema("heartbeat_player", HeartbeatPlayerReducer),
   __reducerSchema("join_world", JoinWorldReducer),
+  __reducerSchema("join_world_by_id", JoinWorldByIdReducer),
   __reducerSchema("leave_world", LeaveWorldReducer),
   __reducerSchema("move_player", MovePlayerReducer),
   __reducerSchema("release_object", ReleaseObjectReducer),
   __reducerSchema("request_create_object", RequestCreateObjectReducer),
   __reducerSchema("request_edit_lock", RequestEditLockReducer),
   __reducerSchema("reset_world", ResetWorldReducer),
+  __reducerSchema("send_chat_message", SendChatMessageReducer),
   __reducerSchema("submit_ai_draft", SubmitAiDraftReducer),
   __reducerSchema("submit_object_edit", SubmitObjectEditReducer),
   __reducerSchema("update_draft_transform", UpdateDraftTransformReducer),
@@ -255,3 +276,4 @@ export class DbConnection extends __DbConnectionImpl<typeof REMOTE_MODULE> {
     return new SubscriptionBuilder(this);
   };
 }
+
