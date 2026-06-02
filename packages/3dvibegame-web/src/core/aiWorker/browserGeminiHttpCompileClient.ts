@@ -1,12 +1,12 @@
-import { createPlanSchema, type CompilePlanRequest } from "@3dvibegame/ai-planning";
+import type { CompileVoxelRequest } from "@3dvibegame/ai-planning";
 
 import type { AiWorkerClient } from "./fixtureAiWorkerClient";
 import { AiWorkerError, normalizeAiWorkerError } from "./aiWorkerErrors";
 import {
   defaultGeminiModel,
   defaultGeminiTimeoutMs,
-  generateCreatePlan,
-} from "./geminiPlan";
+  generateVoxelCore,
+} from "./geminiVoxel";
 import {
   normalizeEndpoint,
   postWorkerJson,
@@ -27,15 +27,15 @@ const defaultWorkerTimeoutMs = 20_000;
 
 /**
  * Hybrid create client: the browser calls Gemini directly (BYOK key never leaves
- * the browser) to get a create plan, then POSTs that plan to the AI worker's
- * /compile endpoint, which deterministically turns it into a builder spec.
+ * the browser) to author the voxel geometry, then POSTs that voxel core to the AI
+ * worker's /compile endpoint, which grounds, validates, and compiles it.
  */
 export function createBrowserGeminiHttpCompileClient({
   apiKey,
   workerUrl,
   fetchImpl = fetch,
   model = defaultGeminiModel,
-  temperature = 0.25,
+  temperature = 0.35,
   geminiTimeoutMs = defaultGeminiTimeoutMs,
   workerTimeoutMs = defaultWorkerTimeoutMs,
 }: BrowserGeminiHttpCompileClientConfig): AiWorkerClient {
@@ -51,7 +51,7 @@ export function createBrowserGeminiHttpCompileClient({
       const sourcePrompt = prompt.trim();
 
       try {
-        const planPayload = await generateCreatePlan({
+        const voxel = await generateVoxelCore({
           apiKey: trimmedKey,
           fetchImpl,
           model,
@@ -59,18 +59,11 @@ export function createBrowserGeminiHttpCompileClient({
           temperature,
           timeoutMs: geminiTimeoutMs,
         });
-        const parsedPlan = createPlanSchema.safeParse(planPayload);
-        if (!parsedPlan.success) {
-          throw new AiWorkerError(
-            "validation_failed",
-            parsedPlan.error.issues[0]?.message ?? "Gemini returned an invalid create plan.",
-          );
-        }
 
-        const body: CompilePlanRequest = {
+        const body: CompileVoxelRequest = {
           operation: "create",
           source_prompt: sourcePrompt,
-          plan: parsedPlan.data,
+          voxel,
           warnings: ["browser Gemini BYOK"],
         };
         const response = await postWorkerJson(

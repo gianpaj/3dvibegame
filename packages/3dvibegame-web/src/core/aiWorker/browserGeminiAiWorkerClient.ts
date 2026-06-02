@@ -1,7 +1,6 @@
 import {
-  aiWorkerRequestSchema,
-  buildCreateResponse,
-  createPlanSchema,
+  buildVoxelResponse,
+  type AiWorkerRequest,
 } from "@3dvibegame/ai-planning";
 import {
   parseVoxelBuilderSpec,
@@ -13,8 +12,8 @@ import { AiWorkerError, normalizeAiWorkerError } from "./aiWorkerErrors";
 import {
   defaultGeminiModel,
   defaultGeminiTimeoutMs,
-  generateCreatePlan,
-} from "./geminiPlan";
+  generateVoxelCore,
+} from "./geminiVoxel";
 
 export interface BrowserGeminiAiWorkerClientConfig {
   apiKey(): string | null;
@@ -24,11 +23,15 @@ export interface BrowserGeminiAiWorkerClientConfig {
   timeoutMs?: number;
 }
 
+/**
+ * Local-compile browser client (no worker URL): the browser calls Gemini for the
+ * voxel geometry and assembles + compiles it in-process via buildVoxelResponse.
+ */
 export function createBrowserGeminiAiWorkerClient({
   apiKey,
   fetchImpl = fetch,
   model = defaultGeminiModel,
-  temperature = 0.25,
+  temperature = 0.35,
   timeoutMs = defaultGeminiTimeoutMs,
 }: BrowserGeminiAiWorkerClientConfig): AiWorkerClient {
   return {
@@ -38,32 +41,25 @@ export function createBrowserGeminiAiWorkerClient({
         throw new AiWorkerError("generation_failed", "Browser Gemini key is not configured.");
       }
 
-      const request = aiWorkerRequestSchema.parse({
+      const sourcePrompt = prompt.trim();
+      const request: AiWorkerRequest = {
         operation: "create",
-        source_prompt: prompt,
+        source_prompt: sourcePrompt,
         target_object_id: null,
         base_object_version: null,
         object_context: null,
-      });
+      };
 
       try {
-        const planPayload = await generateCreatePlan({
+        const voxel = await generateVoxelCore({
           apiKey: trimmedKey,
           fetchImpl,
           model,
-          prompt: request.source_prompt,
+          prompt: sourcePrompt,
           temperature,
           timeoutMs,
         });
-        const parsedPlan = createPlanSchema.safeParse(planPayload);
-        if (!parsedPlan.success) {
-          throw new AiWorkerError(
-            "validation_failed",
-            parsedPlan.error.issues[0]?.message ?? "Gemini returned an invalid create plan.",
-          );
-        }
-        const plan = parsedPlan.data;
-        const response = buildCreateResponse(request, plan, ["browser Gemini BYOK"]);
+        const response = buildVoxelResponse(request, voxel, ["browser Gemini BYOK"]);
 
         return {
           jobIdBase: response.job_id_base,

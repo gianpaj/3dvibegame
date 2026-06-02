@@ -3,13 +3,13 @@ import { ZodError } from "zod";
 
 import {
   aiWorkerRequestSchema,
-  compilePlanRequestSchema,
+  compileVoxelRequestSchema,
   type AiWorkerFailureCode,
   type AiWorkerFailedResponse,
   type AiWorkerRequest,
   type CreatePlanGenerator,
 } from "./contracts.ts";
-import { buildCreateResponse } from "./specBuilder.ts";
+import { buildCreateResponse, buildVoxelResponse } from "./specBuilder.ts";
 
 export interface AiWorkerServerOptions {
   allowedOrigin?: string;
@@ -38,13 +38,13 @@ export function createAiWorkerHandler({
       return;
     }
 
-    // /compile turns a pre-computed plan (e.g. from a browser Gemini call) into a
-    // builder spec. It does not call the LLM, so it works with no API key configured.
+    // /compile turns an LLM-authored voxel core (e.g. from a browser Gemini call)
+    // into a builder spec. It does not call the LLM, so it works with no API key.
     if (req.method === "POST" && req.url === "/compile") {
       try {
         const payload = await readJsonBody(req);
-        const { operation, source_prompt, plan, warnings } =
-          compilePlanRequestSchema.parse(payload);
+        const { operation, source_prompt, voxel, warnings } =
+          compileVoxelRequestSchema.parse(payload);
         const request: AiWorkerRequest = {
           operation,
           source_prompt,
@@ -52,7 +52,7 @@ export function createAiWorkerHandler({
           base_object_version: null,
           object_context: null,
         };
-        writeJson(res, 200, buildCreateResponse(request, plan, warnings ?? []));
+        writeJson(res, 200, buildVoxelResponse(request, voxel, warnings ?? []));
       } catch (error) {
         const { status, response } = normalizeError(error);
         writeJson(res, status, response);

@@ -1,4 +1,8 @@
-import { createPlanJsonSchema, createPlanSystemPrompt } from "@3dvibegame/ai-planning";
+import {
+  voxelBuilderSystemPrompt,
+  voxelCoreSchema,
+  type VoxelCore,
+} from "@3dvibegame/ai-planning";
 
 import { AiWorkerError } from "./aiWorkerErrors";
 
@@ -18,7 +22,7 @@ interface GeminiGenerateContentResponse {
 export const defaultGeminiModel = "gemini-2.5-flash";
 export const defaultGeminiTimeoutMs = 45_000;
 
-export interface GenerateCreatePlanOptions {
+export interface GenerateVoxelCoreOptions {
   apiKey: string;
   fetchImpl: typeof fetch;
   model: string;
@@ -28,18 +32,18 @@ export interface GenerateCreatePlanOptions {
 }
 
 /**
- * Calls Gemini directly from the browser to produce a raw create-plan JSON object.
- * Shared by the local-compile and worker-compile browser clients so the request,
- * schema, and timeout behaviour stay identical.
+ * Calls Gemini directly from the browser to author the actual voxel geometry
+ * (object metadata + operations) for a player prompt. Returns the validated
+ * creative core; the worker (or local path) assembles + compiles it.
  */
-export async function generateCreatePlan({
+export async function generateVoxelCore({
   apiKey,
   fetchImpl,
   model,
   prompt,
   temperature,
   timeoutMs,
-}: GenerateCreatePlanOptions): Promise<unknown> {
+}: GenerateVoxelCoreOptions): Promise<VoxelCore> {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
 
@@ -52,7 +56,7 @@ export async function generateCreatePlan({
       },
       body: JSON.stringify({
         systemInstruction: {
-          parts: [{ text: createPlanSystemPrompt }],
+          parts: [{ text: voxelBuilderSystemPrompt }],
         },
         contents: [
           {
@@ -60,10 +64,12 @@ export async function generateCreatePlan({
             parts: [{ text: `Player prompt: ${prompt}` }],
           },
         ],
+        // JSON mode without a strict responseSchema: the voxel op discriminated
+        // union can't be expressed in Gemini's responseSchema subset, so the schema
+        // lives in the system prompt and we validate the result with zod below.
         generationConfig: {
-          maxOutputTokens: 900,
+          maxOutputTokens: 2048,
           responseMimeType: "application/json",
-          responseSchema: createPlanJsonSchema,
           temperature,
         },
       }),
@@ -86,10 +92,17 @@ export async function generateCreatePlan({
       .join("")
       .trim();
     if (!text) {
-      throw new AiWorkerError("validation_failed", "Gemini returned an empty create plan.");
+      throw new AiWorkerError("validation_failed", "Gemini returned an empty voxel spec.");
     }
 
-    return parseJsonObject(text);
+    const parsed = voxelCoreSchema.safeParse(parseJsonObject(text));
+    if (!parsed.success) {
+      throw new AiWorkerError(
+        "validation_failed",
+        parsed.error.issues[0]?.message ?? "Gemini returned an invalid voxel spec.",
+      );
+    }
+    return parsed.data;
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       throw new AiWorkerError("timeout", `Gemini timed out after ${timeoutMs}ms`);

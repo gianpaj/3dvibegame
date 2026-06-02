@@ -38,17 +38,70 @@ export const createPlanSchema = z.object({
 
 export type CreatePlan = z.infer<typeof createPlanSchema>;
 
-// Request shape for the worker's /compile endpoint: a pre-computed plan (from a
-// browser-side Gemini call) that the worker turns into a builder spec. No LLM key
-// is needed on this path.
-export const compilePlanRequestSchema = z.object({
+// System prompt for the direct-voxel path: the LLM authors the actual geometry
+// (the operations array) rather than picking a high-level shape template. The LLM
+// returns only the creative core; the worker assembles the deterministic envelope.
+export const voxelBuilderSystemPrompt = [
+  "You are a voxel-builder assistant for Vibe World. Given a player's prompt, design a",
+  "single small 3D object as a list of voxel operations. Return JSON ONLY (no prose,",
+  "no markdown) with this exact shape:",
+  "{",
+  '  "object_category": string,           // e.g. "palm_tree"',
+  '  "size_tier": "tiny"|"small"|"medium"|"large",',
+  '  "style_tags": string[],',
+  '  "behaviors": string[],',
+  '  "materials": [{ "material_id": string, "color_hint"?: string }],',
+  '  "operations": VoxelOp[]',
+  "}",
+  "",
+  "Each VoxelOp is one of:",
+  '- { "op_id": string, "kind": "add_box", "position": [x,y,z], "size": [w,h,d], "material_id": string, "tags"?: string[] }',
+  '- { "op_id": string, "kind": "add_sphere", "center": [x,y,z], "radius": number, "material_id": string, "tags"?: string[] }',
+  '- { "op_id": string, "kind": "add_line", "from": [x,y,z], "to": [x,y,z], "radius": number, "shape"?: "rounded"|"square", "material_id": string, "tags"?: string[] }',
+  "",
+  "Rules:",
+  "- y is up. Keep the object near y=0 (above the floor) and roughly 2-5 units tall.",
+  "- Every op_id is unique; every material_id used must be declared in materials.",
+  "- Use ONLY these material ids so colors render: moss_stone, wood, neon, glass_block,",
+  "  jelly, cloud, lava_light, void, red, stone.",
+  "- Build the real silhouette of the requested object and make different prompts produce",
+  "  different geometry (a palm tree = tall slender trunk + splayed fronds; a pine =",
+  "  conical layered canopy; a barrel = stacked cylinders/boxes).",
+  "- Aim for 4-14 operations.",
+].join("\n");
+
+// Request shape for the worker's /compile endpoint: the LLM-authored voxel core
+// (from a browser-side Gemini call) that the worker grounds, validates, and compiles
+// into a builder spec. No LLM key is needed on this path.
+export const voxelCoreSchema = z.object({
+  object_category: z.string().trim().min(1).max(60),
+  size_tier: z.string().trim().min(1).max(20),
+  style_tags: z.array(z.string()).max(12).optional().default([]),
+  behaviors: z.array(z.string()).max(6).optional().default([]),
+  materials: z
+    .array(
+      z.object({
+        material_id: z.string().trim().min(1).max(40),
+        color_hint: z.string().optional(),
+        tags: z.array(z.string()).optional(),
+      }),
+    )
+    .min(1)
+    .max(12),
+  // Operations are validated strictly after envelope assembly via parseVoxelBuilderSpec.
+  operations: z.array(z.unknown()).min(1).max(40),
+});
+
+export type VoxelCore = z.infer<typeof voxelCoreSchema>;
+
+export const compileVoxelRequestSchema = z.object({
   operation: z.literal("create"),
   source_prompt: z.string().trim().min(1).max(1_000),
-  plan: createPlanSchema,
+  voxel: voxelCoreSchema,
   warnings: z.array(z.string()).max(10).optional(),
 });
 
-export type CompilePlanRequest = z.infer<typeof compilePlanRequestSchema>;
+export type CompileVoxelRequest = z.infer<typeof compileVoxelRequestSchema>;
 
 export const createPlanJsonSchema = {
   type: "object",

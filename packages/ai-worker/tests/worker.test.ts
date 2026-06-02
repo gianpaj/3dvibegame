@@ -56,23 +56,28 @@ test("create request returns source and builder specs", async () => {
   }
 });
 
-test("compile request turns a pre-computed plan into a builder spec", async () => {
+test("compile request turns LLM-authored voxel ops into a builder spec", async () => {
   const server = await startTestWorker();
   try {
+    // Three distinct boxes — geometry is op-driven, not template-driven.
+    const operations = [
+      { op_id: "trunk", kind: "add_box", position: [0, 2, 0], size: [0.6, 4, 0.6], material_id: "wood" },
+      { op_id: "frond_left", kind: "add_box", position: [-1.2, 4, 0], size: [2, 0.3, 0.3], material_id: "moss_stone" },
+      { op_id: "frond_right", kind: "add_box", position: [1.2, 4, 0], size: [2, 0.3, 0.3], material_id: "moss_stone" },
+    ];
     const response = await fetch(`${server.url}/compile`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         operation: "create",
         source_prompt: "Create a tall palm tree",
-        plan: {
+        voxel: {
           object_category: "palm_tree",
           size_tier: "large",
-          shape: "tree",
-          palette: "forest",
           style_tags: ["tropical", "tall"],
           behaviors: [],
-          key_features: ["tall trunk", "fan leaves"],
+          materials: [{ material_id: "wood" }, { material_id: "moss_stone" }],
+          operations,
         },
       }),
     });
@@ -81,13 +86,14 @@ test("compile request turns a pre-computed plan into a builder spec", async () =
     assert.equal(payload.status, "completed");
     assert.equal(payload.source_spec.object_category, "palm_tree");
     assert.equal(payload.builder_spec.object_category, "palm_tree");
-    assert.ok(payload.builder_spec.complexity.part_count > 0);
+    // The compiled part count reflects the LLM ops, not a fixed template.
+    assert.equal(payload.builder_spec.complexity.part_count, operations.length);
   } finally {
     await server.close();
   }
 });
 
-test("compile request rejects an invalid plan with a validation error", async () => {
+test("compile request rejects an invalid voxel op with a validation error", async () => {
   const server = await startTestWorker();
   try {
     const response = await fetch(`${server.url}/compile`, {
@@ -96,7 +102,13 @@ test("compile request rejects an invalid plan with a validation error", async ()
       body: JSON.stringify({
         operation: "create",
         source_prompt: "Create a tall palm tree",
-        plan: { object_category: "palm_tree", shape: "tree" },
+        voxel: {
+          object_category: "palm_tree",
+          size_tier: "large",
+          materials: [{ material_id: "wood" }],
+          // add_box missing required `size`
+          operations: [{ op_id: "trunk", kind: "add_box", position: [0, 2, 0], material_id: "wood" }],
+        },
       }),
     });
     assert.equal(response.status, 400);
