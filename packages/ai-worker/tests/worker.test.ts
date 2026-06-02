@@ -56,6 +56,56 @@ test("create request returns source and builder specs", async () => {
   }
 });
 
+test("compile request turns a pre-computed plan into a builder spec", async () => {
+  const server = await startTestWorker();
+  try {
+    const response = await fetch(`${server.url}/compile`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        operation: "create",
+        source_prompt: "Create a tall palm tree",
+        plan: {
+          object_category: "palm_tree",
+          size_tier: "large",
+          shape: "tree",
+          palette: "forest",
+          style_tags: ["tropical", "tall"],
+          behaviors: [],
+          key_features: ["tall trunk", "fan leaves"],
+        },
+      }),
+    });
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.equal(payload.status, "completed");
+    assert.equal(payload.source_spec.object_category, "palm_tree");
+    assert.equal(payload.builder_spec.object_category, "palm_tree");
+    assert.ok(payload.builder_spec.complexity.part_count > 0);
+  } finally {
+    await server.close();
+  }
+});
+
+test("compile request rejects an invalid plan with a validation error", async () => {
+  const server = await startTestWorker();
+  try {
+    const response = await fetch(`${server.url}/compile`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        operation: "create",
+        source_prompt: "Create a tall palm tree",
+        plan: { object_category: "palm_tree", shape: "tree" },
+      }),
+    });
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).error_code, "validation_failed");
+  } finally {
+    await server.close();
+  }
+});
+
 test("deterministic create specs are grounded and visible at runtime scale", () => {
   const payload = buildCreateResponse(
     {

@@ -3,8 +3,10 @@ import { ZodError } from "zod";
 
 import {
   aiWorkerRequestSchema,
+  compilePlanRequestSchema,
   type AiWorkerFailureCode,
   type AiWorkerFailedResponse,
+  type AiWorkerRequest,
   type CreatePlanGenerator,
 } from "./contracts.ts";
 import { buildCreateResponse } from "./specBuilder.ts";
@@ -26,13 +28,35 @@ export function createAiWorkerHandler({
   ) {
     applyCors(req, res, allowedOrigin);
 
-    if (req.method === "OPTIONS" && req.url === "/generate") {
+    if (req.method === "OPTIONS" && (req.url === "/generate" || req.url === "/compile")) {
       res.writeHead(204).end();
       return;
     }
 
     if (req.method === "GET" && req.url === "/healthz") {
       writeJson(res, 200, { ok: true, status: "ok" });
+      return;
+    }
+
+    // /compile turns a pre-computed plan (e.g. from a browser Gemini call) into a
+    // builder spec. It does not call the LLM, so it works with no API key configured.
+    if (req.method === "POST" && req.url === "/compile") {
+      try {
+        const payload = await readJsonBody(req);
+        const { operation, source_prompt, plan, warnings } =
+          compilePlanRequestSchema.parse(payload);
+        const request: AiWorkerRequest = {
+          operation,
+          source_prompt,
+          target_object_id: null,
+          base_object_version: null,
+          object_context: null,
+        };
+        writeJson(res, 200, buildCreateResponse(request, plan, warnings ?? []));
+      } catch (error) {
+        const { status, response } = normalizeError(error);
+        writeJson(res, status, response);
+      }
       return;
     }
 

@@ -38,6 +38,18 @@ export const createPlanSchema = z.object({
 
 export type CreatePlan = z.infer<typeof createPlanSchema>;
 
+// Request shape for the worker's /compile endpoint: a pre-computed plan (from a
+// browser-side Gemini call) that the worker turns into a builder spec. No LLM key
+// is needed on this path.
+export const compilePlanRequestSchema = z.object({
+  operation: z.literal("create"),
+  source_prompt: z.string().trim().min(1).max(1_000),
+  plan: createPlanSchema,
+  warnings: z.array(z.string()).max(10).optional(),
+});
+
+export type CompilePlanRequest = z.infer<typeof compilePlanRequestSchema>;
+
 export const createPlanJsonSchema = {
   type: "object",
   properties: {
