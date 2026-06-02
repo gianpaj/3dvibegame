@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ComponentRef, type RefObject } from "react";
 import * as THREE from "three";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { OrbitControls, Sky, Cloud, Clouds } from "@react-three/drei";
 import type { SceneDocument } from "../core";
 import { ReferenceWorld } from "./ReferenceWorld";
 import { SceneObjects } from "./SceneObjects";
@@ -37,7 +37,7 @@ export function GameCanvas({
   return (
     <Canvas
       shadows={{ type: THREE.PCFSoftShadowMap }}
-      camera={{ fov: 48, near: 0.1, far: 150, position: [5.2, 4.2, 6.4] }}
+      camera={{ fov: 48, near: 0.1, far: 500, position: [5.2, 4.2, 6.4] }}
       gl={{
         toneMapping: THREE.ACESFilmicToneMapping,
         outputColorSpace: THREE.SRGBColorSpace,
@@ -56,23 +56,51 @@ export function GameCanvas({
         if (moved <= dragThreshold) onDeselect();
       }}
     >
-      <color attach="background" args={["#ebe4d7"]} />
-      <fog attach="fog" args={["#ebe4d7", 14, 26]} />
-      <hemisphereLight args={["#f6fcff", "#7ea1b0", 1.25]} />
+      <color attach="background" args={["#87ceef"]} />
+      <fog attach="fog" args={["#b8daf5", 60, 180]} />
+      <hemisphereLight args={["#87ceeb", "#4a8a30", 1.1]} />
       <directionalLight
-        position={[7, 10, 8]}
-        color="#fff8ef"
-        intensity={2.25}
+        position={[10, 15, 5]}
+        color="#fffaf0"
+        intensity={2.5}
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-camera-near={0.5}
-        shadow-camera-far={40}
-        shadow-camera-left={-15}
-        shadow-camera-right={15}
-        shadow-camera-top={15}
-        shadow-camera-bottom={-15}
+        shadow-camera-far={60}
+        shadow-camera-left={-20}
+        shadow-camera-right={20}
+        shadow-camera-top={20}
+        shadow-camera-bottom={-20}
       />
-      <directionalLight position={[-5, 6, -8]} color="#d8e6ff" intensity={0.38} />
+      <directionalLight position={[-5, 6, -8]} color="#d8e6ff" intensity={0.3} />
+      <Sky
+        distance={450000}
+        sunPosition={[0.5, 0.3, -1]}
+        turbidity={5}
+        rayleigh={1.8}
+        mieCoefficient={0.005}
+        mieDirectionalG={0.7}
+      />
+      <Clouds material={THREE.MeshLambertMaterial}>
+        <Cloud
+          seed={1}
+          segments={20}
+          bounds={[14, 2.5, 3]}
+          volume={10}
+          color="white"
+          opacity={0.9}
+          position={[8, 22, -38]}
+        />
+        <Cloud
+          seed={4}
+          segments={15}
+          bounds={[10, 2, 2.5]}
+          volume={7}
+          color="white"
+          opacity={0.85}
+          position={[-16, 26, -45]}
+        />
+      </Clouds>
       <ReferenceWorld />
       <SceneObjects
         document={document}
@@ -85,7 +113,7 @@ export function GameCanvas({
         maxPolarAngle={Math.PI * 0.47}
         minDistance={2.8}
         maxDistance={18}
-        target={[0, 2.2, 0]}
+        target={[0, 1.5, 0]}
         enablePan={false}
       />
       <KeyboardController
