@@ -110,22 +110,8 @@ function KeyboardController({
       }
       event.preventDefault();
 
-      if (hasSelectedObjectRef.current) {
-        // World-axis object move: A/D = ∓X, W/S = ∓Z.
-        let dx = 0;
-        let dz = 0;
-        if (key === "a") dx = -step;
-        else if (key === "d") dx = step;
-        else if (key === "w") dz = -step;
-        else if (key === "s") dz = step;
-        onMoveObject(dx, dz);
-        return;
-      }
-
-      const controls = controlsRef.current;
-      if (!controls) return;
-
-      // Camera-relative ground pan: move both the camera and its orbit target.
+      // Camera-relative ground direction, shared by object-move and camera-pan so
+      // both feel consistent: W = away from camera, S = toward, A = left, D = right.
       const forward = new THREE.Vector3();
       camera.getWorldDirection(forward);
       forward.y = 0;
@@ -140,6 +126,14 @@ function KeyboardController({
       else if (key === "d") move.add(right);
       move.multiplyScalar(step);
 
+      if (hasSelectedObjectRef.current) {
+        // Move the selected object along the camera-relative ground plane.
+        onMoveObject(move.x, move.z);
+        return;
+      }
+
+      const controls = controlsRef.current;
+      if (!controls) return;
       camera.position.add(move);
       controls.target.add(move);
       controls.update();

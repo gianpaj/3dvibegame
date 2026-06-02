@@ -45,6 +45,90 @@ export function createBackendLifecycleCommands(
   let sequence = 0;
   const selectedObjectId = () => getSelectedObjectId?.() ?? null;
 
+  // WASD fires many moves per second. Running the edit-lock sequence for each in
+  // parallel races (one move's cancelEdit lands after another's lock), producing
+  // "expected edit_locked but got public". So we serialize moves and coalesce any
+  // that arrive while one is in flight into a single summed delta.
+  let movePending: { dx: number; dz: number } | null = null;
+  let moveRunning = false;
+
+  async function drainMoves() {
+    if (moveRunning) return;
+    moveRunning = true;
+    try {
+      while (movePending) {
+        const { dx, dz } = movePending;
+        movePending = null;
+        await performMove(dx, dz);
+      }
+    } finally {
+      moveRunning = false;
+    }
+  }
+
+  async function performMove(dx: number, dz: number) {
+    const snapshot = bridge.getSnapshot();
+    const object = selectBackendObject(snapshot, selectedObjectId());
+    if (!object) {
+      console.warn("[backend.move] no selected object");
+      throw new Error("Select an object before moving it.");
+    }
+
+    const [px, py, pz] = object.transform.position;
+    const [rx, ry, rz] = object.transform.rotation;
+    const [sx, sy, sz] = object.transform.scale;
+    const transform = {
+      positionX: px + dx,
+      positionY: py,
+      positionZ: pz + dz,
+      rotationX: rx,
+      rotationY: ry,
+      rotationZ: rz,
+      scaleX: sx,
+      scaleY: sy,
+      scaleZ: sz,
+    };
+    console.log(
+      "[backend.move] start id=%s state=%s version=%s dx=%s dz=%s",
+      object.object_id,
+      object.state,
+      object.version,
+      dx.toFixed(2),
+      dz.toFixed(2),
+    );
+
+    // Branch on the object's ACTUAL current state each time.
+    if (object.state === "grace") {
+      console.log("[backend.move] grace -> updateDraftTransform");
+      await bridge.updateDraftTransform({ objectId: object.object_id, ...transform });
+      return;
+    }
+
+    if (object.state === "edit_locked") {
+      // Already locked (e.g. we are holding it) — just move, don't re-lock/cancel.
+      console.log("[backend.move] edit_locked -> updateLockedTransform");
+      await bridge.updateLockedTransform({ objectId: object.object_id, ...transform });
+      return;
+    }
+
+    if (object.state === "public") {
+      console.log("[backend.move] public -> requestEditLock");
+      await bridge.requestEditLock({
+        objectId: object.object_id,
+        baseVersion: object.version,
+      });
+      console.log("[backend.move] public -> updateLockedTransform");
+      await bridge.updateLockedTransform({ objectId: object.object_id, ...transform });
+      console.log("[backend.move] public -> cancelEdit");
+      await bridge.cancelEdit({ objectId: object.object_id });
+      console.log("[backend.move] public -> done");
+      return;
+    }
+
+    console.warn("[backend.move] not movable in state %s", object.state);
+    throw new Error(`Object is in ${object.state} state and cannot be moved.`);
+  }
+
   return {
     canHandle() {
       return isBackendReady(bridge);
@@ -193,42 +277,10 @@ export function createBackendLifecycleCommands(
       await bridge.expireCooldown({ objectId: object.object_id });
     },
     async moveSelectedObject(dx: number, dz: number) {
-      const snapshot = bridge.getSnapshot();
-      const object = selectBackendObject(snapshot, selectedObjectId());
-      if (!object) {
-        throw new Error("Select an object before moving it.");
-      }
-
-      const [px, py, pz] = object.transform.position;
-      const [rx, ry, rz] = object.transform.rotation;
-      const [sx, sy, sz] = object.transform.scale;
-      const transform = {
-        positionX: px + dx,
-        positionY: py,
-        positionZ: pz + dz,
-        rotationX: rx,
-        rotationY: ry,
-        rotationZ: rz,
-        scaleX: sx,
-        scaleY: sy,
-        scaleZ: sz,
-      };
-
-      if (object.state === "grace") {
-        await bridge.updateDraftTransform({ objectId: object.object_id, ...transform });
-        return;
-      }
-
-      // Public objects can only be mutated under an edit lock; apply then cancel so
-      // the move persists without bumping the version or starting a cooldown.
-      if (object.state === "public") {
-        await bridge.requestEditLock({
-          objectId: object.object_id,
-          baseVersion: object.version,
-        });
-      }
-      await bridge.updateLockedTransform({ objectId: object.object_id, ...transform });
-      await bridge.cancelEdit({ objectId: object.object_id });
+      movePending = movePending
+        ? { dx: movePending.dx + dx, dz: movePending.dz + dz }
+        : { dx, dz };
+      await drainMoves();
     },
     async deleteSelectedObject() {
       const snapshot = bridge.getSnapshot();
