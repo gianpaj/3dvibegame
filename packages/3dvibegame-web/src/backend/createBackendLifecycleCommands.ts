@@ -383,10 +383,16 @@ export function createBackendLifecycleCommands(
         throw new Error("Select an object before deleting it.");
       }
 
-      // Selecting holds an edit lock, but delete_object requires the object to be
-      // public — release our lock first.
+      // delete_object only accepts `public`, so first bring the object there:
+      //  - grace draft (ours): release it (grace -> public)
+      //  - edit_locked (ours, e.g. from selection): cancel the lock (-> public)
       const localPlayerId = localBackendPlayerId(snapshot);
-      if (object.state === "edit_locked" && object.lock_owner_id === localPlayerId) {
+      if (object.state === "grace") {
+        if (object.grace_owner_id !== localPlayerId) {
+          throw new Error("Only the creator can discard this draft.");
+        }
+        await bridge.releaseObject({ objectId: object.object_id });
+      } else if (object.state === "edit_locked" && object.lock_owner_id === localPlayerId) {
         await bridge.cancelEdit({ objectId: object.object_id });
       }
 
