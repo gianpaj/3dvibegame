@@ -259,11 +259,18 @@ export function createBackendPresenceBridge({
   onSnapshot(snapshot);
 
   try {
+    console.log(
+      "[backend] building DbConnection uri=%o database=%o hasToken=%o",
+      backendConfig.uri,
+      backendConfig.database,
+      Boolean(readToken()),
+    );
     connection = DbConnection.builder()
       .withUri(backendConfig.uri)
       .withDatabaseName(backendConfig.database)
       .withToken(readToken())
       .onConnect((conn, identity, token) => {
+        console.log("[backend] onConnect identity=%s disposed=%o", identity.toHexString(), disposed);
         if (disposed) return;
 
         localIdentityHex = identity.toHexString();
@@ -275,6 +282,7 @@ export function createBackendPresenceBridge({
         subscription = conn
           .subscriptionBuilder()
           .onApplied(() => {
+            console.log("[backend] subscription applied disposed=%o", disposed);
             if (disposed) return;
             status = "connected";
             message = "Live room joined.";
@@ -305,6 +313,7 @@ export function createBackendPresenceBridge({
             }, heartbeatMs);
           })
           .onError((ctx) => {
+            console.error("[backend] subscription onError", ctx.event);
             if (disposed) return;
             status = "error";
             message = errorMessage(ctx.event, "Room subscription failed");
@@ -320,19 +329,23 @@ export function createBackendPresenceBridge({
           ]);
       })
       .onConnectError((_ctx, error) => {
+        console.error("[backend] onConnectError", error);
         if (disposed) return;
         status = "error";
         message = errorMessage(error, "Backend connection failed");
         emitCurrent();
       })
       .onDisconnect((_ctx, error) => {
+        console.warn("[backend] onDisconnect", error);
         if (disposed) return;
         status = "disconnected";
         message = errorMessage(error, "Backend disconnected");
         emitCurrent();
       })
       .build();
+    console.log("[backend] DbConnection.build() returned (async connect in progress)");
   } catch (error) {
+    console.error("[backend] DbConnection.build() threw synchronously:", error);
     status = "error";
     message = errorMessage(error, "Backend connection failed");
     emitCurrent();
@@ -694,7 +707,12 @@ function readBackendConfig() {
   const uri = stringEnv("VITE_SPACETIMEDB_URI");
   const database = stringEnv("VITE_SPACETIMEDB_DATABASE");
 
+  console.log("[backend] readBackendConfig uri=%o database=%o", uri, database);
+
   if (!uri || !database) {
+    console.warn(
+      "[backend] backend disabled — missing VITE_SPACETIMEDB_URI and/or VITE_SPACETIMEDB_DATABASE",
+    );
     return null;
   }
 
