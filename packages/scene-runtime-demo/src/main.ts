@@ -8,6 +8,8 @@ import type {
 import {
   createConfiguredAiWorkerClient,
   createGenerationSessionController,
+  isMissingBrowserGeminiKeyError,
+  resolveAiClientMode,
 } from "./core";
 import { createEditorCommands, createHud } from "./editor";
 import {
@@ -50,6 +52,7 @@ let backendCommands: BackendLifecycleCommands | null = null;
 let backendPresenceSnapshot: BackendPresenceSnapshot | null = null;
 let backendSceneWorld: BackendPresenceSnapshot["authorityWorld"] = null;
 let browserGeminiApiKey: string | null = null;
+let manualSelectedObjectId: string | null = null;
 
 const authorityBridge = createAuthorityBridge({
   draftRoot: sceneState.draftRoot,
@@ -72,6 +75,7 @@ const generation = createGenerationSessionController();
 let renderBackendSnapshot: ((
   backendSnapshot: BackendPresenceSnapshot,
   fallbackSnapshot: ReturnType<typeof generation.getSnapshot>,
+  selectedObjectId?: string | null,
 ) => ReturnType<typeof generation.getSnapshot>) | null = null;
 const editorCommands = createEditorCommands(generation);
 const hud = createHud({
@@ -80,6 +84,10 @@ const hud = createHud({
     if (backendCommands?.canHandle()) {
       hud.setContextMessage("");
       void backendCommands.submitPrompt(prompt).catch((error: unknown) => {
+        if (isMissingBrowserGeminiKeyError(error)) {
+          hud.showAiKeyRequired();
+          return;
+        }
         hud.setContextMessage(errorMessage(error, "Backend prompt failed"));
       });
       return;
@@ -97,6 +105,23 @@ const hud = createHud({
     }
 
     editorCommands.dispatchAction(actionId);
+  },
+  onObjectDelete() {
+    if (!backendCommands?.canHandle()) {
+      hud.setContextMessage("Deleting objects is only available in a live room.");
+      return;
+    }
+
+    hud.setContextMessage("Deleting object.");
+    void backendCommands
+      .deleteSelectedObject()
+      .then(() => {
+        manualSelectedObjectId = null;
+        hud.setContextMessage("Object deleted.");
+      })
+      .catch((error: unknown) => {
+        hud.setContextMessage(errorMessage(error, "Delete failed"));
+      });
   },
   onAiSettingsSubmit(input) {
     browserGeminiApiKey = input.geminiApiKey;
@@ -146,6 +171,7 @@ const hud = createHud({
   onInteractionStateChange(state) {
     cameraRig.controls.enabled = !state.controlsLocked;
   },
+  requireBrowserGeminiKey: hasBackendConfig() && resolveAiClientMode() === "browser-gemini",
 });
 if (hasBackendConfig()) {
   void import("./backend")
@@ -170,6 +196,7 @@ if (hasBackendConfig()) {
           createConfiguredAiWorkerClient({
             getBrowserGeminiApiKey: () => browserGeminiApiKey,
           }),
+          { getSelectedObjectId: () => manualSelectedObjectId },
         );
         disposeBackendPresence = () => backendPresence.dispose();
         publishBackendTransform = (transform) => {
@@ -204,18 +231,68 @@ renderer.canvas.addEventListener("webglcontextrestored", () => {
   resize();
 });
 
+let selectionPointerStart: { x: number; y: number; pointerId: number } | null = null;
+const selectionDragThreshold = 6;
+
+renderer.canvas.addEventListener("pointerdown", (event: PointerEvent) => {
+  selectionPointerStart =
+    event.button === 0
+      ? { x: event.clientX, y: event.clientY, pointerId: event.pointerId }
+      : null;
+});
+
+renderer.canvas.addEventListener("pointerup", (event: PointerEvent) => {
+  const start = selectionPointerStart;
+  selectionPointerStart = null;
+  if (!start || start.pointerId !== event.pointerId) return;
+  const moved = Math.hypot(event.clientX - start.x, event.clientY - start.y);
+  if (moved > selectionDragThreshold) return;
+  handleSelectionClick(event.clientX, event.clientY);
+});
+
+renderer.canvas.addEventListener("pointercancel", () => {
+  selectionPointerStart = null;
+});
+
 renderSnapshot();
+
+function handleSelectionClick(clientX: number, clientY: number) {
+  const objectId = authorityBridge.pickObject(
+    clientX,
+    clientY,
+    cameraRig.camera,
+    renderer.canvas,
+  );
+
+  const inBackendWorld = Boolean(backendSceneWorld && backendSceneWorld.objects.length > 0);
+  if (inBackendWorld) {
+    if (manualSelectedObjectId === objectId) return;
+    manualSelectedObjectId = objectId;
+    renderSnapshot();
+    return;
+  }
+
+  if (objectId) {
+    editorCommands.selectObject(objectId);
+  }
+}
 
 function renderSnapshot() {
   const localSnapshot = generation.getSnapshot();
   const snapshot =
     backendPresenceSnapshot?.status === "connected" && renderBackendSnapshot
-      ? renderBackendSnapshot(backendPresenceSnapshot, localSnapshot)
+      ? renderBackendSnapshot(backendPresenceSnapshot, localSnapshot, manualSelectedObjectId)
       : localSnapshot;
   const backendWorld =
     backendSceneWorld && backendSceneWorld.objects.length > 0 ? backendSceneWorld : null;
+  if (
+    manualSelectedObjectId &&
+    !backendWorld?.objects.some((object) => object.object_id === manualSelectedObjectId)
+  ) {
+    manualSelectedObjectId = null;
+  }
   const focusPoint = backendWorld
-    ? authorityBridge.renderWorld(backendWorld)
+    ? authorityBridge.renderWorld(backendWorld, manualSelectedObjectId)
     : authorityBridge.renderDocument(snapshot.document);
   cameraRig.focus(focusPoint);
   publishBackendTransform(cameraRig.getPresenceTransform());

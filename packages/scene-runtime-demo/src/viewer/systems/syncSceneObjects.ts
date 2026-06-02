@@ -21,34 +21,40 @@ export function createSceneObjectSync({
   let selectedObjectId: string | null = null;
 
   return {
-    syncWorld(world: AuthorityWorld) {
-      return this.syncDocument({
-        objects_by_id: Object.fromEntries(
-          world.objects.map((object) => [
-            object.object_id,
-            {
-              object_id: object.object_id,
-              authority: object,
-              voxel_artifact: null,
-              compiled_artifact: null,
-              diagnostics: [],
-            },
-          ]),
-        ),
-        root_object_ids: world.objects.map((object) => object.object_id),
-        shared_dirty: {
-          source_dirty_ids: [],
-          artifact_dirty_ids: [],
-          render_dirty_ids: world.objects.map((object) => object.object_id),
+    syncWorld(world: AuthorityWorld, selectedObjectId: string | null = null) {
+      return this.syncDocument(
+        {
+          objects_by_id: Object.fromEntries(
+            world.objects.map((object) => [
+              object.object_id,
+              {
+                object_id: object.object_id,
+                authority: object,
+                voxel_artifact: null,
+                compiled_artifact: null,
+                diagnostics: [],
+              },
+            ]),
+          ),
+          root_object_ids: world.objects.map((object) => object.object_id),
+          shared_dirty: {
+            source_dirty_ids: [],
+            artifact_dirty_ids: [],
+            render_dirty_ids: world.objects.map((object) => object.object_id),
+          },
+          player_sessions_by_id: {},
         },
-        player_sessions_by_id: {},
-      });
+        selectedObjectId,
+      );
     },
-    syncDocument(document: SceneDocument) {
+    syncDocument(document: SceneDocument, selectedObjectIdOverride?: string | null) {
       const records = listRenderableSceneObjects(document);
       const currentSession =
         Object.values(document.player_sessions_by_id)[0] ?? null;
-      const nextSelectedObjectId = currentSession?.selection.selected_object_id ?? null;
+      const nextSelectedObjectId =
+        selectedObjectIdOverride !== undefined
+          ? selectedObjectIdOverride
+          : currentSession?.selection.selected_object_id ?? null;
       const currentIds = new Set(records.map((record) => record.object_id));
 
       registry.listObjectIds().forEach((objectId) => {

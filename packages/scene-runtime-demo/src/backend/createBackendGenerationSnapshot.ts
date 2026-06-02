@@ -17,9 +17,10 @@ type BackendAuthorityObject = AuthorityWorld["objects"][number];
 export function createBackendGenerationSnapshot(
   backendSnapshot: BackendPresenceSnapshot,
   fallback: GenerationSnapshot,
+  selectedObjectId: string | null = null,
 ): GenerationSnapshot {
   const world = visibleBackendWorld(backendSnapshot) ?? fallback.world;
-  const object = selectBackendObject(backendSnapshot);
+  const object = selectBackendObject(backendSnapshot, selectedObjectId);
   const aiJob = object ? null : selectBackendAiJob(backendSnapshot);
   const stage = object ? stageForBackendObject(object) : stageForBackendAiJob(aiJob);
   const lastMessage = object
@@ -88,9 +89,17 @@ function selectBackendAiJob(
 
 export function selectBackendObject(
   backendSnapshot: BackendPresenceSnapshot,
+  preferredObjectId: string | null = null,
 ): BackendAuthorityObject | null {
   const world = visibleBackendWorld(backendSnapshot);
   if (!world?.objects.length) return null;
+
+  if (preferredObjectId) {
+    const preferred = world.objects.find(
+      (object) => object.object_id === preferredObjectId,
+    );
+    if (preferred) return preferred;
+  }
 
   const localPlayerId = localBackendPlayerId(backendSnapshot);
   const objects = [...world.objects].reverse();
@@ -131,8 +140,16 @@ export function backendAvailableActions(
   const isLockOwner =
     object.state === "edit_locked" && object.lock_owner_id === localPlayerId;
 
-  if (isGraceOwner || isLockOwner) {
-    return isGraceOwner ? ["release_object"] : [];
+  if (isGraceOwner) {
+    return ["nudge_draft", "rotate_draft", "release_object"];
+  }
+
+  if (isLockOwner) {
+    return ["nudge_draft", "rotate_draft"];
+  }
+
+  if (object.state === "public") {
+    return ["nudge_draft", "rotate_draft"];
   }
 
   return [];

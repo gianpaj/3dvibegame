@@ -22,8 +22,8 @@ export function createAuthorityBridge({
   });
 
   return {
-    renderWorld(world: AuthorityWorld) {
-      return sync.syncWorld(world);
+    renderWorld(world: AuthorityWorld, selectedObjectId: string | null = null) {
+      return sync.syncWorld(world, selectedObjectId);
     },
     renderDocument(document: SceneDocument) {
       return sync.syncDocument(document);

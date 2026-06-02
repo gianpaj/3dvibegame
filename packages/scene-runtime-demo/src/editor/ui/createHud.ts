@@ -61,11 +61,13 @@ interface HudConfig {
   root: HTMLElement;
   onPromptSubmit(prompt: string): void;
   onAction(actionId: GenerationActionId): void;
+  onObjectDelete?(): void;
   onAiSettingsSubmit?(input: HudAiSettingsInput): void;
   onAiSettingsClear?(): void;
   onWorldSettingsSubmit?(input: HudWorldSettingsInput): void;
   onWorldLifecycleAction?(input: HudWorldLifecycleInput): void;
   onInteractionStateChange?(state: HudInteractionState): void;
+  requireBrowserGeminiKey?: boolean;
 }
 
 const stageLabels = {
@@ -95,11 +97,13 @@ export function createHud({
   root,
   onPromptSubmit,
   onAction,
+  onObjectDelete,
   onAiSettingsSubmit,
   onAiSettingsClear,
   onWorldSettingsSubmit,
   onWorldLifecycleAction,
   onInteractionStateChange,
+  requireBrowserGeminiKey = false,
 }: HudConfig) {
   let activePanel: HudPanel | null = null;
   let feedbackVote: FeedbackVote = null;
@@ -167,6 +171,13 @@ export function createHud({
         <button class="send-button" type="submit">Send</button>
       </form>
 
+      <div class="ai-alert" data-role="ai-alert" data-state="hidden" role="alert">
+        <span class="ai-alert__message" data-role="ai-alert-message"></span>
+        <button class="ai-alert__action" type="button" data-action="open-ai-settings">
+          Go to Settings
+        </button>
+      </div>
+
       <div class="context-toast" data-role="context-message" data-state="hidden"></div>
     </div>
   `;
@@ -184,6 +195,8 @@ export function createHud({
   const presencePill = required<HTMLElement>(root, '[data-role="presence-pill"]');
   const roomSubtitle = required<HTMLElement>(root, '[data-role="room-subtitle"]');
   const contextMessage = required<HTMLElement>(root, '[data-role="context-message"]');
+  const aiAlert = required<HTMLElement>(root, '[data-role="ai-alert"]');
+  const aiAlertMessage = required<HTMLElement>(root, '[data-role="ai-alert-message"]');
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -193,6 +206,16 @@ export function createHud({
       return;
     }
 
+    if (
+      requireBrowserGeminiKey &&
+      !browserGeminiKeyConfigured &&
+      resolveMultiplayerMode(latestBackendPresence) === "live"
+    ) {
+      showAiKeyRequiredAlert();
+      return;
+    }
+
+    hideAiAlert();
     activePanel = "chat";
     appendChatMessage({
       role: "player",
@@ -228,6 +251,7 @@ export function createHud({
       target.reset();
       onAiSettingsSubmit?.(input);
       setContextMessage("Browser Gemini key configured for this tab.");
+      hideAiAlert();
       render();
     } catch (error) {
       setContextMessage(error instanceof Error ? error.message : "AI settings are invalid.");
@@ -267,7 +291,7 @@ export function createHud({
       return;
     }
 
-    if (objectLifecycleAction === "release_object") {
+    if (objectLifecycleAction) {
       onAction(objectLifecycleAction);
       return;
     }
@@ -313,6 +337,17 @@ export function createHud({
         activePanel = "chat";
         render();
         promptInput.focus();
+        break;
+      case "open-ai-settings":
+        hideAiAlert();
+        activePanel = "settings";
+        render();
+        focusGeminiKeyInput();
+        break;
+      case "delete-object":
+        if (window.confirm("Delete this object? This cannot be undone.")) {
+          onObjectDelete?.();
+        }
         break;
       case "clear-ai-key":
         browserGeminiKeyConfigured = false;
@@ -362,6 +397,7 @@ export function createHud({
       render();
     },
     setContextMessage,
+    showAiKeyRequired: showAiKeyRequiredAlert,
   };
 
   function render() {
@@ -573,9 +609,10 @@ export function createHud({
 
   function renderActionDock(snapshot: GenerationSnapshot) {
     const workflowState = resolveWorkflowState(snapshot);
-    const visibleActions = snapshot.availableActions.filter(
-      (actionId) => actionId === "release_object",
-    );
+    const canMove = snapshot.availableActions.includes("nudge_draft");
+    const canRotate = snapshot.availableActions.includes("rotate_draft");
+    const canRelease = snapshot.availableActions.includes("release_object");
+    const canDelete = canDeleteSelectedObject(snapshot);
 
     if (workflowState === "failed") {
       return `
@@ -611,7 +648,7 @@ export function createHud({
       return "";
     }
 
-    if (!visibleActions.length) {
+    if (!canMove && !canRotate && !canRelease && !canDelete) {
       return `
         <div class="dock-card">
           <span>${escapeHtml(unavailableActionKicker(snapshot))}</span>
@@ -621,22 +658,43 @@ export function createHud({
       `;
     }
 
+    const buttons = [
+      canMove
+        ? `<button type="button" data-object-lifecycle-action="nudge_draft">Move</button>`
+        : "",
+      canRotate
+        ? `<button type="button" data-object-lifecycle-action="rotate_draft">Rotate</button>`
+        : "",
+      canRelease
+        ? `<button type="button" data-object-lifecycle-action="release_object">Release</button>`
+        : "",
+      canDelete
+        ? `<button type="button" class="dock-button--danger" data-action="delete-object">Delete</button>`
+        : "",
+    ]
+      .filter(Boolean)
+      .join("");
+
     return `
       <div class="dock-card dock-card--actions">
         <div>
-          <span>Draft lifecycle</span>
-          <strong>Release</strong>
-          <p>Publish this draft to the shared world.</p>
+          <span>Selected object</span>
+          <strong>${escapeHtml(actionDockTitle(snapshot))}</strong>
+          <p>${escapeHtml(actionDockHint(snapshot, { canMove, canRotate, canDelete }))}</p>
         </div>
-        ${visibleActions
-          .map(
-            (actionId) => `
-              <button type="button" data-object-lifecycle-action="${actionId}">Release</button>
-            `,
-          )
-          .join("")}
+        <div class="dock-actions">${buttons}</div>
       </div>
     `;
+  }
+
+  function canDeleteSelectedObject(snapshot: GenerationSnapshot) {
+    const world = latestBackendPresence?.world;
+    return Boolean(
+      snapshot.object &&
+        snapshot.object.state === "public" &&
+        world?.visibility === "private" &&
+        world.destructiveEditsEnabled,
+    );
   }
 
   function renderFeedback(snapshot: GenerationSnapshot) {
@@ -753,6 +811,21 @@ export function createHud({
   function setContextMessage(message: string) {
     contextMessage.textContent = message;
     contextMessage.dataset.state = message ? "visible" : "hidden";
+  }
+
+  function showAiKeyRequiredAlert() {
+    aiAlertMessage.textContent =
+      "Gemini API key is missing. Add your Gemini API key to create with AI.";
+    aiAlert.dataset.state = "visible";
+  }
+
+  function hideAiAlert() {
+    aiAlert.dataset.state = "hidden";
+  }
+
+  function focusGeminiKeyInput() {
+    const input = sidePanel.querySelector<HTMLInputElement>('input[name="geminiApiKey"]');
+    input?.focus();
   }
 
   function currentInteractionState(): HudInteractionState {
@@ -1042,6 +1115,29 @@ function unavailableActionTitle(snapshot: GenerationSnapshot) {
       object.state satisfies never;
       return "Unavailable";
   }
+}
+
+function actionDockTitle(snapshot: GenerationSnapshot) {
+  const object = snapshot.object;
+  if (!object) return "No object selected";
+  return `v${object.version} · ${object.state}`;
+}
+
+function actionDockHint(
+  snapshot: GenerationSnapshot,
+  options: { canMove: boolean; canRotate: boolean; canDelete: boolean },
+) {
+  if (snapshot.object?.state === "grace") {
+    return "Move or rotate your draft, then release it to publish.";
+  }
+
+  const verbs = [
+    options.canMove ? "Move" : "",
+    options.canRotate ? "rotate" : "",
+    options.canDelete ? "delete" : "",
+  ].filter(Boolean);
+  if (!verbs.length) return snapshot.lastMessage;
+  return `${verbs.join(", ")} the selected object.`;
 }
 
 function resolveStageState(snapshot: GenerationSnapshot) {

@@ -1,19 +1,37 @@
 import type { AiWorkerClient } from "./fixtureAiWorkerClient";
+import { AiWorkerError } from "./aiWorkerErrors";
 import { createBrowserGeminiAiWorkerClient } from "./browserGeminiAiWorkerClient";
 import { createFixtureAiWorkerClient } from "./fixtureAiWorkerClient";
 import { createHttpAiWorkerClient } from "./httpAiWorkerClient";
 
+export type AiClientMode = "browser-gemini" | "http-worker" | "fixture";
+
 export interface ConfiguredAiWorkerClientOptions {
   getBrowserGeminiApiKey?: () => string | null;
+}
+
+export const missingBrowserGeminiKeyMessage =
+  "Browser Gemini API key is missing. Add your Gemini API key in Settings.";
+
+export function isMissingBrowserGeminiKeyError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes(missingBrowserGeminiKeyMessage);
+}
+
+export function resolveAiClientMode(): AiClientMode {
+  const mode = stringEnv("VITE_AI_CLIENT_MODE");
+  if (mode === "browser-gemini") return "browser-gemini";
+  if (mode === "http-worker") return "http-worker";
+  return "fixture";
 }
 
 export function createConfiguredAiWorkerClient({
   getBrowserGeminiApiKey,
 }: ConfiguredAiWorkerClientOptions = {}): AiWorkerClient {
   const fixtureClient = createFixtureAiWorkerClient();
-  const clientMode = stringEnv("VITE_AI_CLIENT_MODE");
+  const clientMode = resolveAiClientMode();
   const workerUrl = stringEnv("VITE_AI_WORKER_URL");
   const httpWorkerRequested = clientMode === "http-worker";
+  const browserGeminiRequested = clientMode === "browser-gemini";
   const httpClient = httpWorkerRequested && workerUrl
     ? createHttpAiWorkerClient({
         url: workerUrl,
@@ -30,8 +48,12 @@ export function createConfiguredAiWorkerClient({
 
   return {
     createDraft(input) {
-      if (browserGeminiClient && getBrowserGeminiApiKey?.()?.trim()) {
+      const hasBrowserGeminiKey = Boolean(getBrowserGeminiApiKey?.()?.trim());
+      if (browserGeminiClient && hasBrowserGeminiKey) {
         return browserGeminiClient.createDraft(input);
+      }
+      if (browserGeminiRequested) {
+        throw new AiWorkerError("generation_failed", missingBrowserGeminiKeyMessage);
       }
       if (httpWorkerRequested) {
         if (!httpClient) {

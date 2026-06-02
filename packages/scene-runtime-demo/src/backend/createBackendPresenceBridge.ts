@@ -124,6 +124,7 @@ export interface BackendPresenceBridge {
   requestEditLock(input: BackendRequestEditLockInput): Promise<void>;
   submitObjectEdit(input: BackendSubmitObjectEditInput): Promise<void>;
   cancelEdit(input: BackendObjectIdInput): Promise<void>;
+  deleteObject(input: BackendObjectIdInput): Promise<void>;
   expireCooldown(input: BackendObjectIdInput): Promise<void>;
   failAiJob(input: BackendFailAiJobInput): Promise<void>;
   expireAiJob(input: BackendAiJobIdInput): Promise<void>;
@@ -223,6 +224,7 @@ export function createBackendPresenceBridge({
       requestEditLock: rejectDisabledBackend,
       submitObjectEdit: rejectDisabledBackend,
       cancelEdit: rejectDisabledBackend,
+      deleteObject: rejectDisabledBackend,
       expireCooldown: rejectDisabledBackend,
       failAiJob: rejectDisabledBackend,
       expireAiJob: rejectDisabledBackend,
@@ -416,6 +418,11 @@ export function createBackendPresenceBridge({
     cancelEdit(input) {
       return callLiveReducer("Edit cancel rejected", (conn) =>
         conn.reducers.cancelEdit(input),
+      );
+    },
+    deleteObject(input) {
+      return callLiveReducer("Delete rejected", (conn) =>
+        conn.reducers.deleteObject(input),
       );
     },
     expireCooldown(input) {

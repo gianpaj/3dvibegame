@@ -55,8 +55,6 @@ await runLiveDemoBrowserSmoke({
         const fixedActionSelectors = [
           'button[data-object-lifecycle-action="refine_silhouette"]',
           'button[data-object-lifecycle-action="add_ornament"]',
-          'button[data-object-lifecycle-action="nudge_draft"]',
-          'button[data-object-lifecycle-action="rotate_draft"]',
           'button[data-object-lifecycle-action="scale_draft"]',
           'button[data-refine]',
           'button[data-prompt]',

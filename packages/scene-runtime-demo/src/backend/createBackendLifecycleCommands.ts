@@ -26,16 +26,23 @@ export interface BackendLifecycleCommands {
   canHandle(): boolean;
   submitPrompt(prompt: string): Promise<void>;
   dispatchAction(actionId: GenerationActionId): Promise<void>;
+  deleteSelectedObject(): Promise<void>;
   updateWorldSettings(input: BackendUpdateWorldSettingsInput): Promise<void>;
   createSnapshot(reason?: string): Promise<void>;
   resetWorld(reason?: string): Promise<void>;
 }
 
+export interface BackendLifecycleCommandsOptions {
+  getSelectedObjectId?: () => string | null;
+}
+
 export function createBackendLifecycleCommands(
   bridge: BackendPresenceBridge,
   aiWorker: AiWorkerClient = createFixtureAiWorkerClient(),
+  { getSelectedObjectId }: BackendLifecycleCommandsOptions = {},
 ): BackendLifecycleCommands {
   let sequence = 0;
+  const selectedObjectId = () => getSelectedObjectId?.() ?? null;
 
   return {
     canHandle() {
@@ -104,7 +111,7 @@ export function createBackendLifecycleCommands(
     },
     async dispatchAction(actionId: GenerationActionId) {
       const snapshot = bridge.getSnapshot();
-      const object = selectBackendObject(snapshot);
+      const object = selectBackendObject(snapshot, selectedObjectId());
       const allowedActions = backendAvailableActions(snapshot, object);
 
       if (!object || !allowedActions.includes(actionId)) {
@@ -121,22 +128,24 @@ export function createBackendLifecycleCommands(
           return;
         }
 
-        if (object.state === "edit_locked") {
+        // Public objects can only be mutated under an edit lock. Apply the
+        // transform in place and immediately cancel the lock so the move/rotate
+        // persists without bumping the object version or starting a cooldown.
+        if (object.state === "public") {
+          await bridge.requestEditLock({
+            objectId: object.object_id,
+            baseVersion: object.version,
+          });
+        }
+        try {
           await bridge.updateLockedTransform({
             objectId: object.object_id,
             ...transform,
           });
-          return;
+        } finally {
+          // Best-effort unlock so a failed transform never strands the object.
+          await bridge.cancelEdit({ objectId: object.object_id }).catch(() => {});
         }
-
-        await bridge.requestEditLock({
-          objectId: object.object_id,
-          baseVersion: object.version,
-        });
-        await bridge.updateLockedTransform({
-          objectId: object.object_id,
-          ...transform,
-        });
         return;
       }
 
@@ -185,6 +194,15 @@ export function createBackendLifecycleCommands(
         builderSpecJson: edit.builderSpecJson,
       });
       await bridge.expireCooldown({ objectId: object.object_id });
+    },
+    async deleteSelectedObject() {
+      const snapshot = bridge.getSnapshot();
+      const object = selectBackendObject(snapshot, selectedObjectId());
+      if (!object) {
+        throw new Error("Select an object before deleting it.");
+      }
+
+      await bridge.deleteObject({ objectId: object.object_id });
     },
   };
 }
