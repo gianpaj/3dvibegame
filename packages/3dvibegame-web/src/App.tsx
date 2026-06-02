@@ -142,16 +142,13 @@ export function App() {
 
   function handleDispatch(actionId: GenerationActionId) {
     setContextMsg("");
-    const usingBackend = backendCommandsRef.current?.canHandle() ?? false;
-    console.log("[handleDispatch] actionId=%s usingBackend=%s", actionId, usingBackend);
-    if (usingBackend) {
-      void backendCommandsRef.current!.dispatchAction(actionId).catch((err: unknown) => {
+    if (backendCommandsRef.current?.canHandle()) {
+      void backendCommandsRef.current.dispatchAction(actionId).catch((err: unknown) => {
         setContextMsg(errorMessage(err, "Action failed"));
       });
       return;
     }
     sessionRef.current?.dispatch(actionId);
-    console.log("[handleDispatch] local session snapshot after dispatch:", sessionRef.current?.getSnapshot());
   }
 
   function handleSelectObject(objectId: string) {

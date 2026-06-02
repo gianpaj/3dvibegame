@@ -184,7 +184,6 @@ export function createAiSession(aiClient: AiWorkerClient) {
 
     dispatch(actionId: GenerationActionId) {
       const object = currentObject();
-      console.log("[dispatch] actionId=%s object=%s objectState=%s stage=%s", actionId, object?.object_id ?? "null", object?.state ?? "null", stage);
       if (!object) {
         lastMessage = "Select an object first.";
         notify();
@@ -199,7 +198,6 @@ export function createAiSession(aiClient: AiWorkerClient) {
               activeObjectId = null;
               stage = "idle";
               lastMessage = "Deselected.";
-              console.log("[dispatch] release_object (public deselect) done");
               break;
             }
             if (object.state === "grace" || object.state === "edit_locked") {
@@ -215,7 +213,6 @@ export function createAiSession(aiClient: AiWorkerClient) {
             activeObjectId = null;
             stage = "idle";
             lastMessage = "Object released to the world!";
-            console.log("[dispatch] release_object done — stage=%s activeObjectId=%s", stage, activeObjectId);
             break;
           }
           case "nudge_draft": {
