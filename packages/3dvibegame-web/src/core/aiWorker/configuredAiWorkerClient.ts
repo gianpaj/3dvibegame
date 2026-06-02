@@ -1,6 +1,7 @@
 import type { AiWorkerClient } from "./fixtureAiWorkerClient";
 import { AiWorkerError } from "./aiWorkerErrors";
 import { createBrowserGeminiAiWorkerClient } from "./browserGeminiAiWorkerClient";
+import { createBrowserGeminiHttpCompileClient } from "./browserGeminiHttpCompileClient";
 import { createFixtureAiWorkerClient } from "./fixtureAiWorkerClient";
 import { createHttpAiWorkerClient } from "./httpAiWorkerClient";
 
@@ -38,12 +39,23 @@ export function createConfiguredAiWorkerClient({
         timeoutMs: numberEnv("VITE_AI_WORKER_TIMEOUT_MS") ?? undefined,
       })
     : null;
+  // In browser-gemini mode the browser always owns the Gemini call. When a worker
+  // URL is set, the resulting plan is compiled on the worker (/compile); otherwise
+  // it is compiled locally in the browser. Either way the key stays in the browser.
   const browserGeminiClient = getBrowserGeminiApiKey
-    ? createBrowserGeminiAiWorkerClient({
-        apiKey: getBrowserGeminiApiKey,
-        model: stringEnv("VITE_BROWSER_GEMINI_MODEL") ?? undefined,
-        timeoutMs: numberEnv("VITE_AI_WORKER_TIMEOUT_MS") ?? undefined,
-      })
+    ? workerUrl
+      ? createBrowserGeminiHttpCompileClient({
+          apiKey: getBrowserGeminiApiKey,
+          workerUrl,
+          model: stringEnv("VITE_BROWSER_GEMINI_MODEL") ?? undefined,
+          geminiTimeoutMs: numberEnv("VITE_AI_WORKER_TIMEOUT_MS") ?? undefined,
+          workerTimeoutMs: numberEnv("VITE_AI_WORKER_TIMEOUT_MS") ?? undefined,
+        })
+      : createBrowserGeminiAiWorkerClient({
+          apiKey: getBrowserGeminiApiKey,
+          model: stringEnv("VITE_BROWSER_GEMINI_MODEL") ?? undefined,
+          timeoutMs: numberEnv("VITE_AI_WORKER_TIMEOUT_MS") ?? undefined,
+        })
     : null;
 
   return {
