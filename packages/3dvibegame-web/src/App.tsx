@@ -239,9 +239,15 @@ export function App() {
 
   function handleSelectObject(objectId: string) {
     if (backendCommandsRef.current?.canHandle()) {
+      setContextMsg("");
+      // Only one object can be selected at a time: release the previously selected
+      // object's lock before locking the new one. releaseSelectedLock reads the
+      // current selection synchronously, so call it before updating the ref.
+      if (selectedObjectIdRef.current && selectedObjectIdRef.current !== objectId) {
+        void backendCommandsRef.current.releaseSelectedLock().catch(() => {});
+      }
       setSelectedObjectId(objectId);
       selectedObjectIdRef.current = objectId;
-      setContextMsg("");
       // Acquire an exclusive edit lock; if another player holds it, undo selection.
       void backendCommandsRef.current.lockSelectedObject().catch((err: unknown) => {
         setSelectedObjectId(null);
