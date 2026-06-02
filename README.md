@@ -5,11 +5,20 @@
 - <https://3dvibegame.com>
 
 Current vertical slice:
-`text prompt -> staged generation session -> compiled object -> grace edits -> released object`
+`text prompt -> browser Gemini -> voxel operations -> worker compile -> live object -> shared-room editing`
 
-## Architecture
+[![Watch the video](https://raw.githubusercontent.com/gianpaj/3dvibegame/master/path/to/thumbnail.jpg)](https://raw.githubusercontent.com/gianpaj/3dvibegame/master/demo-multiplayer-jun-2.mp4)
 
-The current prototype lives in `packages/scene-runtime-demo`. It keeps scene truth in `core`, tool orchestration in `editor`, and Three.js projection in `viewer`, while `@3dvibegame/scene-authority-ts` owns the authoritative object lifecycle and voxel-to-builder compilation rules.
+## Clients
+
+There are two browser clients:
+
+- **`packages/3dvibegame-web`** — the deployable player app (React + React Three Fiber). Real-time multiplayer via SpacetimeDB, LLM-authored voxel geometry (the browser calls Gemini directly with a player-supplied key, then the AI worker compiles the result), and shared-room editing: prompt to create, then select / move (WASD) / rotate / scale / delete with exclusive 30s edit locks.
+- **`packages/scene-runtime-demo`** — the original plain Three.js dev harness for inspecting runtime fixtures and exercising the full HUD.
+
+## Architecture (dev harness)
+
+`packages/scene-runtime-demo` keeps scene truth in `core`, tool orchestration in `editor`, and Three.js projection in `viewer`, while `@3dvibegame/scene-authority-ts` owns the authoritative object lifecycle and voxel-to-builder compilation rules.
 
 ```mermaid
 flowchart LR
@@ -47,19 +56,37 @@ Keep stable setup and architecture notes in this README. Keep dated design plans
 
 ## Workspace packages
 
-- `packages/website` — current placeholder marketing site
+- `packages/3dvibegame-web` — deployable player app (React + React Three Fiber, multiplayer)
+- `packages/scene-runtime-demo` — plain Three.js dev harness for inspecting runtime fixtures in the browser
+- `packages/scene-authority-ts` — authoritative object lifecycle reducers, contracts, and the voxel-to-builder compiler
+- `packages/ai-planning` — shared create/voxel schemas, system prompts, and deterministic plan/voxel-to-builder conversion
+- `packages/ai-worker` — external Node AI worker (`POST /generate` prompt path, keyless `POST /compile` path)
+- `packages/world-backend` — SpacetimeDB module (worlds, presence, object lifecycle, locks, world settings)
 - `packages/scene-runtime-ts` — TypeScript consumer port of the Python `scene_runtime` contract
-- `packages/scene-runtime-demo` — plain Three.js demo for inspecting runtime fixtures in the browser
+- `packages/website` — placeholder marketing site
 
-## Demo commands
+## Commands
 
 ```bash
+# Player app (3dvibegame-web)
+pnpm web:dev
+pnpm web:build
+pnpm web:test
+
+# Dev harness (scene-runtime-demo)
 pnpm demo:dev
 pnpm demo:build
+
+# Backend smokes + typecheck
+pnpm phase3:smoke
 pnpm typecheck
 ```
 
+The player app expects a Gemini key (entered in-app) and, for shared geometry compilation, `VITE_AI_WORKER_URL`; multiplayer needs `VITE_SPACETIMEDB_URI` + `VITE_SPACETIMEDB_DATABASE` and a published `world-backend` module. See `packages/3dvibegame-web/.env.example`.
+
 ## Manual deploy
+
+The player app (`packages/3dvibegame-web`) ships a `vercel.json` SPA rewrite and is built for Vercel (`pnpm web:build`). The dev harness deploy is documented below.
 
 `packages/scene-runtime-demo` is deployed as a Cloudflare Pages project named `3dvibegame` in account `f993cefa62ff85589a32173f0813fbad`.
 

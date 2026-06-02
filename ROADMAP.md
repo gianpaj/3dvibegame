@@ -377,8 +377,29 @@ Sub-phases:
 - Added HUD Settings controls for a tab-memory Gemini key; no key is sent to SpacetimeDB and `Release` remains the only lifecycle button
 - Added `smoke:live-browser-gemini` to prove direct browser Gemini create, backend draft submission, release, and completed create-job rows without starting the external worker
 
+### Phase 4.6 — React + React Three Fiber Player App ✅
+- Added `packages/3dvibegame-web`, a deployable React + React Three Fiber (R3F) MVP client, separate from the `scene-runtime-demo` dev harness
+- Ported the pure-TypeScript core (generation session, AI-worker clients, SpacetimeDB bindings) and rebuilt the viewer declaratively with `<Canvas>`, `useFrame`, and drei `OrbitControls`
+- Added the repo's first `vitest` + Testing Library suite covering the HUD components
+- First-load player-name prompt (persisted locally) feeds the SpacetimeDB join nickname and the live presence list
+
+### Phase 4.7 — Browser-Gemini Plan → Worker Compile Pipeline ✅
+- Split the pipeline so the browser owns the Gemini call (BYOK key never leaves the browser) and the AI worker owns deterministic geometry assembly
+- Added a keyless `POST /compile` endpoint to `@3dvibegame/ai-worker` plus a shared compile-request schema in `@3dvibegame/ai-planning`
+- Browser client posts the LLM output to `/compile`; falls back to local compilation when no `VITE_AI_WORKER_URL` is set
+
+### Phase 4.8 — LLM-Authored Voxel Geometry ✅
+- Reconnected the `scene-planning-bench` voxel-builder technique: the LLM now emits the actual `VoxelBuilderSpec` operations (`add_box` / `add_sphere` / `add_line`) per prompt instead of selecting one of five fixed shape templates
+- The worker grounds, validates (`parseVoxelBuilderSpec`), and compiles the LLM operations; templates remain only as the offline/no-key fixture fallback
+- Distinct prompts (palm vs. pine) now produce structurally different objects
+
+### Phase 4.9 — Shared-Room Editing & Moderation ✅
+- Direct manipulation in live rooms: camera-relative WASD moves the selected object (or pans the camera when nothing is selected), plus Move / Rotate / Scale ↑ / Scale ↓ HUD controls
+- Exclusive editing: selecting an object holds its backend edit lock for 30s (released on Esc, click-away, Done, or expiry) so other players cannot move it
+- Object deletion with a confirmation modal; the shared "Vibe Test Room" is now private + destructive, with a 90-second window in which only the creator can delete a freshly created object
+
 ### Phase 5 — V1 Hardening & Launch
-- Rate limiting and abuse guardrails
+- Rate limiting and abuse guardrails (the private shared room currently skips per-player create/object caps)
 - World settings UI for hosts (presets, reset schedules, permission toggles)
 - Curation zones (build / gallery / chaos areas) — *candidate V2 feature*
 - Behavior scripting for players — *deferred post-V1*
@@ -394,14 +415,19 @@ Sub-phases:
 |---|---|
 | Authoritative backend | SpacetimeDB |
 | AI generation | External worker service (stateless, validated output) |
-| Client rendering | Web client (Three.js / React Three Fiber, TypeScript) |
-| Object representation | Constrained prompt IR → deterministic voxel builder |
+| Client rendering | Player app (`3dvibegame-web`, React + React Three Fiber); `scene-runtime-demo` dev harness (plain Three.js) |
+| Object representation | LLM-authored voxel operations → validated, grounded, compiled builder spec |
 | Sync | Delta-based (object create / edit / delete events) |
 
-**AI pipeline:**
+**AI pipelines:**
 ```
+# External worker path
 player prompt → AI worker → constrained prompt IR
   → validated builder spec → authoritative object reducer
+
+# Browser-Gemini path (3dvibegame-web)
+player prompt → browser Gemini (BYOK) → voxel operations
+  → AI worker /compile (ground + validate + compile) → authoritative object reducer
 ```
 
 ---
