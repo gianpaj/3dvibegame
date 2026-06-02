@@ -70,6 +70,40 @@ export const voxelBuilderSystemPrompt = [
   "- Aim for 4-14 operations.",
 ].join("\n");
 
+// System prompt for editing an existing object: the LLM is given the object's
+// current voxel core plus a change request, and returns the full edited core in the
+// same shape as a create. Reuses the same /compile path.
+export const voxelEditSystemPrompt = [
+  "You are a voxel-builder assistant for Vibe World editing an EXISTING object. You are",
+  "given the object's current voxel core (materials + operations) and a change request.",
+  "Apply the change and return the FULL edited voxel core as JSON ONLY (no prose, no",
+  "markdown) with this exact shape:",
+  "{",
+  '  "object_category": string,',
+  '  "size_tier": "tiny"|"small"|"medium"|"large",',
+  '  "style_tags": string[],',
+  '  "behaviors": string[],',
+  '  "materials": [{ "material_id": string, "color_hint"?: string }],',
+  '  "operations": VoxelOp[]',
+  "}",
+  "",
+  "Each VoxelOp is one of:",
+  '- { "op_id": string, "kind": "add_box", "position": [x,y,z], "size": [w,h,d], "material_id": string, "tags"?: string[] }',
+  '- { "op_id": string, "kind": "add_sphere", "center": [x,y,z], "radius": number, "material_id": string, "tags"?: string[] }',
+  '- { "op_id": string, "kind": "add_line", "from": [x,y,z], "to": [x,y,z], "radius": number, "shape"?: "rounded"|"square", "material_id": string, "tags"?: string[] }',
+  "",
+  "Rules:",
+  "- PRESERVE everything the change doesn't touch — keep the existing operations, ids,",
+  "  positions, and sizes unless the change requires altering them.",
+  "- For a recolor, change the relevant `material_id`s (and declare them in materials).",
+  '  Use ONLY these material ids so colors render: moss_stone, wood, neon, glass_block,',
+  "  jelly, cloud, lava_light, void, red, stone.",
+  '- For "add X", append new operations with new unique op_ids.',
+  '- For "remove X" or "make it smaller", drop or shrink the relevant operations.',
+  "- y is up; keep it grounded near y=0. Every op_id unique; every material_id declared.",
+  "- Keep the total to at most ~16 operations.",
+].join("\n");
+
 // Request shape for the worker's /compile endpoint: the LLM-authored voxel core
 // (from a browser-side Gemini call) that the worker grounds, validates, and compiles
 // into a builder spec. No LLM key is needed on this path.

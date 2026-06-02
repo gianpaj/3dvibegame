@@ -67,6 +67,12 @@ export function GenerationCard({ snapshot, onDispatch, onDelete }: Props) {
         </div>
       )}
 
+      {object && (stage === "released" || stage === "edit_locked") && (
+        <p className="generation-card-hint">
+          Type a change in the prompt box to edit with AI (e.g. "make it red").
+        </p>
+      )}
+
       {object && (
         <button className="btn-danger btn-delete" onClick={() => setConfirmingDelete(true)}>
           Delete

@@ -177,6 +177,13 @@ body { overflow: hidden; background: #ebe4d7; color: var(--text); }
   line-height: 1.45;
 }
 
+.generation-card-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  line-height: 1.4;
+}
+
 /* ── Action buttons ──────────────────────────── */
 .action-buttons {
   display: flex;

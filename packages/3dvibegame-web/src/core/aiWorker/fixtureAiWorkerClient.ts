@@ -17,7 +17,9 @@ export interface AiWorkerDraftResult extends AiWorkerArtifact {
 export interface AiWorkerClient {
   createDraft(input: { prompt: string }): Promise<AiWorkerDraftResult>;
   createEdit(input: {
-    actionId: ScenarioActionId;
+    // Optional: scenario refine recipes use it; free-form chat edits omit it and rely
+    // on `sourcePrompt` + `objectContext`.
+    actionId?: ScenarioActionId;
     baseObjectId: string;
     baseVersion: number;
     sourcePrompt?: string;

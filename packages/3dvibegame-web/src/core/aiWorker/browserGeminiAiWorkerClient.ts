@@ -10,9 +10,11 @@ import {
 import type { AiWorkerArtifact, AiWorkerClient } from "./fixtureAiWorkerClient";
 import { AiWorkerError, normalizeAiWorkerError } from "./aiWorkerErrors";
 import {
+  coreFromSourceSpec,
   defaultGeminiModel,
   defaultGeminiTimeoutMs,
   generateVoxelCore,
+  generateVoxelEdit,
 } from "./geminiVoxel";
 
 export interface BrowserGeminiAiWorkerClientConfig {
@@ -70,11 +72,43 @@ export function createBrowserGeminiAiWorkerClient({
         throw normalizeAiWorkerError(error);
       }
     },
-    async createEdit() {
-      throw new AiWorkerError(
-        "unsupported_request",
-        "Browser Gemini mode currently supports create only.",
-      );
+    async createEdit({ sourcePrompt, objectContext }) {
+      const trimmedKey = apiKey()?.trim();
+      if (!trimmedKey) {
+        throw new AiWorkerError("generation_failed", "Browser Gemini key is not configured.");
+      }
+      const changePrompt = (sourcePrompt ?? "").trim();
+      const currentCore = coreFromSourceSpec(objectContext?.sourceSpecJson);
+      if (!currentCore) {
+        throw new AiWorkerError(
+          "unsupported_request",
+          "This object can't be edited (missing source spec).",
+        );
+      }
+
+      const request: AiWorkerRequest = {
+        operation: "create",
+        source_prompt: changePrompt,
+        target_object_id: null,
+        base_object_version: null,
+        object_context: null,
+      };
+
+      try {
+        const voxel = await generateVoxelEdit({
+          apiKey: trimmedKey,
+          fetchImpl,
+          model,
+          temperature,
+          timeoutMs,
+          currentCore,
+          changePrompt,
+        });
+        const response = buildVoxelResponse(request, voxel, ["browser Gemini BYOK edit"]);
+        return toArtifact(response.source_spec, response.builder_spec);
+      } catch (error) {
+        throw normalizeAiWorkerError(error);
+      }
     },
   };
 }

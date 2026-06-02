@@ -3,9 +3,11 @@ import { useRef, useState } from "react";
 interface Props {
   onSubmit: (prompt: string) => void;
   disabled: boolean;
+  /** When an object is selected, the prompt edits it instead of creating. */
+  editing?: boolean;
 }
 
-export function PromptInput({ onSubmit, disabled }: Props) {
+export function PromptInput({ onSubmit, disabled, editing = false }: Props) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -32,12 +34,16 @@ export function PromptInput({ onSubmit, disabled }: Props) {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Describe an object to generate…"
+        placeholder={
+          editing
+            ? "Describe a change to the selected object…"
+            : "Describe an object to generate…"
+        }
         disabled={disabled}
         rows={1}
       />
       <button className="prompt-submit" type="submit" disabled={disabled || !value.trim()}>
-        Generate
+        {editing ? "Edit" : "Generate"}
       </button>
     </form>
   );

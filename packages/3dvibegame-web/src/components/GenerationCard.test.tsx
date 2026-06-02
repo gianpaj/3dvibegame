@@ -80,6 +80,17 @@ describe("GenerationCard", () => {
     expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
   });
 
+  it("shows the AI-edit hint for a selected released object", () => {
+    render(
+      <GenerationCard
+        snapshot={makeSnapshot("released", allActions, fakeObject)}
+        onDispatch={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/edit with AI/i)).toBeInTheDocument();
+  });
+
   it("dispatches the matching action id when a button is clicked", async () => {
     const onDispatch = vi.fn();
     const user = userEvent.setup();

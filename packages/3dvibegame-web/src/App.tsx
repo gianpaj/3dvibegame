@@ -145,6 +145,10 @@ export function App() {
   const needsApiKey = resolveAiClientMode() === "browser-gemini" && !geminiKey;
   const inputDisabled = GENERATING_STAGES.has(displaySnapshot.stage);
 
+  // A manually-clicked object in a live room (we hold its lock) → the prompt box
+  // edits that object with AI instead of creating a new one.
+  const editing = isLive && selectedObjectId !== null;
+
   // WASD moves the object when one is selected (local or live), else moves the camera.
   const hasSelectedObjectRef = useRef(false);
   hasSelectedObjectRef.current = displaySnapshot.object !== null;
@@ -194,12 +198,17 @@ export function App() {
   function handlePromptSubmit(prompt: string) {
     setContextMsg("");
     if (backendCommandsRef.current?.canHandle()) {
-      void backendCommandsRef.current.submitPrompt(prompt).catch((err: unknown) => {
+      // A manually-selected object → edit it; otherwise create a new object.
+      const editingNow = selectedObjectIdRef.current !== null;
+      const action = editingNow
+        ? backendCommandsRef.current.editSelectedObject(prompt)
+        : backendCommandsRef.current.submitPrompt(prompt);
+      void action.catch((err: unknown) => {
         if (isMissingBrowserGeminiKeyError(err)) {
           setGeminiKey(null);
           return;
         }
-        setContextMsg(errorMessage(err, "Prompt failed"));
+        setContextMsg(errorMessage(err, editingNow ? "Edit failed" : "Prompt failed"));
       });
       return;
     }
@@ -295,7 +304,11 @@ export function App() {
         </div>
 
         <div className="hud-bottom">
-          <PromptInput onSubmit={handlePromptSubmit} disabled={inputDisabled} />
+          <PromptInput
+            onSubmit={handlePromptSubmit}
+            disabled={inputDisabled}
+            editing={editing}
+          />
         </div>
       </div>
 

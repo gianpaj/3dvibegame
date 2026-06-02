@@ -18,6 +18,14 @@ describe("PromptInput", () => {
     expect(screen.getByPlaceholderText(placeholder)).toBeDisabled();
   });
 
+  it("switches to edit placeholder + label when editing", () => {
+    render(<PromptInput onSubmit={vi.fn()} disabled={false} editing />);
+    expect(
+      screen.getByPlaceholderText("Describe a change to the selected object…"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
+  });
+
   it("submits trimmed text on Enter and clears the field", async () => {
     const onSubmit = vi.fn();
     const user = userEvent.setup();

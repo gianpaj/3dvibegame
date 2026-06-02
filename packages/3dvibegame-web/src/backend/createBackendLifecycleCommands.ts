@@ -26,6 +26,7 @@ export interface BackendLifecycleCommands {
   canHandle(): boolean;
   submitPrompt(prompt: string): Promise<void>;
   dispatchAction(actionId: GenerationActionId): Promise<void>;
+  editSelectedObject(prompt: string): Promise<void>;
   lockSelectedObject(): Promise<void>;
   releaseSelectedLock(): Promise<void>;
   moveSelectedObject(dx: number, dz: number): Promise<void>;
@@ -270,6 +271,58 @@ export function createBackendLifecycleCommands(
         objectId: object.object_id,
         baseVersion: object.version,
       });
+      await bridge.submitObjectEdit({
+        objectId: object.object_id,
+        baseVersion: object.version,
+        sourceSpecJson: edit.sourceSpecJson,
+        builderSpecJson: edit.builderSpecJson,
+      });
+      await bridge.expireCooldown({ objectId: object.object_id });
+    },
+    // Free-form AI edit of the selected object: feed the LLM the current spec + the
+    // player's change request, then submit the result as a new object version.
+    async editSelectedObject(prompt: string) {
+      const snapshot = bridge.getSnapshot();
+      const object = selectBackendObject(snapshot, selectedObjectId());
+      if (!object) {
+        throw new Error("Select an object to edit it.");
+      }
+
+      const localPlayerId = localBackendPlayerId(snapshot);
+      if (object.state === "edit_locked" && object.lock_owner_id !== localPlayerId) {
+        throw new Error("Object is being edited by another player.");
+      }
+      if (object.state === "grace" && object.grace_owner_id !== localPlayerId) {
+        throw new Error("Object is in another player's grace window.");
+      }
+      if (object.state !== "public" && object.state !== "edit_locked") {
+        throw new Error(`Object cannot be edited in ${object.state} state.`);
+      }
+
+      let edit: Awaited<ReturnType<AiWorkerClient["createEdit"]>>;
+      try {
+        edit = await aiWorker.createEdit({
+          baseObjectId: object.object_id,
+          baseVersion: object.version,
+          sourcePrompt: prompt,
+          objectContext: {
+            objectId: object.object_id,
+            version: object.version,
+            sourceSpecJson: sourceSpecJsonForObject(snapshot, object.object_id),
+            builderSpecJson: JSON.stringify(object.builder_spec),
+          },
+        });
+      } catch (error) {
+        throw userFacingAiWorkerError(error);
+      }
+
+      // Public objects need a lock first; if we already hold it (from selection), skip.
+      if (object.state === "public") {
+        await bridge.requestEditLock({
+          objectId: object.object_id,
+          baseVersion: object.version,
+        });
+      }
       await bridge.submitObjectEdit({
         objectId: object.object_id,
         baseVersion: object.version,

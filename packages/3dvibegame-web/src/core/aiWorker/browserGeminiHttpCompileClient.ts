@@ -3,9 +3,11 @@ import type { CompileVoxelRequest } from "@3dvibegame/ai-planning";
 import type { AiWorkerClient } from "./fixtureAiWorkerClient";
 import { AiWorkerError, normalizeAiWorkerError } from "./aiWorkerErrors";
 import {
+  coreFromSourceSpec,
   defaultGeminiModel,
   defaultGeminiTimeoutMs,
   generateVoxelCore,
+  generateVoxelEdit,
 } from "./geminiVoxel";
 import {
   normalizeEndpoint,
@@ -82,11 +84,47 @@ export function createBrowserGeminiHttpCompileClient({
         throw normalizeAiWorkerError(error);
       }
     },
-    async createEdit() {
-      throw new AiWorkerError(
-        "unsupported_request",
-        "Browser Gemini mode currently supports create only.",
-      );
+    async createEdit({ sourcePrompt, objectContext }) {
+      const trimmedKey = apiKey()?.trim();
+      if (!trimmedKey) {
+        throw new AiWorkerError("generation_failed", "Browser Gemini key is not configured.");
+      }
+      const changePrompt = (sourcePrompt ?? "").trim();
+      const currentCore = coreFromSourceSpec(objectContext?.sourceSpecJson);
+      if (!currentCore) {
+        throw new AiWorkerError(
+          "unsupported_request",
+          "This object can't be edited (missing source spec).",
+        );
+      }
+
+      try {
+        const voxel = await generateVoxelEdit({
+          apiKey: trimmedKey,
+          fetchImpl,
+          model,
+          temperature,
+          timeoutMs: geminiTimeoutMs,
+          currentCore,
+          changePrompt,
+        });
+
+        const body: CompileVoxelRequest = {
+          operation: "create",
+          source_prompt: changePrompt,
+          voxel,
+          warnings: ["browser Gemini BYOK edit"],
+        };
+        const response = await postWorkerJson(
+          fetchImpl,
+          compileEndpoint,
+          workerTimeoutMs,
+          body,
+        );
+        return workerResponseToArtifact(response);
+      } catch (error) {
+        throw normalizeAiWorkerError(error);
+      }
     },
   };
 }

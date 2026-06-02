@@ -61,7 +61,7 @@ export function createHttpAiWorkerClient({
       try {
         const body: HttpAiWorkerRequest = {
           operation: "refine",
-          source_prompt: sourcePrompt ?? actionId,
+          source_prompt: sourcePrompt ?? actionId ?? "edit",
           action_id: actionId,
           target_object_id: baseObjectId,
           base_object_version: baseVersion,

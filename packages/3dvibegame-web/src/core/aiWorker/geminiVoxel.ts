@@ -1,8 +1,10 @@
 import {
   voxelBuilderSystemPrompt,
   voxelCoreSchema,
+  voxelEditSystemPrompt,
   type VoxelCore,
 } from "@3dvibegame/ai-planning";
+import { parseVoxelBuilderSpec } from "@3dvibegame/scene-authority-ts";
 
 import { AiWorkerError } from "./aiWorkerErrors";
 
@@ -23,13 +25,21 @@ interface GeminiGenerateContentResponse {
 export const defaultGeminiModel = "gemini-2.5-flash";
 export const defaultGeminiTimeoutMs = 45_000;
 
-export interface GenerateVoxelCoreOptions {
+interface GeminiCallOptions {
   apiKey: string;
   fetchImpl: typeof fetch;
   model: string;
-  prompt: string;
   temperature: number;
   timeoutMs: number;
+}
+
+export interface GenerateVoxelCoreOptions extends GeminiCallOptions {
+  prompt: string;
+}
+
+export interface GenerateVoxelEditOptions extends GeminiCallOptions {
+  currentCore: VoxelCore;
+  changePrompt: string;
 }
 
 /**
@@ -37,14 +47,36 @@ export interface GenerateVoxelCoreOptions {
  * (object metadata + operations) for a player prompt. Returns the validated
  * creative core; the worker (or local path) assembles + compiles it.
  */
-export async function generateVoxelCore({
-  apiKey,
-  fetchImpl,
-  model,
+export function generateVoxelCore({
   prompt,
-  temperature,
-  timeoutMs,
+  ...call
 }: GenerateVoxelCoreOptions): Promise<VoxelCore> {
+  return requestVoxelCore(call, voxelBuilderSystemPrompt, `Player prompt: ${prompt}`);
+}
+
+/**
+ * Calls Gemini to edit an existing object: it gets the current voxel core plus a
+ * change request and returns the full edited core (same shape as create).
+ */
+export function generateVoxelEdit({
+  currentCore,
+  changePrompt,
+  ...call
+}: GenerateVoxelEditOptions): Promise<VoxelCore> {
+  const userText = [
+    "Current object core:",
+    JSON.stringify(currentCore),
+    "",
+    `Change request: ${changePrompt}`,
+  ].join("\n");
+  return requestVoxelCore(call, voxelEditSystemPrompt, userText);
+}
+
+async function requestVoxelCore(
+  { apiKey, fetchImpl, model, temperature, timeoutMs }: GeminiCallOptions,
+  systemPrompt: string,
+  userText: string,
+): Promise<VoxelCore> {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
 
@@ -57,12 +89,12 @@ export async function generateVoxelCore({
       },
       body: JSON.stringify({
         systemInstruction: {
-          parts: [{ text: voxelBuilderSystemPrompt }],
+          parts: [{ text: systemPrompt }],
         },
         contents: [
           {
             role: "user",
-            parts: [{ text: `Player prompt: ${prompt}` }],
+            parts: [{ text: userText }],
           },
         ],
         // JSON mode without a strict responseSchema: the voxel op discriminated
@@ -129,6 +161,34 @@ export async function generateVoxelCore({
     throw error;
   } finally {
     window.clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Reduces a stored VoxelBuilderSpec (the object's `source_spec_json`) to the creative
+ * VoxelCore that the edit prompt operates on. Returns null if the spec is missing or
+ * not a valid voxel spec (older/non-voxel objects can't be AI-edited).
+ */
+export function coreFromSourceSpec(
+  sourceSpecJson: string | null | undefined,
+): VoxelCore | null {
+  if (!sourceSpecJson) return null;
+  try {
+    const spec = parseVoxelBuilderSpec(JSON.parse(sourceSpecJson));
+    return {
+      object_category: spec.object_category,
+      size_tier: spec.size_tier,
+      style_tags: spec.style_tags,
+      behaviors: spec.behaviors,
+      materials: spec.materials.map((material) => ({
+        material_id: material.material_id,
+        color_hint: material.color_hint,
+        tags: material.tags,
+      })),
+      operations: spec.operations,
+    };
+  } catch {
+    return null;
   }
 }
 
