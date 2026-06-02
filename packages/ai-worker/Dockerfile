@@ -17,6 +17,11 @@ WORKDIR /app
 # Workspace deps (@3dvibegame/ai-planning, @3dvibegame/scene-authority-ts) are
 # consumed as TypeScript source via tsx, so copy the monorepo and install it.
 COPY . .
+# Fail loudly if the build context isn't the repo root (Coolify "Base Directory" = /).
+RUN test -f pnpm-lock.yaml || ( \
+      echo "ERROR: build context is not the repo root (no pnpm-lock.yaml)." && \
+      echo "Set Coolify Base Directory to '/' and Dockerfile location to packages/ai-worker/Dockerfile." && \
+      exit 1 )
 RUN pnpm install --frozen-lockfile
 
 WORKDIR /app/packages/ai-worker

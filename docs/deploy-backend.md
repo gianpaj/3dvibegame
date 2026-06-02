@@ -122,7 +122,12 @@ In Coolify → **New Resource → Dockerfile** (or a Git-based app with Build Pa
 Dockerfile):
 
 - **Dockerfile location:** `packages/ai-worker/Dockerfile`
-- **Build context / base directory:** repo root `/` (it's a pnpm workspace)
+- **Base Directory (build context):** `/` — the **repo root**, NOT
+  `/packages/ai-worker`. It's a pnpm workspace, so the build needs the root
+  `pnpm-lock.yaml` + `pnpm-workspace.yaml` + every package's `package.json`. Pointing
+  the context at the package dir fails with
+  `[ERR_PNPM_NO_LOCKFILE] ... pnpm-lock.yaml is absent` (and corepack pulls the wrong
+  pnpm version, since `packageManager` is in the root `package.json`).
 - **Port:** `8787`
 - **Domain:** e.g. `ai.3dvibegame.com` (TLS via Coolify)
 - **Env:**
