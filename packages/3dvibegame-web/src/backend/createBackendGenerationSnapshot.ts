@@ -101,6 +101,10 @@ export function selectBackendObject(
     if (preferred) return preferred;
   }
 
+  // With no explicit selection, only surface the local player's own in-progress
+  // work (a fresh draft in grace, or an object they hold an edit lock on). Do NOT
+  // auto-select an arbitrary public object — that made the card appear with a
+  // released object the player never selected.
   const localPlayerId = localBackendPlayerId(backendSnapshot);
   const objects = [...world.objects].reverse();
 
@@ -112,9 +116,6 @@ export function selectBackendObject(
       (object) =>
         object.state === "edit_locked" && object.lock_owner_id === localPlayerId,
     ) ??
-    objects.find((object) => object.state === "cooldown") ??
-    objects.find((object) => object.state === "public") ??
-    objects[0] ??
     null
   );
 }

@@ -37,7 +37,7 @@ describe("PlayerList", () => {
 
     expect(screen.getByText("Alice")).toBeInTheDocument();
     expect(screen.queryByText("Bob")).not.toBeInTheDocument();
-    expect(screen.getByText("You")).toBeInTheDocument();
+    expect(screen.getByText("Me (you)")).toBeInTheDocument();
   });
 
   it("renders nothing when there are no active players", () => {

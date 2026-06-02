@@ -111,6 +111,8 @@ export interface BackendPresenceSnapshot {
 
 interface BackendPresenceBridgeConfig {
   onSnapshot(snapshot: BackendPresenceSnapshot): void;
+  /** Player-chosen display name; falls back to env / "You" when omitted. */
+  nickname?: string;
 }
 
 export interface BackendPresenceBridge {
@@ -202,15 +204,16 @@ const movementEpsilon = 0.025;
 
 export function createBackendPresenceBridge({
   onSnapshot,
+  nickname: nicknameOverride,
 }: BackendPresenceBridgeConfig): BackendPresenceBridge {
-  const config = readBackendConfig();
+  const config = readBackendConfig(nicknameOverride);
 
   if (!config) {
     const snapshot = createBaseSnapshot({
       enabled: false,
       status: "disabled",
       message: "Local room",
-      nickname: resolveNickname(),
+      nickname: resolveNickname(nicknameOverride),
     });
     onSnapshot(snapshot);
     return {
@@ -703,7 +706,7 @@ function createBaseSnapshot({
   };
 }
 
-function readBackendConfig() {
+function readBackendConfig(nicknameOverride?: string) {
   const uri = stringEnv("VITE_SPACETIMEDB_URI");
   const database = stringEnv("VITE_SPACETIMEDB_DATABASE");
 
@@ -719,12 +722,12 @@ function readBackendConfig() {
   return {
     uri,
     database,
-    nickname: resolveNickname(),
+    nickname: resolveNickname(nicknameOverride),
   };
 }
 
-function resolveNickname() {
-  const nickname = stringEnv("VITE_PLAYER_NICKNAME") ?? "You";
+function resolveNickname(override?: string) {
+  const nickname = override ?? stringEnv("VITE_PLAYER_NICKNAME") ?? "You";
   return nickname.trim().replace(/\s+/g, " ").slice(0, 24) || "You";
 }
 

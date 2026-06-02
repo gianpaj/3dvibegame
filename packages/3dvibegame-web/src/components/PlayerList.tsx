@@ -13,7 +13,9 @@ export function PlayerList({ players }: Props) {
       {active.map((player) => (
         <div key={player.id} className={`player-chip ${player.isLocal ? "player-chip-local" : ""}`}>
           <span className="player-dot" />
-          <span className="player-name">{player.isLocal ? "You" : player.nickname}</span>
+          <span className="player-name">
+            {player.isLocal ? `${player.nickname} (you)` : player.nickname}
+          </span>
         </div>
       ))}
     </div>

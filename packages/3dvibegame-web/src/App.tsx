@@ -13,6 +13,7 @@ import type { createBackendGenerationSnapshot } from "./backend/createBackendGen
 import { GameCanvas } from "./scene/GameCanvas";
 import { GenerationCard } from "./components/GenerationCard";
 import { GeminiKeyModal, loadStoredGeminiKey } from "./components/GeminiKeyModal";
+import { NameModal, loadStoredPlayerName } from "./components/NameModal";
 import { PlayerList } from "./components/PlayerList";
 import { ConnectionStatus } from "./components/ConnectionStatus";
 import { PromptInput } from "./components/PromptInput";
@@ -44,6 +45,13 @@ export function App() {
     geminiKeyRef.current = geminiKey;
   }, [geminiKey]);
 
+  // --- Player name (asked on first load) ---
+  const [playerName, setPlayerName] = useState<string | null>(() => loadStoredPlayerName());
+  const playerNameRef = useRef(playerName);
+  useEffect(() => {
+    playerNameRef.current = playerName;
+  }, [playerName]);
+
   // --- AI session (stable, never recreated) ---
   const sessionRef = useRef<ReturnType<typeof createAiSession> | null>(null);
   if (!sessionRef.current) {
@@ -63,36 +71,52 @@ export function App() {
   const backendSnapshotFnRef = useRef<typeof createBackendGenerationSnapshot | null>(null);
   const bridgeRef = useRef<BackendPresenceBridge | null>(null);
 
+  // Connect to the backend once the player has entered a name (so we join the
+  // world with their chosen nickname). Recreated cleanly across React StrictMode's
+  // dev mount/unmount/mount, so reloads always reconnect and show the live world.
   useEffect(() => {
+    if (!hasBackendConfig() || !playerName) return;
     let alive = true;
+    let localBridge: BackendPresenceBridge | null = null;
 
-    if (hasBackendConfig()) {
-      void import("./backend").then(
-        ({
-          createBackendPresenceBridge,
-          createBackendLifecycleCommands,
-          createBackendGenerationSnapshot: createSnapshotFn,
-        }) => {
-          if (!alive) return;
-          const aiClient = createConfiguredAiWorkerClient({
-            getBrowserGeminiApiKey: () => geminiKeyRef.current,
-          });
-          const bridge = createBackendPresenceBridge({ onSnapshot: setBackendSnap });
-          bridgeRef.current = bridge;
-          backendCommandsRef.current = createBackendLifecycleCommands(bridge, aiClient, {
-            getSelectedObjectId: () => selectedObjectIdRef.current,
-          });
-          backendSnapshotFnRef.current = createSnapshotFn;
-        },
-      );
-    }
+    void import("./backend").then(
+      ({
+        createBackendPresenceBridge,
+        createBackendLifecycleCommands,
+        createBackendGenerationSnapshot: createSnapshotFn,
+      }) => {
+        if (!alive) return;
+        const aiClient = createConfiguredAiWorkerClient({
+          getBrowserGeminiApiKey: () => geminiKeyRef.current,
+        });
+        const bridge = createBackendPresenceBridge({
+          onSnapshot: setBackendSnap,
+          nickname: playerNameRef.current ?? undefined,
+        });
+        localBridge = bridge;
+        bridgeRef.current = bridge;
+        backendCommandsRef.current = createBackendLifecycleCommands(bridge, aiClient, {
+          getSelectedObjectId: () => selectedObjectIdRef.current,
+        });
+        backendSnapshotFnRef.current = createSnapshotFn;
+      },
+    );
 
     return () => {
       alive = false;
-      sessionRef.current?.dispose();
-      bridgeRef.current?.dispose();
+      localBridge?.dispose();
+      if (bridgeRef.current === localBridge) {
+        bridgeRef.current = null;
+        backendCommandsRef.current = null;
+      }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playerName]);
+
+  // Dispose the in-memory session on unmount.
+  useEffect(() => {
+    return () => {
+      sessionRef.current?.dispose();
+    };
   }, []);
 
   // --- Derive display state ---
@@ -135,6 +159,23 @@ export function App() {
     sessionRef.current?.moveSelected(dx, dz);
   }, []);
 
+  const handleDeselect = useCallback(() => {
+    if (backendCommandsRef.current?.canHandle()) {
+      setSelectedObjectId(null);
+      selectedObjectIdRef.current = null;
+    } else {
+      sessionRef.current?.selectObject(null);
+    }
+  }, []);
+
+  // 30-second selection lock: a selected object auto-unlocks (deselects) after the
+  // window unless the player ends it early via Release/Done. Re-selecting restarts it.
+  useEffect(() => {
+    if (effectiveSelectedId === null) return;
+    const timer = window.setTimeout(handleDeselect, 30_000);
+    return () => window.clearTimeout(timer);
+  }, [effectiveSelectedId, handleDeselect]);
+
   // --- Handlers ---
   function handlePromptSubmit(prompt: string) {
     setContextMsg("");
@@ -159,9 +200,14 @@ export function App() {
     const usingBackend = backendCommandsRef.current?.canHandle() ?? false;
     console.log("[handleDispatch] actionId=%s usingBackend=%s", actionId, usingBackend);
     if (usingBackend) {
-      void backendCommandsRef.current!.dispatchAction(actionId).catch((err: unknown) => {
-        setContextMsg(errorMessage(err, "Action failed"));
-      });
+      void backendCommandsRef.current!
+        .dispatchAction(actionId)
+        .then(() => {
+          if (actionId === "release_object") handleDeselect();
+        })
+        .catch((err: unknown) => {
+          setContextMsg(errorMessage(err, "Action failed"));
+        });
       return;
     }
     sessionRef.current?.dispatch(actionId);
@@ -180,6 +226,11 @@ export function App() {
   function handleApiKeySave(key: string) {
     setGeminiKey(key);
     geminiKeyRef.current = key;
+  }
+
+  function handleNameSave(name: string) {
+    setPlayerName(name);
+    playerNameRef.current = name;
   }
 
   return (
@@ -210,7 +261,11 @@ export function App() {
         </div>
       </div>
 
-      {needsApiKey && <GeminiKeyModal onSave={handleApiKeySave} />}
+      {!playerName ? (
+        <NameModal onSave={handleNameSave} />
+      ) : needsApiKey ? (
+        <GeminiKeyModal onSave={handleApiKeySave} />
+      ) : null}
     </div>
   );
 }

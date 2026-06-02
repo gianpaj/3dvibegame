@@ -14,45 +14,73 @@ const allActions: GenerationActionId[] = [
   "release_object",
 ];
 
+const fakeObject = {
+  object_id: "obj_1",
+  builder_spec: { object_category: "tree" },
+} as unknown as NonNullable<AiSessionSnapshot["object"]>;
+
 function makeSnapshot(
   stage: AiSessionSnapshot["stage"],
   availableActions: GenerationActionId[],
+  object: AiSessionSnapshot["object"] = null,
 ): AiSessionSnapshot {
   return {
     document: { player_sessions_by_id: {} } as AiSessionSnapshot["document"],
     world: {} as AiSessionSnapshot["world"],
     stage,
     lastMessage: "status message",
-    object: null,
+    object,
     availableActions,
   };
 }
 
 describe("GenerationCard", () => {
-  it("renders nothing when idle", () => {
+  it("renders nothing when idle with no object selected", () => {
     const { container } = render(
       <GenerationCard snapshot={makeSnapshot("idle", [])} onDispatch={vi.fn()} />,
     );
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("renders nothing when nothing is generating and no object is selected", () => {
+    const { container } = render(
+      <GenerationCard snapshot={makeSnapshot("released", allActions)} onDispatch={vi.fn()} />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it("shows the manipulation and release buttons in grace", () => {
-    render(<GenerationCard snapshot={makeSnapshot("grace", allActions)} onDispatch={vi.fn()} />);
+    render(
+      <GenerationCard
+        snapshot={makeSnapshot("grace", allActions, fakeObject)}
+        onDispatch={vi.fn()}
+      />,
+    );
     expect(screen.getByRole("button", { name: "Move" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rotate" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Scale/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Release to world" })).toBeInTheDocument();
   });
 
-  it("labels the release button Done when the object is already released", () => {
-    render(<GenerationCard snapshot={makeSnapshot("released", allActions)} onDispatch={vi.fn()} />);
+  it("labels the release button Done when the selected object is already released", () => {
+    render(
+      <GenerationCard
+        snapshot={makeSnapshot("released", allActions, fakeObject)}
+        onDispatch={vi.fn()}
+      />,
+    );
     expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
   });
 
   it("dispatches the matching action id when a button is clicked", async () => {
     const onDispatch = vi.fn();
     const user = userEvent.setup();
-    render(<GenerationCard snapshot={makeSnapshot("grace", allActions)} onDispatch={onDispatch} />);
+    render(
+      <GenerationCard
+        snapshot={makeSnapshot("grace", allActions, fakeObject)}
+        onDispatch={onDispatch}
+      />,
+    );
 
     await user.click(screen.getByRole("button", { name: "Rotate" }));
     expect(onDispatch).toHaveBeenCalledWith("rotate_draft");

@@ -10,9 +10,11 @@ interface Props {
 export function GenerationCard({ snapshot, onDispatch }: Props) {
   const { stage, lastMessage, object, availableActions } = snapshot;
 
-  console.log("[GenerationCard] stage=%s activeObject=%s availableActions=%o", stage, object?.object_id ?? "null", availableActions);
+  const isGenerating =
+    stage === "queued" || stage === "planning" || stage === "compiled_artifact_ready";
 
-  if (stage === "idle") return null;
+  // Only show while actively generating, on a failure, or when an object is selected.
+  if (!isGenerating && stage !== "failed" && object === null) return null;
 
   const showMove = availableActions.includes("nudge_draft");
   const showRotate = availableActions.includes("rotate_draft");
