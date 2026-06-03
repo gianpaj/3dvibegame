@@ -352,6 +352,12 @@ export function createBackendPresenceBridge({
       .onConnectError((_ctx, error) => {
         console.error("[backend] onConnectError", error);
         if (disposed) return;
+        // Stale token from a server reset — clear it and reload for a fresh identity.
+        if (String(error).includes("Failed to verify token")) {
+          clearToken();
+          window.location.reload();
+          return;
+        }
         status = "error";
         message = errorMessage(error, "Backend connection failed");
         emitCurrent();
@@ -838,6 +844,14 @@ function writeToken(token: string) {
     window.localStorage.setItem(tokenStorageKey, token);
   } catch {
     // Token persistence is optional; anonymous reconnect can still proceed.
+  }
+}
+
+function clearToken() {
+  try {
+    window.localStorage.removeItem(tokenStorageKey);
+  } catch {
+    // ignore
   }
 }
 
