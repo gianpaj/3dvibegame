@@ -206,28 +206,33 @@ export function App() {
   }, [handleDeselect]);
 
   // --- Handlers ---
-  function handlePromptSubmit(prompt: string) {
+  async function handlePromptSubmit(prompt: string): Promise<void> {
     setContextMsg("");
     appendPlayerMessage(prompt);
     if (backendCommandsRef.current?.canHandle()) {
-      // A manually-selected object → edit it; otherwise create a new object.
       const editingNow = selectedObjectIdRef.current !== null;
       const action = editingNow
         ? backendCommandsRef.current.editSelectedObject(prompt)
         : backendCommandsRef.current.submitPrompt(prompt);
-      void action.catch((err: unknown) => {
+      try {
+        await action;
+      } catch (err: unknown) {
         if (isMissingBrowserGeminiKeyError(err)) {
           setGeminiKey(null);
-          return;
+        } else {
+          setContextMsg(errorMessage(err, editingNow ? "Edit failed" : "Prompt failed"));
         }
-        setContextMsg(errorMessage(err, editingNow ? "Edit failed" : "Prompt failed"));
-      });
+        throw err;
+      }
       return;
     }
-    void sessionRef.current?.submitPrompt(prompt).catch((err: unknown) => {
+    try {
+      await sessionRef.current?.submitPrompt(prompt);
+    } catch (err: unknown) {
       if (isMissingBrowserGeminiKeyError(err)) setGeminiKey(null);
       else setContextMsg(errorMessage(err, "Generation failed"));
-    });
+      throw err;
+    }
   }
 
   function handleDispatch(actionId: GenerationActionId) {
@@ -298,10 +303,13 @@ export function App() {
     playerNameRef.current = name;
   }
 
-  function handleSendChat(text: string) {
-    void bridgeRef.current
-      ?.sendChat(text)
-      .catch((err: unknown) => setContextMsg(errorMessage(err, "Chat failed")));
+  async function handleSendChat(text: string): Promise<void> {
+    try {
+      await bridgeRef.current?.sendChat(text);
+    } catch (err: unknown) {
+      setContextMsg(errorMessage(err, "Chat failed"));
+      throw err;
+    }
   }
 
   function handleDeleteChat(messageId: string) {

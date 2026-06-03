@@ -5,7 +5,7 @@ import type { ChatMessage } from "../hooks/useChatTranscript";
 
 interface Props {
   messages: BackendChatMessage[];
-  onSend?: (text: string) => void;
+  onSend?: (text: string) => Promise<void>;
   /** Delete a message by id (own message, or any message when a moderator). */
   onDelete?: (messageId: string) => void;
   /** Whether the local player can delete other players' messages. */
@@ -37,6 +37,8 @@ export function ChatPanel({
 }: Props) {
   const [open, setOpen] = useState(true);
   const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to the latest message whenever the transcript grows (while open).
@@ -45,17 +47,25 @@ export function ChatPanel({
     bottomRef.current?.scrollIntoView({ block: "end" });
   }, [messages.length, debugMessages?.length, open]);
 
-  function submit() {
+  async function submit() {
     const trimmed = draft.trim();
-    if (!trimmed || disabled || !onSend) return;
-    onSend(trimmed);
-    setDraft("");
+    if (!trimmed || disabled || sending || !onSend) return;
+    setSending(true);
+    setSendError(null);
+    try {
+      await onSend(trimmed);
+      setDraft("");
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : "Failed to send. Try again.");
+    } finally {
+      setSending(false);
+    }
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Enter") {
       event.preventDefault();
-      submit();
+      void submit();
     }
   }
 
@@ -133,12 +143,17 @@ export function ChatPanel({
             <button
               type="button"
               className="chat-send"
-              onClick={submit}
-              disabled={disabled || !draft.trim()}
+              onClick={() => void submit()}
+              disabled={disabled || sending || !draft.trim()}
             >
-              Send
+              {sending ? "…" : "Send"}
             </button>
           </div>
+          {sendError && (
+            <p className="chat-send-error" role="alert">
+              {sendError}
+            </p>
+          )}
         </>
       )}
     </div>

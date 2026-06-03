@@ -9,17 +9,17 @@ const placeholder = "Describe an object to generate…";
 
 describe("PromptInput", () => {
   it("disables the submit button while the input is empty", () => {
-    render(<PromptInput onSubmit={vi.fn()} disabled={false} />);
+    render(<PromptInput onSubmit={vi.fn().mockResolvedValue(undefined)} disabled={false} />);
     expect(screen.getByRole("button", { name: "Generate" })).toBeDisabled();
   });
 
   it("disables the textarea when disabled", () => {
-    render(<PromptInput onSubmit={vi.fn()} disabled />);
+    render(<PromptInput onSubmit={vi.fn().mockResolvedValue(undefined)} disabled />);
     expect(screen.getByPlaceholderText(placeholder)).toBeDisabled();
   });
 
   it("switches to edit placeholder + label when editing", () => {
-    render(<PromptInput onSubmit={vi.fn()} disabled={false} editing />);
+    render(<PromptInput onSubmit={vi.fn().mockResolvedValue(undefined)} disabled={false} editing />);
     expect(
       screen.getByPlaceholderText("Describe a change to the selected object…"),
     ).toBeInTheDocument();
@@ -27,7 +27,7 @@ describe("PromptInput", () => {
   });
 
   it("submits trimmed text on Enter and clears the field", async () => {
-    const onSubmit = vi.fn();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();
     render(<PromptInput onSubmit={onSubmit} disabled={false} />);
 

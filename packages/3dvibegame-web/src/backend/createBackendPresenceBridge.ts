@@ -216,6 +216,9 @@ export interface BackendObjectTransformInput extends BackendObjectIdInput {
 const tokenStorageKey = "vibe-world:spacetimedb-token";
 const heartbeatMs = 15_000;
 const movementThrottleMs = 180;
+const reconnectBaseMs = 2_000;
+const reconnectMaxMs = 30_000;
+const reconnectMaxRetries = 6;
 const movementEpsilon = 0.025;
 
 export function createBackendPresenceBridge({
@@ -272,6 +275,8 @@ export function createBackendPresenceBridge({
   let lastQueuedTransform: BackendPlayerTransform | null = null;
   let pendingTransform: BackendPlayerTransform | null = null;
   let joined = false;
+  let retryCount = 0;
+  let retryTimeoutId: number | null = null;
 
   let snapshot = createBaseSnapshot({
     enabled: true,
@@ -281,129 +286,155 @@ export function createBackendPresenceBridge({
   });
   onSnapshot(snapshot);
 
-  try {
+  function teardownConnection() {
+    if (heartbeatId !== null) {
+      window.clearInterval(heartbeatId);
+      heartbeatId = null;
+    }
+    try { subscription?.unsubscribe(); } catch { /* double-unsubscribe is harmless */ }
+    try { chatSubscription?.unsubscribe(); } catch { /* double-unsubscribe is harmless */ }
+    subscription = null;
+    chatSubscription = null;
+    chatSubscriptionWorldId = null;
+    removeTableListeners?.();
+    removeTableListeners = null;
+    joined = false;
+  }
+
+  function scheduleReconnect() {
+    if (disposed) return;
+    if (retryCount >= reconnectMaxRetries) {
+      status = "error";
+      message = "Connection lost. Reload the page to reconnect.";
+      emitCurrent();
+      return;
+    }
+    const delay = Math.min(reconnectBaseMs * 2 ** retryCount, reconnectMaxMs);
+    retryCount++;
+    status = "connecting";
+    message = `Reconnecting… (attempt ${retryCount} of ${reconnectMaxRetries})`;
+    emitCurrent();
+    console.log("[backend] reconnect scheduled in %dms (attempt %d)", delay, retryCount);
+    retryTimeoutId = window.setTimeout(() => {
+      retryTimeoutId = null;
+      if (!disposed) connect();
+    }, delay);
+  }
+
+  function connect() {
+    teardownConnection();
     console.log(
-      "[backend] building DbConnection uri=%o database=%o hasToken=%o",
+      "[backend] building DbConnection uri=%o database=%o hasToken=%o retry=%d",
       backendConfig.uri,
       backendConfig.database,
       Boolean(readToken()),
+      retryCount,
     );
-    connection = DbConnection.builder()
-      .withUri(backendConfig.uri)
-      .withDatabaseName(backendConfig.database)
-      .withToken(readToken())
-      .onConnect((conn, identity, token) => {
-        console.log("[backend] onConnect identity=%s disposed=%o", identity.toHexString(), disposed);
-        if (disposed) return;
+    try {
+      connection = DbConnection.builder()
+        .withUri(backendConfig.uri)
+        .withDatabaseName(backendConfig.database)
+        .withToken(readToken())
+        .onConnect((conn, identity, token) => {
+          console.log("[backend] onConnect identity=%s disposed=%o", identity.toHexString(), disposed);
+          if (disposed) return;
 
-        localIdentityHex = identity.toHexString();
-        writeToken(token);
-        status = "connected";
-        message = "Connected. Loading room.";
-        removeTableListeners = installTableListeners(conn, emitCurrent);
+          retryCount = 0;
+          localIdentityHex = identity.toHexString();
+          writeToken(token);
+          status = "connected";
+          message = "Connected. Loading room.";
+          removeTableListeners = installTableListeners(conn, emitCurrent);
 
-        subscription = conn
-          .subscriptionBuilder()
-          .onApplied(() => {
-            console.log("[backend] subscription applied disposed=%o", disposed);
-            if (disposed) return;
-            status = "connected";
-            message = "Live room joined.";
-            emitCurrent();
-            void conn.reducers
-              .joinWorld({ nickname: backendConfig.nickname })
-              .then(() => {
-                if (disposed) return;
-                joined = true;
-                ensureChatSubscription(conn);
-                emitCurrent();
-                flushPendingTransform();
-              })
-              .catch((error: unknown) => {
-                if (!disposed) {
-                  status = "error";
-                  message = errorMessage(error, "Failed to join room");
+          subscription = conn
+            .subscriptionBuilder()
+            .onApplied(() => {
+              console.log("[backend] subscription applied disposed=%o", disposed);
+              if (disposed) return;
+              status = "connected";
+              message = "Live room joined.";
+              emitCurrent();
+              void conn.reducers
+                .joinWorld({ nickname: backendConfig.nickname })
+                .then(() => {
+                  if (disposed) return;
+                  joined = true;
+                  ensureChatSubscription(conn);
                   emitCurrent();
-                }
-              });
-            heartbeatId = window.setInterval(() => {
-              void conn.reducers.heartbeatPlayer({}).catch(() => {
-                if (!disposed) {
-                  status = "disconnected";
-                  message = "Heartbeat failed.";
-                  emitCurrent();
-                }
-              });
-            }, heartbeatMs);
-          })
-          .onError((ctx) => {
-            console.error("[backend] subscription onError", ctx.event);
-            if (disposed) return;
-            status = "error";
-            message = errorMessage(ctx.event, "Room subscription failed");
-            emitCurrent();
-          })
-          .subscribe([
-            "SELECT * FROM world",
-            "SELECT * FROM ai_job",
-            "SELECT * FROM player_session",
-            "SELECT * FROM world_object",
-            "SELECT * FROM world_snapshot",
-            "SELECT * FROM snapshot_object",
-          ]);
-      })
-      .onConnectError((_ctx, error) => {
-        console.error("[backend] onConnectError", error);
-        if (disposed) return;
-        // Stale token from a server reset — clear it and reload for a fresh identity.
-        if (String(error).includes("Failed to verify token")) {
-          clearToken();
-          window.location.reload();
-          return;
-        }
-        status = "error";
-        message = errorMessage(error, "Backend connection failed");
-        emitCurrent();
-      })
-      .onDisconnect((_ctx, error) => {
-        console.warn("[backend] onDisconnect", error);
-        if (disposed) return;
-        status = "disconnected";
-        message = errorMessage(error, "Backend disconnected");
-        emitCurrent();
-      })
-      .build();
-    console.log("[backend] DbConnection.build() returned (async connect in progress)");
-  } catch (error) {
-    console.error("[backend] DbConnection.build() threw synchronously:", error);
-    status = "error";
-    message = errorMessage(error, "Backend connection failed");
-    emitCurrent();
+                  flushPendingTransform();
+                })
+                .catch((error: unknown) => {
+                  if (!disposed) {
+                    status = "error";
+                    message = errorMessage(error, "Failed to join room");
+                    emitCurrent();
+                  }
+                });
+              heartbeatId = window.setInterval(() => {
+                void conn.reducers.heartbeatPlayer({}).catch(() => {
+                  if (!disposed) {
+                    status = "disconnected";
+                    message = "Heartbeat failed.";
+                    emitCurrent();
+                  }
+                });
+              }, heartbeatMs);
+            })
+            .onError((ctx) => {
+              console.error("[backend] subscription onError", ctx.event);
+              if (disposed) return;
+              status = "error";
+              message = errorMessage(ctx.event, "Room subscription failed");
+              emitCurrent();
+            })
+            .subscribe([
+              "SELECT * FROM world",
+              "SELECT * FROM ai_job",
+              "SELECT * FROM player_session",
+              "SELECT * FROM world_object",
+              "SELECT * FROM world_snapshot",
+              "SELECT * FROM snapshot_object",
+            ]);
+        })
+        .onConnectError((_ctx, error) => {
+          console.error("[backend] onConnectError", error);
+          if (disposed) return;
+          // Stale token from a server reset — clear it and reload for a fresh identity.
+          if (String(error).includes("Failed to verify token")) {
+            clearToken();
+            window.location.reload();
+            return;
+          }
+          scheduleReconnect();
+        })
+        .onDisconnect((_ctx, error) => {
+          console.warn("[backend] onDisconnect", error);
+          if (disposed) return;
+          scheduleReconnect();
+        })
+        .build();
+      console.log("[backend] DbConnection.build() returned (async connect in progress)");
+    } catch (error) {
+      console.error("[backend] DbConnection.build() threw synchronously:", error);
+      scheduleReconnect();
+    }
   }
+
+  connect();
 
   return {
     getSnapshot: () => snapshot,
     dispose() {
       disposed = true;
-      if (heartbeatId !== null) {
-        window.clearInterval(heartbeatId);
-        heartbeatId = null;
+      if (retryTimeoutId !== null) {
+        window.clearTimeout(retryTimeoutId);
+        retryTimeoutId = null;
       }
       if (movementTimeoutId !== null) {
         window.clearTimeout(movementTimeoutId);
         movementTimeoutId = null;
       }
-      try {
-        subscription?.unsubscribe();
-      } catch {
-        // The SDK rejects double/unapplied unsubscribe calls; disposal should continue.
-      }
-      try {
-        chatSubscription?.unsubscribe();
-      } catch {
-        // The SDK rejects double/unapplied unsubscribe calls; disposal should continue.
-      }
-      removeTableListeners?.();
+      teardownConnection();
       if (connection?.isActive) {
         void connection.reducers.leaveWorld({}).finally(() => connection?.disconnect());
       } else {

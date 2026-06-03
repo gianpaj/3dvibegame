@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 
 interface Props {
-  onSubmit: (prompt: string) => void;
+  onSubmit: (prompt: string) => Promise<void>;
   disabled: boolean;
   /** When an object is selected, the prompt edits it instead of creating. */
   editing?: boolean;
@@ -15,25 +15,35 @@ export function PromptInput({
   placeholder,
 }: Props) {
   const [value, setValue] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  function handleSubmit(e: React.SubmitEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = value.trim();
-    if (!trimmed || disabled) return;
-    onSubmit(trimmed);
-    setValue("");
+    if (!trimmed || disabled || submitting) return;
+    setSubmitting(true);
+    try {
+      await onSubmit(trimmed);
+      setValue("");
+    } catch {
+      // Text preserved; App.tsx sets contextMsg with the error detail.
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e as unknown as React.SubmitEvent);
+      void handleSubmit(e);
     }
   }
 
+  const isDisabled = disabled || submitting;
+
   return (
-    <form className="prompt-form" onSubmit={handleSubmit}>
+    <form className="prompt-form" onSubmit={(e) => void handleSubmit(e)}>
       <textarea
         ref={textareaRef}
         className="prompt-input"
@@ -46,13 +56,13 @@ export function PromptInput({
             ? "Describe a change to the selected object…"
             : "Describe an object to generate…")
         }
-        disabled={disabled}
+        disabled={isDisabled}
         rows={1}
       />
       <button
         className="prompt-submit"
         type="submit"
-        disabled={disabled || !value.trim()}
+        disabled={isDisabled || !value.trim()}
       >
         {editing ? "Edit" : "Generate"}
       </button>

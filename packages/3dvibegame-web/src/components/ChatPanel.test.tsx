@@ -31,7 +31,7 @@ const messages: BackendChatMessage[] = [
 
 describe("ChatPanel", () => {
   it("renders sender nicknames with local vs remote styling", () => {
-    render(<ChatPanel messages={messages} onSend={() => {}} />);
+    render(<ChatPanel messages={messages} onSend={() => Promise.resolve()} />);
 
     const local = screen.getByText("hi all").closest(".chat-message");
     expect(local).toHaveClass("chat-message--player");
@@ -43,7 +43,7 @@ describe("ChatPanel", () => {
 
   it("sends a typed message and clears the input", async () => {
     const user = userEvent.setup();
-    const onSend = vi.fn();
+    const onSend = vi.fn().mockResolvedValue(undefined);
     render(<ChatPanel messages={[]} onSend={onSend} />);
 
     const input = screen.getByLabelText("Chat message");
@@ -56,7 +56,7 @@ describe("ChatPanel", () => {
 
   it("sends on Enter", async () => {
     const user = userEvent.setup();
-    const onSend = vi.fn();
+    const onSend = vi.fn().mockResolvedValue(undefined);
     render(<ChatPanel messages={[]} onSend={onSend} />);
 
     await user.type(screen.getByLabelText("Chat message"), "ping{Enter}");
@@ -64,7 +64,7 @@ describe("ChatPanel", () => {
   });
 
   it("disables the composer and shows a hint when offline", () => {
-    render(<ChatPanel messages={[]} onSend={() => {}} disabled />);
+    render(<ChatPanel messages={[]} onSend={() => Promise.resolve()} disabled />);
 
     const input = screen.getByLabelText("Chat message");
     expect(input).toBeDisabled();
@@ -76,7 +76,7 @@ describe("ChatPanel", () => {
     const debugMessages: ChatMessage[] = [
       { id: "e1", role: "event", label: "Planning", text: "Structured the request." },
     ];
-    render(<ChatPanel messages={messages} onSend={() => {}} debugMessages={debugMessages} />);
+    render(<ChatPanel messages={messages} onSend={() => Promise.resolve()} debugMessages={debugMessages} />);
 
     const debug = screen.getByText("Structured the request.").closest(".chat-message");
     expect(debug).toHaveClass("chat-message--debug");
@@ -85,7 +85,7 @@ describe("ChatPanel", () => {
   it("shows a delete button on own messages and calls onDelete", async () => {
     const user = userEvent.setup();
     const onDelete = vi.fn();
-    render(<ChatPanel messages={messages} onSend={() => {}} onDelete={onDelete} />);
+    render(<ChatPanel messages={messages} onSend={() => Promise.resolve()} onDelete={onDelete} />);
 
     // Local (own) message has a delete control; the remote one does not (non-moderator).
     expect(screen.getByRole("button", { name: /delete message from alice/i })).toBeInTheDocument();
@@ -96,13 +96,13 @@ describe("ChatPanel", () => {
   });
 
   it("lets a moderator delete any message", () => {
-    render(<ChatPanel messages={messages} onSend={() => {}} onDelete={() => {}} canModerate />);
+    render(<ChatPanel messages={messages} onSend={() => Promise.resolve()} onDelete={() => {}} canModerate />);
     expect(screen.getByRole("button", { name: /delete message from bob/i })).toBeInTheDocument();
   });
 
   it("collapses and expands via the header toggle", async () => {
     const user = userEvent.setup();
-    render(<ChatPanel messages={messages} onSend={() => {}} />);
+    render(<ChatPanel messages={messages} onSend={() => Promise.resolve()} />);
 
     expect(screen.getByRole("log")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /chat/i }));
