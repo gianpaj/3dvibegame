@@ -79,10 +79,20 @@ function selectBackendAiJob(
     ? backendSnapshot.aiJobs.filter((job) => job.playerId === localPlayerId)
     : backendSnapshot.aiJobs;
 
-  // Only surface an in-progress generation. Failures are shown transiently by the
-  // client when they happen; stale `failed` rows from past attempts shouldn't keep
-  // haunting the HUD after a later success.
-  return jobs.find((job) => job.status === "pending") ?? null;
+  // An in-progress generation always wins.
+  const pending = jobs.find((job) => job.status === "pending");
+  if (pending) return pending;
+
+  // Otherwise surface the player's most-recent attempt, but only if it FAILED — so the
+  // rejection/timeout reason reaches the HUD. This matters most in HTTP-worker mode,
+  // where the Gemini call (and its failure) happens server-side and is never thrown to
+  // the client. A later pending or completed job has a newer `requestedAt` and
+  // supersedes it, so stale failures from earlier attempts don't keep haunting the HUD.
+  const latest = jobs.reduce<BackendAiJobDebug | null>(
+    (newest, job) => (!newest || job.requestedAt > newest.requestedAt ? job : newest),
+    null,
+  );
+  return latest?.status === "failed" ? latest : null;
 }
 
 export function selectBackendObject(

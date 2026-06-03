@@ -923,10 +923,22 @@ function mapAiJobDebug(job: AiJob): BackendAiJobDebug {
     jobType: job.jobType,
     status: job.status,
     sourcePrompt: job.sourcePrompt,
-    requestedAt: job.requestedAt.toString(),
-    completedAt: job.completedAt?.toString() ?? null,
+    // SpacetimeDB's Timestamp has no toString(); emit ISO 8601 (UTC) so these are
+    // both human-readable and lexicographically orderable by recency.
+    requestedAt: timestampToIso(job.requestedAt),
+    completedAt: job.completedAt ? timestampToIso(job.completedAt) : null,
     errorCode: job.errorCode ?? null,
   };
+}
+
+function timestampToIso(timestamp: AiJob["requestedAt"]): string {
+  try {
+    return timestamp.toISOString();
+  } catch {
+    // toISOString throws for timestamps outside JS Date's range; fall back to the
+    // raw microsecond count so the value is still present (if not orderable).
+    return timestamp.microsSinceUnixEpoch.toString();
+  }
 }
 
 function mapWorldSnapshotDebug(
