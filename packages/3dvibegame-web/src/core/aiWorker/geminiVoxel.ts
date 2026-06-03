@@ -193,6 +193,7 @@ export function coreFromSourceSpec(
         tags: material.tags,
       })),
       operations: spec.operations,
+      quantity: 1,
     };
   } catch {
     return null;

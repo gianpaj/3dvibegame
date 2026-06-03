@@ -51,6 +51,7 @@ export function createHttpAiWorkerClient({
           jobIdBase: response.job_id_base ?? response.jobIdBase ?? "http_worker_job",
           objectIdBase:
             response.object_id_base ?? response.objectIdBase ?? "http_worker_object",
+          quantity: 1,
           ...workerResponseToArtifact(response),
         };
       } catch (error) {

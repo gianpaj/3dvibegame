@@ -41,6 +41,9 @@ export interface BackendLifecycleCommandsOptions {
   getSpawnPoint?: () => { x: number; y: number; z: number };
 }
 
+const MAX_MULTI_OBJECT_COUNT = 4;
+const MULTI_SPAWN_SPACING = 2.5; // world units between copies
+
 export function createBackendLifecycleCommands(
   bridge: BackendPresenceBridge,
   aiWorker: AiWorkerClient = createFixtureAiWorkerClient(),
@@ -173,36 +176,51 @@ export function createBackendLifecycleCommands(
         throw new Error("Type a message before sending it to Savi.");
       }
 
-      const idSuffix = `${Date.now().toString(36)}_${sequence++}`;
-      const jobId = `backend_create_${idSuffix}`;
-
-      await bridge.requestCreateObject({
-        jobId,
-        sourcePrompt: trimmed,
-      });
-
+      // Call the AI once — it decides how many independent objects are needed.
       let draft: Awaited<ReturnType<AiWorkerClient["createDraft"]>>;
       try {
         draft = await aiWorker.createDraft({ prompt: trimmed });
       } catch (error) {
-        throw await failCreateJobForWorkerError(bridge, jobId, error);
+        throw normalizeAiWorkerError(error);
       }
 
-      const objectId = `${draft.objectIdBase}_${idSuffix}`;
-      const spawn = spawnPoint();
-      try {
-        await bridge.submitAiDraft({
-          jobId,
-          objectId,
-          sourceSpecJson: draft.sourceSpecJson,
-          builderSpecJson: draft.builderSpecJson,
-          positionX: spawn.x,
-          positionY: spawn.y,
-          positionZ: spawn.z,
-        });
-      } catch (error) {
-        await failCreateJob(bridge, jobId, "validation_failed");
-        throw error;
+      const count = Math.min(draft.quantity, MAX_MULTI_OBJECT_COUNT);
+      const baseSpawn = spawnPoint();
+
+      // Register and submit one backend job per object, reusing the same spec.
+      // Only the first object keeps its grace period so the player can position it;
+      // the rest are released immediately and become click-selectable public objects.
+      for (let i = 0; i < count; i++) {
+        const idSuffix = `${Date.now().toString(36)}_${sequence++}`;
+        const jobId = `backend_create_${idSuffix}`;
+        const objectId = `${draft.objectIdBase}_${idSuffix}`;
+        const spawn = {
+          x: baseSpawn.x + i * MULTI_SPAWN_SPACING,
+          y: baseSpawn.y,
+          z: baseSpawn.z,
+        };
+
+        await bridge.requestCreateObject({ jobId, sourcePrompt: trimmed });
+        try {
+          await bridge.submitAiDraft({
+            jobId,
+            objectId,
+            sourceSpecJson: draft.sourceSpecJson,
+            builderSpecJson: draft.builderSpecJson,
+            positionX: spawn.x,
+            positionY: spawn.y,
+            positionZ: spawn.z,
+          });
+        } catch (error) {
+          await failCreateJob(bridge, jobId, "validation_failed");
+          throw error;
+        }
+
+        // Release extra copies immediately — player interacts with the first one
+        // via the normal grace flow, then clicks each subsequent object to move it.
+        if (i > 0) {
+          await bridge.releaseObject({ objectId }).catch(() => {});
+        }
       }
     },
     async dispatchAction(actionId: GenerationActionId) {

@@ -78,6 +78,7 @@ export function createBrowserGeminiHttpCompileClient({
         return {
           jobIdBase: response.job_id_base ?? response.jobIdBase ?? "compile_job",
           objectIdBase: response.object_id_base ?? response.objectIdBase ?? "compile_object",
+          quantity: voxel.quantity ?? 1,
           ...workerResponseToArtifact(response),
         };
       } catch (error) {

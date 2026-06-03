@@ -12,6 +12,8 @@ export interface AiWorkerArtifact {
 export interface AiWorkerDraftResult extends AiWorkerArtifact {
   jobIdBase: string;
   objectIdBase: string;
+  /** Number of independent objects the player asked for (1 = default). */
+  quantity: number;
 }
 
 export interface AiWorkerClient {
@@ -41,6 +43,7 @@ export function createFixtureAiWorkerClient(): AiWorkerClient {
       return {
         jobIdBase: scenario.jobId,
         objectIdBase: scenario.objectId,
+        quantity: 1,
         ...toArtifact(scenario.voxelSource, scenario.draftBuilder),
       };
     },

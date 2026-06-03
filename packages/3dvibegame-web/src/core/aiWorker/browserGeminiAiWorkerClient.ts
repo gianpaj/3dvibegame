@@ -66,6 +66,7 @@ export function createBrowserGeminiAiWorkerClient({
         return {
           jobIdBase: response.job_id_base,
           objectIdBase: response.object_id_base,
+          quantity: voxel.quantity ?? 1,
           ...toArtifact(response.source_spec, response.builder_spec),
         };
       } catch (error) {

@@ -56,7 +56,8 @@ export const voxelBuilderSystemPrompt = [
   '  "style_tags": string[],',
   '  "behaviors": string[],',
   '  "materials": [{ "material_id": string, "color_hint"?: string }],',
-  '  "operations": VoxelOp[]',
+  '  "operations": VoxelOp[],',
+  '  "quantity"?: number                  // omit or 1 for a single object (default)',
   "}",
   "",
   "Each VoxelOp is one of:",
@@ -73,6 +74,10 @@ export const voxelBuilderSystemPrompt = [
   "  different geometry (a palm tree = tall slender trunk + splayed fronds; a pine =",
   "  conical layered canopy; a barrel = stacked cylinders/boxes).",
   "- Aim for 4-14 operations.",
+  "- quantity: set to 2-4 ONLY when the player asks for multiple SEPARATE INDEPENDENT",
+  "  objects (e.g. '2 palm trees', 'three barrels'). Describe ONE of them in operations.",
+  "  Leave quantity absent when the count refers to parts of one object",
+  "  (e.g. 'a tree with 2 apples', 'a car with 4 wheels', 'a house with 3 windows').",
 ].join("\n");
 
 // System prompt for editing an existing object: the LLM is given the object's
@@ -132,6 +137,7 @@ export const voxelCoreSchema = z.object({
     .max(12),
   // Operations are validated strictly after envelope assembly via parseVoxelBuilderSpec.
   operations: z.array(z.unknown()).min(1).max(40),
+  quantity: z.number().int().min(1).max(4).optional().default(1),
 });
 
 export type VoxelCore = z.infer<typeof voxelCoreSchema>;
