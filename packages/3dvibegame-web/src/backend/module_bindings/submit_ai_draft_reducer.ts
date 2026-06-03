@@ -15,4 +15,7 @@ export default {
   objectId: __t.string(),
   sourceSpecJson: __t.string(),
   builderSpecJson: __t.string(),
+  positionX: __t.f64(),
+  positionY: __t.f64(),
+  positionZ: __t.f64(),
 };

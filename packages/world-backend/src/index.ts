@@ -355,8 +355,11 @@ export const submit_ai_draft = spacetimedb.reducer(
     objectId: t.string(),
     sourceSpecJson: t.string(),
     builderSpecJson: t.string(),
+    positionX: t.f64(),
+    positionY: t.f64(),
+    positionZ: t.f64(),
   },
-  (ctx, { jobId, objectId, sourceSpecJson, builderSpecJson }) => {
+  (ctx, { jobId, objectId, sourceSpecJson, builderSpecJson, positionX, positionY, positionZ }) => {
     const player = requireActivePlayer(ctx);
     const normalizedJobId = normalizeId("jobId", jobId);
     const normalizedObjectId = normalizeId("objectId", objectId);
@@ -396,9 +399,9 @@ export const submit_ai_draft = spacetimedb.reducer(
       sizeTier: sourceSpec.sizeTier,
       sourceSpecJson: sourceSpec.normalizedJson,
       builderSpecJson: builderSpec.normalizedJson,
-      positionX: 0,
-      positionY: 0,
-      positionZ: 0,
+      positionX,
+      positionY,
+      positionZ,
       rotationX: 0,
       rotationY: 0,
       rotationZ: 0,

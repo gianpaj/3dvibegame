@@ -159,6 +159,9 @@ export interface BackendSubmitAiDraftInput {
   objectId: string;
   sourceSpecJson: string;
   builderSpecJson: string;
+  positionX: number;
+  positionY: number;
+  positionZ: number;
 }
 
 export interface BackendObjectIdInput {

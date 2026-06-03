@@ -10,7 +10,7 @@ import type { GenerationActionId } from "./core/session/generationSession";
 import type { BackendLifecycleCommands } from "./backend/createBackendLifecycleCommands";
 import type { BackendPresenceBridge, BackendPresenceSnapshot } from "./backend/createBackendPresenceBridge";
 import type { createBackendGenerationSnapshot } from "./backend/createBackendGenerationSnapshot";
-import { GameCanvas } from "./scene/GameCanvas";
+import { GameCanvas, type SpawnPoint } from "./scene/GameCanvas";
 import { GenerationCard } from "./components/GenerationCard";
 import { GeminiKeyModal, loadStoredGeminiKey } from "./components/GeminiKeyModal";
 import { NameModal, loadStoredPlayerName } from "./components/NameModal";
@@ -75,6 +75,7 @@ export function App() {
   const backendCommandsRef = useRef<BackendLifecycleCommands | null>(null);
   const backendSnapshotFnRef = useRef<typeof createBackendGenerationSnapshot | null>(null);
   const bridgeRef = useRef<BackendPresenceBridge | null>(null);
+  const spawnPointRef = useRef<(() => SpawnPoint) | null>(null);
 
   // Connect to the backend once the player has entered a name (so we join the
   // world with their chosen nickname). Recreated cleanly across React StrictMode's
@@ -102,6 +103,7 @@ export function App() {
         bridgeRef.current = bridge;
         backendCommandsRef.current = createBackendLifecycleCommands(bridge, aiClient, {
           getSelectedObjectId: () => selectedObjectIdRef.current,
+          getSpawnPoint: () => spawnPointRef.current?.() ?? { x: 0, y: 0, z: 0 },
         });
         backendSnapshotFnRef.current = createSnapshotFn;
       },
@@ -323,6 +325,7 @@ export function App() {
           hasSelectedObjectRef={hasSelectedObjectRef}
           onMoveObject={handleMoveObject}
           onDeselect={handleDeselect}
+          spawnPointRef={spawnPointRef}
         />
       </div>
 

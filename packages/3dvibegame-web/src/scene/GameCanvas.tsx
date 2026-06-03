@@ -2,6 +2,8 @@ import { useEffect, useRef, type ComponentRef, type RefObject } from "react";
 import * as THREE from "three";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, Cloud, Clouds } from "@react-three/drei";
+
+export type SpawnPoint = { x: number; y: number; z: number };
 import type { SceneDocument } from "../core";
 import { ReferenceWorld } from "./ReferenceWorld";
 import { SceneObjects } from "./SceneObjects";
@@ -18,6 +20,8 @@ interface Props {
   onMoveObject: (dx: number, dy: number, dz: number) => void;
   /** Clears the current selection (clicking empty space). */
   onDeselect: () => void;
+  /** Ref populated with a function that returns the world-space spawn point in front of the camera. */
+  spawnPointRef?: RefObject<(() => SpawnPoint) | null>;
 }
 
 // Clicks that move more than this are treated as a camera drag, not a deselect.
@@ -30,6 +34,7 @@ export function GameCanvas({
   hasSelectedObjectRef,
   onMoveObject,
   onDeselect,
+  spawnPointRef,
 }: Props) {
   const controlsRef = useRef<OrbitControlsRef>(null);
   const pointerDownRef = useRef<{ x: number; y: number } | null>(null);
@@ -93,6 +98,7 @@ export function GameCanvas({
           position={[-16, 26, -45]}
         />
       </Clouds>
+      {spawnPointRef && <SpawnPointRegistrar spawnPointRef={spawnPointRef} />}
       <ReferenceWorld />
       <SceneObjects
         document={document}
@@ -189,6 +195,43 @@ function KeyboardController({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [camera, controlsRef, hasSelectedObjectRef, onMoveObject, step]);
+
+  return null;
+}
+
+function SpawnPointRegistrar({
+  spawnPointRef,
+}: {
+  spawnPointRef: RefObject<(() => SpawnPoint) | null>;
+}) {
+  const { camera } = useThree();
+
+  useEffect(() => {
+    spawnPointRef.current = () => {
+      const forward = new THREE.Vector3();
+      camera.getWorldDirection(forward);
+      // Cast the look ray to y=0; cap at 20 units so objects don't spawn too far away.
+      if (forward.y < -0.01 && camera.position.y > 0) {
+        const t = Math.min(-camera.position.y / forward.y, 20);
+        return {
+          x: camera.position.x + forward.x * t,
+          y: 0,
+          z: camera.position.z + forward.z * t,
+        };
+      }
+      // Fallback when looking up or horizontally.
+      forward.y = 0;
+      if (forward.lengthSq() > 0) forward.normalize();
+      return {
+        x: camera.position.x + forward.x * 6,
+        y: 0,
+        z: camera.position.z + forward.z * 6,
+      };
+    };
+    return () => {
+      spawnPointRef.current = null;
+    };
+  }, [camera, spawnPointRef]);
 
   return null;
 }

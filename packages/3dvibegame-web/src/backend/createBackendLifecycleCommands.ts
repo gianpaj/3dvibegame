@@ -38,15 +38,17 @@ export interface BackendLifecycleCommands {
 
 export interface BackendLifecycleCommandsOptions {
   getSelectedObjectId?: () => string | null;
+  getSpawnPoint?: () => { x: number; y: number; z: number };
 }
 
 export function createBackendLifecycleCommands(
   bridge: BackendPresenceBridge,
   aiWorker: AiWorkerClient = createFixtureAiWorkerClient(),
-  { getSelectedObjectId }: BackendLifecycleCommandsOptions = {},
+  { getSelectedObjectId, getSpawnPoint }: BackendLifecycleCommandsOptions = {},
 ): BackendLifecycleCommands {
   let sequence = 0;
   const selectedObjectId = () => getSelectedObjectId?.() ?? null;
+  const spawnPoint = () => getSpawnPoint?.() ?? { x: 0, y: 0, z: 0 };
 
   // WASD fires many moves per second. Running the edit-lock sequence for each in
   // parallel races (one move's cancelEdit lands after another's lock), producing
@@ -187,12 +189,16 @@ export function createBackendLifecycleCommands(
       }
 
       const objectId = `${draft.objectIdBase}_${idSuffix}`;
+      const spawn = spawnPoint();
       try {
         await bridge.submitAiDraft({
           jobId,
           objectId,
           sourceSpecJson: draft.sourceSpecJson,
           builderSpecJson: draft.builderSpecJson,
+          positionX: spawn.x,
+          positionY: spawn.y,
+          positionZ: spawn.z,
         });
       } catch (error) {
         await failCreateJob(bridge, jobId, "validation_failed");
