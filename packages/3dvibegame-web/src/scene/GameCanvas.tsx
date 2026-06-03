@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ComponentRef, type RefObject } from "react";
 import * as THREE from "three";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls, Sky, Cloud, Clouds } from "@react-three/drei";
+import { OrbitControls, Cloud, Clouds } from "@react-three/drei";
 import type { SceneDocument } from "../core";
 import { ReferenceWorld } from "./ReferenceWorld";
 import { SceneObjects } from "./SceneObjects";
@@ -56,7 +56,7 @@ export function GameCanvas({
         if (moved <= dragThreshold) onDeselect();
       }}
     >
-      <color attach="background" args={["#87ceef"]} />
+      <color attach="background" args={["#b8daf5"]} />
       <fog attach="fog" args={["#b8daf5", 60, 180]} />
       <hemisphereLight args={["#87ceeb", "#4a8a30", 1.1]} />
       <directionalLight
@@ -73,14 +73,6 @@ export function GameCanvas({
         shadow-camera-bottom={-20}
       />
       <directionalLight position={[-5, 6, -8]} color="#d8e6ff" intensity={0.3} />
-      <Sky
-        distance={450000}
-        sunPosition={[0.5, 0.3, -1]}
-        turbidity={5}
-        rayleigh={1.8}
-        mieCoefficient={0.005}
-        mieDirectionalG={0.7}
-      />
       <Clouds material={THREE.MeshLambertMaterial}>
         <Cloud
           seed={1}
