@@ -102,7 +102,6 @@ export function GameCanvas({
       <OrbitControls
         ref={controlsRef}
         enableDamping
-        maxPolarAngle={Math.PI * 0.47}
         minDistance={2.8}
         maxDistance={18}
         target={[0, 1.5, 0]}
