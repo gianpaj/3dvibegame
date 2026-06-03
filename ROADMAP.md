@@ -336,7 +336,7 @@ Sub-phases:
 - Live first-playable browser smoke now reaches the released-object state with lifecycle wording, keeping the first playable framed as world object creation rather than avatar editing
 - Direct manipulation and edit/remix controls remain later playtest polish candidates, but Phase 3 now has the reducer, browser, AI-worker, and copy gates needed to close the prototype
 
-### Phase 4 — Multiplayer Validation (Prototype 2) 🔄 *(current)*
+### Phase 4 — Multiplayer Validation (Prototype 2) ✅
 - Multi-host world network (federated worlds model)
 - Live browser real-LLM create validation through the external worker path
 - Trusted builder role (host-elevated players)
@@ -404,7 +404,16 @@ Sub-phases:
 - Backend `editSelectedObject` runs `createEdit → submit_object_edit → expire_cooldown` under the existing 30s exclusive lock, with server-side `lock_owner` + `base_version` checks rejecting stale edits
 - Scope is the live/backend path; local-only edit, a chat transcript, and edit attribution are follow-ups
 
-### Phase 5 — V1 Hardening & Launch
+### Phase 4.11 — Scene Polish, Multi-Object Creation & Color Fidelity 🔄 *(current)*
+- Sky background color now matches the fog horizon colour (`#b8daf5`) for a seamless ground-to-sky transition; atmospheric `Sky` shader removed
+- Camera `maxPolarAngle` constraint removed — players can now orbit all the way up to look at the sky
+- New objects spawn in front of the camera: `SpawnPointRegistrar` inside the R3F canvas ray-casts the camera look direction to `y=0` and threads the result through `GameCanvas → App → createBackendLifecycleCommands`; `submit_ai_draft` backend reducer accepts `positionX/Y/Z`
+- Multi-object creation: `VoxelCore.quantity` (1–4) added to the Gemini schema with a disambiguation rule in the system prompt ("2 palm trees" → 2 objects; "a tree with 2 apples" → 1 object). `submitPrompt` calls the AI once and registers N jobs; all copies beyond the first are immediately released to public so the player can interact with each independently
+- Color rendering fixed: the voxel compiler now consults `color_hint` on each `VoxelMaterial` entry and uses it as the effective material name for `BuilderPart`; `resolveMaterialColor` handles all common colour names (`yellow`, `blue`, …) and hex passthrough — `material_id: "jelly", color_hint: "yellow"` now renders yellow, not pink
+- Stale SpacetimeDB token recovery: `onConnectError` detects "Failed to verify token" (e.g. after a server reset), clears the localStorage token, and reloads for a fresh anonymous identity
+- Agent documentation: root `AGENTS.md` updated to reflect current implementation status; `packages/3dvibegame-web/AGENTS.md` created with dev/test/deploy/architecture guidance
+
+### Phase 5 — V1 Hardening & Launch 🔄 *(current)*
 - Rate limiting and abuse guardrails (the private shared room currently skips per-player create/object caps)
 - World settings UI for hosts (presets, reset schedules, permission toggles)
 - Curation zones (build / gallery / chaos areas) — *candidate V2 feature*

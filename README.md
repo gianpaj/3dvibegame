@@ -1,79 +1,62 @@
 # 3d vibe game
 
-👷
-
 - <https://3dvibegame.com>
 
 Current vertical slice:
-`text prompt -> browser Gemini -> voxel operations -> worker compile -> live object -> select + AI edit / move / delete`
+`text prompt → browser Gemini → voxel ops + quantity → worker compile → object(s) spawned in front of camera → select + AI-edit / move / delete`
 
 https://github.com/user-attachments/assets/17322171-449d-4279-a8c7-0218190edb77
 
-## Clients
+## Player app
 
-There are two browser clients:
+**`packages/3dvibegame-web`** — React + React Three Fiber, deployed on Vercel.
 
-- **`packages/3dvibegame-web`** — the deployable player app (React + React Three Fiber). Real-time multiplayer via SpacetimeDB, LLM-authored voxel geometry (the browser calls Gemini directly with a player-supplied key, then the AI worker compiles the result), and shared-room editing: prompt to create, then select an object to **AI-edit it via chat** ("make it red") or move (WASD) / rotate / scale / delete — all under exclusive 30s edit locks.
-- **`packages/scene-runtime-demo`** — the original plain Three.js dev harness for inspecting runtime fixtures and exercising the full HUD.
+- Deployed on Cloudflare Pages via native GitHub integration (`master` auto-deploys)
+- Real-time multiplayer via SpacetimeDB (`stdb.3dvibegame.com`)
+- Prompt to create: browser calls Gemini (BYOK) → voxel operations → AI worker `/compile` (or local compile as fallback)
+- Multi-object prompts ("create 2 palm trees"): AI returns `quantity`, client spawns N objects with offset positions — first stays in grace for placement, extras auto-release to public
+- Select an object → AI-edit via chat ("make it red"), or WASD / rotate / scale / delete under exclusive 30s edit locks
+- Objects spawn at the camera look-ray intersection with `y=0`
+- Color rendered from `color_hint` on each material (e.g. `material_id: "jelly", color_hint: "yellow"` → yellow, not pink)
 
-## Architecture (dev harness)
+**`packages/scene-runtime-demo`** — original plain Three.js dev harness for fixtures and HUD testing (not the deployed app).
 
-`packages/scene-runtime-demo` keeps scene truth in `core`, tool orchestration in `editor`, and Three.js projection in `viewer`, while `@3dvibegame/scene-authority-ts` owns the authoritative object lifecycle and voxel-to-builder compilation rules.
+## Architecture
 
-```mermaid
-flowchart LR
-  User["Player prompt + clicks"]
-
-  subgraph Demo["packages/scene-runtime-demo"]
-    Main["main.ts<br/>bootstraps app shell"]
-    Editor["editor/<br/>HUD + editor commands"]
-    Core["core/<br/>generation session<br/>SceneDocument<br/>selectors + event bus"]
-    Viewer["viewer/<br/>authority bridge<br/>object sync<br/>object registry"]
-    Three["Three.js scene<br/>camera rig<br/>render loop"]
-
-    Main --> Editor
-    Main --> Core
-    Main --> Viewer
-    Editor -->|"prompt, action, selection commands"| Core
-    Core -->|"SceneDocument snapshots + dirty ids"| Viewer
-    Viewer --> Three
-  end
-
-  Fixtures["demo fixtures/<br/>scenario recipes + voxel builder JSON"] --> Core
-  Authority["@3dvibegame/scene-authority-ts<br/>reducers + contracts + voxel compiler"] -->|"AuthorityWorld + BuilderSpec"| Core
-  User -->|"submit prompt / trigger actions"| Editor
-  User -->|"inspect rendered result"| Three
-  Three -->|"WebGL canvas"| Browser["Browser viewport"]
+```
+player prompt
+  → browser Gemini (BYOK)         → VoxelCore JSON (quantity, materials, operations)
+  → AI worker /compile            → VoxelBuilderSpec + BuilderSpec
+  → submit_ai_draft reducer       → world object in grace state (SpacetimeDB)
+  → release_object / edit_lock    → public / edit_locked / cooldown / archived
 ```
 
-`@3dvibegame/scene-runtime-ts` remains an adjacent workspace package for normalized planning artifacts and render-draft utilities; it is not yet the main demo loop shown above.
-
-## Project State
-
-[`CURRENT_STATE.md`](CURRENT_STATE.md) is the source of truth for the current slice tracker, completed work, next steps, and latest verification status.
-
-Keep stable setup and architecture notes in this README. Keep dated design plans in `docs/plans/`. Keep the broader product and backend direction in `/Users/gianpaj_it/github/gianpaj/ideas/vibe-world`.
+Shared packages:
+- `@3dvibegame/scene-authority-ts` — pure reducers, voxel compiler, contracts (authority truth)
+- `@3dvibegame/ai-planning` — Gemini system prompts, voxel schema (`VoxelCore` incl. `quantity`), `buildVoxelResponse`
 
 ## Workspace packages
 
-- `packages/3dvibegame-web` — deployable player app (React + React Three Fiber, multiplayer)
-- `packages/scene-runtime-demo` — plain Three.js dev harness for inspecting runtime fixtures in the browser
-- `packages/scene-authority-ts` — authoritative object lifecycle reducers, contracts, and the voxel-to-builder compiler
-- `packages/ai-planning` — shared create/voxel schemas, system prompts, and deterministic plan/voxel-to-builder conversion
-- `packages/ai-worker` — external Node AI worker (`POST /generate` prompt path, keyless `POST /compile` path)
-- `packages/world-backend` — SpacetimeDB module (worlds, presence, object lifecycle, locks, world settings)
-- `packages/scene-runtime-ts` — TypeScript consumer port of the Python `scene_runtime` contract
-- `packages/website` — placeholder marketing site
+| Package | Purpose |
+|---|---|
+| `packages/3dvibegame-web` | Deployable player app (React + R3F, multiplayer) |
+| `packages/world-backend` | SpacetimeDB module (worlds, presence, object lifecycle, locks) |
+| `packages/ai-worker` | Cloudflare Worker — keyless `POST /compile`, keyed `POST /generate` |
+| `packages/scene-authority-ts` | Authoritative reducers, contracts, voxel→builder compiler |
+| `packages/ai-planning` | Gemini schemas, system prompts, `buildVoxelResponse` |
+| `packages/scene-runtime-demo` | Plain Three.js dev harness (not the deployed app) |
+| `packages/scene-runtime-ts` | TypeScript port of planning/render contracts |
+| `packages/website` | Placeholder marketing site |
 
 ## Commands
 
 ```bash
-# Player app (3dvibegame-web)
-pnpm web:dev
-pnpm web:build
-pnpm web:test
+# Player app
+pnpm web:dev        # Vite dev server (localhost:5173)
+pnpm web:build      # typecheck + Vite production build
+pnpm web:test       # vitest run
 
-# Dev harness (scene-runtime-demo)
+# Dev harness
 pnpm demo:dev
 pnpm demo:build
 
@@ -82,48 +65,54 @@ pnpm phase3:smoke
 pnpm typecheck
 ```
 
-The player app expects a Gemini key (entered in-app) and, for shared geometry compilation, `VITE_AI_WORKER_URL`; multiplayer needs `VITE_SPACETIMEDB_URI` + `VITE_SPACETIMEDB_DATABASE` and a published `world-backend` module. See `packages/3dvibegame-web/.env.example`.
+Player app env vars — copy `packages/3dvibegame-web/.env` to `.env.local` and fill in:
 
-## Manual deploy
-
-Both browser clients are Vite SPAs that build to `dist/` and deploy to the same Cloudflare Pages project `3dvibegame` (account `f993cefa62ff85589a32173f0813fbad`) → <https://3dvibegame.com>. Pages uses `packages/3dvibegame-web/public/_redirects` for SPA fallback; the player app also ships a `vercel.json` if you'd rather host it on Vercel.
-
-For the multiplayer backend (SpacetimeDB + AI worker) on a VPS with Coolify, see [`docs/deploy-backend.md`](docs/deploy-backend.md) (compose: `deploy/spacetimedb/`, Dockerfile: `packages/ai-worker/Dockerfile`).
-
-### Player app (`3dvibegame-web`)
-
-`VITE_*` values are baked at **build time**, so set the production backend before building. The Gemini key is entered in-app at runtime (not an env var). Run from the repo root:
-
-```bash
-VITE_SPACETIMEDB_URI=https://stdb.3dvibegame.com \
-VITE_SPACETIMEDB_DATABASE=3dvibegame \
-VITE_AI_CLIENT_MODE=browser-gemini \
-pnpm web:build
-
-CLOUDFLARE_ACCOUNT_ID=f993cefa62ff85589a32173f0813fbad \
-  wrangler pages deploy packages/3dvibegame-web/dist \
-  --project-name 3dvibegame \
-  --branch master
+```
+VITE_SPACETIMEDB_URI=https://stdb.3dvibegame.com
+VITE_SPACETIMEDB_DATABASE=3dvibegame
+VITE_AI_CLIENT_MODE=browser-gemini
+# VITE_AI_WORKER_URL=https://ai.3dvibegame.com   # optional server-side compile
 ```
 
-Deploying to `--project-name 3dvibegame` serves the player app on `3dvibegame.com`, **replacing the dev harness**. To keep both, use a different `--project-name` (new `*.pages.dev`, attach a custom domain separately). Optional: add `VITE_AI_WORKER_URL=https://ai.3dvibegame.com` to compile geometry on the worker instead of in the browser. Without `VITE_SPACETIMEDB_*` the app runs local-only (no multiplayer).
+The Gemini key is entered in-app at runtime — never an env var.
 
-### Dev harness (`scene-runtime-demo`)
+## Deploy
+
+### Player app → Cloudflare Pages
+
+Deployed automatically via Cloudflare Pages' native GitHub integration — no GitHub Actions involved. Pushes to `master` trigger a build and deploy.
+
+`VITE_*` values are baked at build time. Set them in the Cloudflare Pages project settings → Environment variables, then redeploy:
+
+```
+VITE_SPACETIMEDB_URI=https://stdb.3dvibegame.com
+VITE_SPACETIMEDB_DATABASE=3dvibegame
+VITE_AI_CLIENT_MODE=browser-gemini
+# VITE_AI_WORKER_URL=https://ai.3dvibegame.com   # optional
+```
+
+Manual deploy (e.g. to test a branch):
 
 ```bash
-pnpm demo:build
 CLOUDFLARE_ACCOUNT_ID=f993cefa62ff85589a32173f0813fbad \
-  wrangler pages deploy packages/scene-runtime-demo/dist \
-  --project-name 3dvibegame \
-  --branch master
+  wrangler pages deploy packages/3dvibegame-web/dist \
+  --project-name 3dvibegame --branch master
+```
+
+### Backend (SpacetimeDB + AI worker) → Coolify VPS
+
+See [`docs/deploy-backend.md`](docs/deploy-backend.md).  
+Compose: `deploy/spacetimedb/docker-compose.yml` · AI worker Dockerfile: `packages/ai-worker/Dockerfile`
+
+```bash
+# Publish world-backend module
+cd packages/world-backend
+spacetime logout
+spacetime login --server-issued-login https://stdb.3dvibegame.com
+spacetime publish --server https://stdb.3dvibegame.com --yes 3dvibegame
 ```
 
 Useful URLs:
 
-- production domain: <https://3dvibegame.com>
-- Pages dashboard: <https://dash.cloudflare.com/f993cefa62ff85589a32173f0813fbad/pages/view/3dvibegame>
-
-Notes:
-
-- The old `3dvibegame` Worker in Cloudflare Workers is separate from the Pages project.
-- As of 2026-04-01, the custom domain `3dvibegame.com` is attached in Cloudflare but still shows `pending`. If the custom domain is not serving yet, use `https://3dvibegame.pages.dev`.
+- Production: <https://3dvibegame.com>
+- Cloudflare Pages dashboard: <https://dash.cloudflare.com/f993cefa62ff85589a32173f0813fbad/pages/view/3dvibegame>
