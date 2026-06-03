@@ -209,7 +209,7 @@ export function createBackendLifecycleCommands(
       }
 
       if (isTransformAction(actionId)) {
-        const transform = transformForAction(actionId, object.transform);
+        const transform = transformForAction(actionId, object.transform, object.builder_spec.parts);
         if (object.state === "grace") {
           await bridge.updateDraftTransform({
             objectId: object.object_id,
@@ -481,6 +481,17 @@ function isTransformAction(
   );
 }
 
+function computeBottomLocal(
+  parts: { local_position?: [number, number, number]; dimensions: [number, number, number] }[],
+): number {
+  let bottom = 0;
+  for (const part of parts) {
+    const localY = part.local_position ? part.local_position[1] : part.dimensions[1] / 2;
+    bottom = Math.min(bottom, localY - part.dimensions[1] / 2);
+  }
+  return bottom;
+}
+
 function transformForAction(
   actionId: "nudge_draft" | "rotate_draft" | "scale_draft" | "scale_down_draft",
   transform: {
@@ -488,6 +499,7 @@ function transformForAction(
     rotation: [number, number, number];
     scale: [number, number, number];
   },
+  parts: { local_position?: [number, number, number]; dimensions: [number, number, number] }[],
 ) {
   const [positionX, positionY, positionZ] = transform.position;
   const [rotationX, rotationY, rotationZ] = transform.rotation;
@@ -518,30 +530,36 @@ function transformForAction(
         scaleY,
         scaleZ,
       };
-    case "scale_draft":
+    case "scale_draft": {
+      const factor = 1.12;
+      const bottomLocal = computeBottomLocal(parts);
       return {
         positionX,
-        positionY,
+        positionY: positionY + bottomLocal * scaleY * (1 - factor),
         positionZ,
         rotationX,
         rotationY,
         rotationZ,
-        scaleX: scaleX * 1.12,
-        scaleY: scaleY * 1.12,
-        scaleZ: scaleZ * 1.12,
+        scaleX: scaleX * factor,
+        scaleY: scaleY * factor,
+        scaleZ: scaleZ * factor,
       };
-    case "scale_down_draft":
+    }
+    case "scale_down_draft": {
+      const factor = 1 / 1.12;
+      const bottomLocal = computeBottomLocal(parts);
       return {
         positionX,
-        positionY,
+        positionY: positionY + bottomLocal * scaleY * (1 - factor),
         positionZ,
         rotationX,
         rotationY,
         rotationZ,
-        scaleX: scaleX / 1.12,
-        scaleY: scaleY / 1.12,
-        scaleZ: scaleZ / 1.12,
+        scaleX: scaleX * factor,
+        scaleY: scaleY * factor,
+        scaleZ: scaleZ * factor,
       };
+    }
     default:
       actionId satisfies never;
       return {

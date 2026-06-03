@@ -280,14 +280,26 @@ export function createAiSession(aiClient: AiWorkerClient) {
           }
           case "scale_draft": {
             const [sx, sy, sz] = object.transform.scale;
-            const patch = { scale: { x: sx * 1.12, y: sy * 1.12, z: sz * 1.12 } };
+            const [, py] = object.transform.position;
+            const factor = 1.12;
+            const bottomLocal = computeBottomLocal(object.builder_spec.parts);
+            const patch = {
+              scale: { x: sx * factor, y: sy * factor, z: sz * factor },
+              position: { y: py + bottomLocal * sy * (1 - factor) },
+            };
             world = applyTransform(world, object, playerId, patch);
             lastMessage = "Object scaled up.";
             break;
           }
           case "scale_down_draft": {
             const [sx, sy, sz] = object.transform.scale;
-            const patch = { scale: { x: sx / 1.12, y: sy / 1.12, z: sz / 1.12 } };
+            const [, py] = object.transform.position;
+            const factor = 1 / 1.12;
+            const bottomLocal = computeBottomLocal(object.builder_spec.parts);
+            const patch = {
+              scale: { x: sx * factor, y: sy * factor, z: sz * factor },
+              position: { y: py + bottomLocal * sy * (1 - factor) },
+            };
             world = applyTransform(world, object, playerId, patch);
             lastMessage = "Object scaled down.";
             break;
@@ -369,6 +381,17 @@ export function createAiSession(aiClient: AiWorkerClient) {
       listeners.clear();
     },
   };
+}
+
+function computeBottomLocal(
+  parts: { local_position?: [number, number, number]; dimensions: [number, number, number] }[],
+): number {
+  let bottom = 0;
+  for (const part of parts) {
+    const localY = part.local_position ? part.local_position[1] : part.dimensions[1] / 2;
+    bottom = Math.min(bottom, localY - part.dimensions[1] / 2);
+  }
+  return bottom;
 }
 
 function applyTransform(
