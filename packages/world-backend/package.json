@@ -6,6 +6,7 @@
   "scripts": {
     "build": "spacetime build --module-path .",
     "smoke:archive-reset": "node scripts/smoke-archive-reset.mjs",
+    "smoke:chat": "node scripts/smoke-chat.mjs",
     "smoke:ai-job-failure": "node scripts/smoke-ai-job-failure.mjs",
     "smoke:first-playable-flow": "node scripts/smoke-first-playable-flow.mjs",
     "smoke:lock-contention": "node scripts/smoke-lock-contention.mjs",
@@ -17,6 +18,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "glin-profanity": "^3.3.0",
     "spacetimedb": "2.0.3"
   },
   "devDependencies": {

@@ -575,15 +575,117 @@ body {
   color: var(--text-muted);
 }
 
+.chat-message {
+  position: relative;
+}
+
+.chat-delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.12s,
+    background 0.12s,
+    color 0.12s;
+}
+
+.chat-message:hover .chat-delete {
+  opacity: 1;
+}
+
+.chat-delete:hover {
+  background: rgba(224, 80, 80, 0.14);
+  color: var(--red);
+}
+
 .chat-message--player {
   border-color: rgba(47, 143, 161, 0.32);
+}
+
+.chat-message--remote {
+  border-color: var(--border);
 }
 
 .chat-message--system {
   border-color: rgba(47, 113, 69, 0.3);
 }
 
+.chat-message--debug {
+  opacity: 0.75;
+  font-style: italic;
+}
+
 .chat-message[data-status="error"] {
   border-color: rgba(224, 80, 80, 0.45);
   background: rgba(252, 230, 226, 0.7);
+}
+
+.chat-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 2px 2px 4px;
+}
+
+/* ── Chat composer ──────────────────────────── */
+.chat-composer {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--border);
+}
+
+.chat-input {
+  flex: 1;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 6px 9px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text);
+  outline: none;
+}
+
+.chat-input:disabled {
+  opacity: 0.6;
+}
+
+.chat-input::placeholder {
+  color: var(--text-muted);
+}
+
+.chat-send {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: 7px;
+  border: none;
+  background: #1a1a1a;
+  color: #fff;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+
+.chat-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.chat-send:not(:disabled):hover {
+  opacity: 0.8;
 }

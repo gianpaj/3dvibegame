@@ -3,8 +3,13 @@
 
 /* eslint-disable */
 /* tslint:disable */
-import { type Infer as __Infer } from "spacetimedb";
+import {
+  TypeBuilder as __TypeBuilder,
+  t as __t,
+  type AlgebraicTypeType as __AlgebraicTypeType,
+  type Infer as __Infer,
+} from "spacetimedb";
 
-// Import all procedure arg schemas
-
-
+export default {
+  body: __t.string(),
+};

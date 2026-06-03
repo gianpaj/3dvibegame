@@ -223,6 +223,30 @@ export const SnapshotObject = table(
   },
 );
 
+export const ChatMessage = table(
+  {
+    name: "chat_message",
+    public: true,
+    indexes: [
+      {
+        name: "chat_message_world_id",
+        accessor: "byWorldId",
+        algorithm: "btree",
+        columns: ["worldId"],
+      },
+    ],
+  },
+  {
+    messageId: t.u64().primaryKey().autoInc(),
+    worldId: t.u64(),
+    senderIdentity: t.identity(),
+    // Denormalized so messages keep their author after the sender leaves the world.
+    senderNickname: t.string(),
+    body: t.string(),
+    createdAt: t.timestamp(),
+  },
+);
+
 const spacetimedb = schema({
   world: World,
   playerSession: PlayerSession,
@@ -231,6 +255,7 @@ const spacetimedb = schema({
   objectLock: ObjectLock,
   worldSnapshot: WorldSnapshot,
   snapshotObject: SnapshotObject,
+  chatMessage: ChatMessage,
 });
 
 export default spacetimedb;

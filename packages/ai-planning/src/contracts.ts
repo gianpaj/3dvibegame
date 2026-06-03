@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const createPlanSystemPrompt =
-  "You plan simple voxel objects for Vibe World. Return a small, safe, world-native create plan only. Do not request terrain edits, accounts, economy, combat, scripting, raw meshes, or destructive actions.";
+  "You plan simple voxel objects for Vibe World. If the player prompt is meaningless (random characters, gibberish, or not interpretable as a 3D object concept), set `rejection` to a brief reason and provide minimal valid values for all other required fields. Otherwise leave `rejection` unset and return a small, safe, world-native create plan only. Do not request terrain edits, accounts, economy, combat, scripting, raw meshes, or destructive actions.";
 
 export const aiWorkerFailureCodes = [
   "invalid_prompt",
@@ -27,6 +27,7 @@ export const aiWorkerRequestSchema = z.object({
 export type AiWorkerRequest = z.infer<typeof aiWorkerRequestSchema>;
 
 export const createPlanSchema = z.object({
+  rejection: z.string().trim().min(1).optional(),
   object_category: z.string().trim().min(1).max(40),
   size_tier: z.enum(["tiny", "small", "medium", "large"]),
   shape: z.enum(["tree", "structure", "creature", "cluster", "marker", "prop"]),
@@ -44,7 +45,11 @@ export type CreatePlan = z.infer<typeof createPlanSchema>;
 export const voxelBuilderSystemPrompt = [
   "You are a voxel-builder assistant for Vibe World. Given a player's prompt, design a",
   "single small 3D object as a list of voxel operations. Return JSON ONLY (no prose,",
-  "no markdown) with this exact shape:",
+  "no markdown).",
+  "",
+  "IMPORTANT: If the player prompt is meaningless (random characters, gibberish, or not",
+  "interpretable as a 3D object concept), return ONLY: {\"rejection\": \"<brief reason>\"}",
+  "Otherwise return a full voxel spec with this exact shape:",
   "{",
   '  "object_category": string,           // e.g. "palm_tree"',
   '  "size_tier": "tiny"|"small"|"medium"|"large",',
@@ -76,7 +81,10 @@ export const voxelBuilderSystemPrompt = [
 export const voxelEditSystemPrompt = [
   "You are a voxel-builder assistant for Vibe World editing an EXISTING object. You are",
   "given the object's current voxel core (materials + operations) and a change request.",
-  "Apply the change and return the FULL edited voxel core as JSON ONLY (no prose, no",
+  "",
+  "IMPORTANT: If the change request is meaningless (random characters, gibberish, or not",
+  "interpretable as an edit instruction), return ONLY: {\"rejection\": \"<brief reason>\"}",
+  "Otherwise apply the change and return the FULL edited voxel core as JSON ONLY (no prose, no",
   "markdown) with this exact shape:",
   "{",
   '  "object_category": string,',
@@ -140,6 +148,10 @@ export type CompileVoxelRequest = z.infer<typeof compileVoxelRequestSchema>;
 export const createPlanJsonSchema = {
   type: "object",
   properties: {
+    rejection: {
+      type: "string",
+      description: "Set only when the prompt is meaningless or cannot be interpreted as a 3D object. Leave absent otherwise.",
+    },
     object_category: {
       type: "string",
       description: "Short world-object category, such as pine_tree, bridge, shrine, or marker.",
