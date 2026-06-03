@@ -258,6 +258,8 @@ export function createBackendPresenceBridge({
   let localIdentityHex: string | null = null;
   let connection: DbConnection | null = null;
   let subscription: SubscriptionHandle | null = null;
+  let chatSubscription: SubscriptionHandle | null = null;
+  let chatSubscriptionWorldId: bigint | null = null;
   let removeTableListeners: (() => void) | null = null;
   let heartbeatId: number | null = null;
   let movementTimeoutId: number | null = null;
@@ -308,6 +310,7 @@ export function createBackendPresenceBridge({
               .then(() => {
                 if (disposed) return;
                 joined = true;
+                ensureChatSubscription(conn);
                 emitCurrent();
                 flushPendingTransform();
               })
@@ -342,7 +345,6 @@ export function createBackendPresenceBridge({
             "SELECT * FROM world_object",
             "SELECT * FROM world_snapshot",
             "SELECT * FROM snapshot_object",
-            "SELECT * FROM chat_message",
           ]);
       })
       .onConnectError((_ctx, error) => {
@@ -382,6 +384,11 @@ export function createBackendPresenceBridge({
       }
       try {
         subscription?.unsubscribe();
+      } catch {
+        // The SDK rejects double/unapplied unsubscribe calls; disposal should continue.
+      }
+      try {
+        chatSubscription?.unsubscribe();
       } catch {
         // The SDK rejects double/unapplied unsubscribe calls; disposal should continue.
       }
@@ -505,8 +512,38 @@ export function createBackendPresenceBridge({
     if (snapshot.players.some((player) => player.isLocal && player.presenceState === "active")) {
       joined = true;
     }
+    if (connection?.isActive && joined) {
+      ensureChatSubscription(connection);
+    }
     onSnapshot(snapshot);
     flushPendingTransform();
+  }
+
+  function ensureChatSubscription(conn: DbConnection) {
+    const worldId = findLocalPlayerWorldId(conn, localIdentityHex);
+    if (worldId === null || chatSubscriptionWorldId === worldId) return;
+
+    try {
+      chatSubscription?.unsubscribe();
+    } catch {
+      // The SDK rejects double/unapplied unsubscribe calls; resubscribe should continue.
+    }
+
+    chatSubscriptionWorldId = worldId;
+    chatSubscription = conn
+      .subscriptionBuilder()
+      .onApplied(() => {
+        if (disposed) return;
+        emitCurrent();
+      })
+      .onError((ctx) => {
+        console.error("[backend] chat subscription onError", ctx.event);
+        if (disposed) return;
+        status = "error";
+        message = errorMessage(ctx.event, "Chat subscription failed");
+        emitCurrent();
+      })
+      .subscribe([`SELECT * FROM chat_message WHERE world_id = ${worldId.toString()}`]);
   }
 
   function flushPendingTransform() {
@@ -710,6 +747,16 @@ function readSnapshotFromConnection({
     snapshotObjects: snapshotObjects.map(mapSnapshotObjectDebug),
     chatMessages,
   };
+}
+
+function findLocalPlayerWorldId(connection: DbConnection, localIdentityHex: string | null) {
+  if (!localIdentityHex) return null;
+  for (const player of connection.db.playerSession.iter()) {
+    if (player.identity.toHexString() === localIdentityHex) {
+      return player.worldId;
+    }
+  }
+  return null;
 }
 
 function createBaseSnapshot({
