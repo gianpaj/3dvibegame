@@ -52,6 +52,10 @@ export function compileVoxelBuilderSpec(spec: VoxelBuilderSpec): BuilderSpec {
     });
   }
 
+  // Resolve material_id → effective render name: prefer color_hint when present so
+  // the renderer can use the intended color (e.g. "jelly" + color_hint "yellow" → "yellow").
+  const resolveMatId = buildMaterialColorResolver(spec.materials);
+
   let shapes: Shape[] = [];
 
   spec.operations.forEach((op) => {
@@ -90,7 +94,12 @@ export function compileVoxelBuilderSpec(spec: VoxelBuilderSpec): BuilderSpec {
   });
 
   const parts = shapes.map((shape, index) =>
-    toBuilderPart(shape, index, spec.grid.unit_meters, diagnostics),
+    toBuilderPart(
+      { ...shape, materialId: resolveMatId(shape.materialId) },
+      index,
+      spec.grid.unit_meters,
+      diagnostics,
+    ),
   );
   const instanceOffset = scaleVector(
     spec.placement.offset,
@@ -201,12 +210,18 @@ function compileInstancedCloneLayout(
   const selected = shapes.filter((shape) => matchesRegion(shape, finalOp.target));
   if (!selected.length || selected.length !== shapes.length) return null;
 
+  const resolveMatId = buildMaterialColorResolver(spec.materials);
   const layoutOrigin = getLayoutOrigin(selected, finalOp);
   const localShapes = selected.map((shape) =>
     translateShape(shape, scaleVector(layoutOrigin, -1)),
   );
   const parts = localShapes.map((shape, index) =>
-    toBuilderPart(shape, index, spec.grid.unit_meters, diagnostics),
+    toBuilderPart(
+      { ...shape, materialId: resolveMatId(shape.materialId) },
+      index,
+      spec.grid.unit_meters,
+      diagnostics,
+    ),
   );
   const instanceOffsets = buildCloneInstanceOffsets(
     finalOp,
@@ -789,4 +804,18 @@ function roundToGrid(value: number): number {
 
 function unique(values: string[]): string[] {
   return Array.from(new Set(values));
+}
+
+// When a material declares a color_hint (e.g. material_id "jelly", color_hint "yellow"),
+// use the hint as the effective material name so the renderer can match the intended color.
+function buildMaterialColorResolver(
+  materials: VoxelBuilderSpec["materials"],
+): (id: string) => string {
+  const map = new Map<string, string>();
+  for (const m of materials) {
+    if (m.color_hint) {
+      map.set(m.material_id, m.color_hint);
+    }
+  }
+  return (id: string) => map.get(id) ?? id;
 }

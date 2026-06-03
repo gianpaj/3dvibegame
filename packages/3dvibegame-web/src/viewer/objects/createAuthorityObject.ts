@@ -238,26 +238,33 @@ function measureRingMetrics(group: THREE.Group) {
 }
 
 function resolveMaterialColor(name: string) {
+  // Hex passthrough — color_hint may be a raw hex string.
+  if (/^#[0-9a-f]{3,8}$/i.test(name)) return name;
+
   switch (name) {
-    case "red":
-      return "#c63a36";
-    case "wood":
-      return "#8f6745";
-    case "moss_stone":
-      return "#6d8860";
-    case "neon":
-      return "#4de8c3";
-    case "glass_block":
-      return "#d3f5ff";
-    case "jelly":
-      return "#ff7cb1";
-    case "cloud":
-      return "#f4f7ff";
-    case "lava_light":
-      return "#ff9a3d";
-    case "void":
-      return "#40355e";
-    default:
-      return "#7aaec2";
+    // Named materials
+    case "wood":       return "#8f6745";
+    case "moss_stone": return "#6d8860";
+    case "neon":       return "#4de8c3";
+    case "glass_block":return "#d3f5ff";
+    case "jelly":      return "#ff7cb1";
+    case "cloud":      return "#f4f7ff";
+    case "lava_light": return "#ff9a3d";
+    case "void":       return "#40355e";
+    // Color names (used directly as material_id, or resolved from color_hint)
+    case "red":    return "#c63a36";
+    case "blue":   return "#2255cc";
+    case "green":  return "#22aa44";
+    case "yellow": return "#eecc22";
+    case "black":  return "#222222";
+    case "white":  return "#eeeeee";
+    case "purple": return "#882299";
+    case "orange": return "#dd7722";
+    case "pink":   return "#ee6699";
+    case "brown":  return "#885533";
+    case "cyan":   return "#22aacc";
+    case "gray":
+    case "grey":   return "#888888";
+    default:       return "#7aaec2";
   }
 }
