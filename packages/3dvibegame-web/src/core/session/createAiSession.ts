@@ -301,12 +301,13 @@ export function createAiSession(aiClient: AiWorkerClient) {
       notify();
     },
 
-    moveSelected(dx: number, dz: number) {
+    moveSelected(dx: number, dy: number, dz: number) {
       const object = currentObject();
       if (!object) return;
       try {
-        const [px, , pz] = object.transform.position;
-        const patch = { position: { x: px + dx, z: pz + dz } };
+        const [px, py, pz] = object.transform.position;
+        const newY = Math.min(4.0, Math.max(-1.0, py + dy));
+        const patch = { position: { x: px + dx, y: newY, z: pz + dz } };
         world = applyTransform(world, object, playerId, patch);
         lastMessage = "Object moved.";
       } catch (error) {

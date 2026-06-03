@@ -162,14 +162,14 @@ export function App() {
   const hasSelectedObjectRef = useRef(false);
   hasSelectedObjectRef.current = !viewerMode && displaySnapshot.object !== null;
 
-  const handleMoveObject = useCallback((dx: number, dz: number) => {
+  const handleMoveObject = useCallback((dx: number, dy: number, dz: number) => {
     if (backendCommandsRef.current?.canHandle()) {
       void backendCommandsRef.current
-        .moveSelectedObject(dx, dz)
+        .moveSelectedObject(dx, dy, dz)
         .catch((err: unknown) => setContextMsg(errorMessage(err, "Move failed")));
       return;
     }
-    sessionRef.current?.moveSelected(dx, dz);
+    sessionRef.current?.moveSelected(dx, dy, dz);
   }, []);
 
   const handleDeselect = useCallback(() => {

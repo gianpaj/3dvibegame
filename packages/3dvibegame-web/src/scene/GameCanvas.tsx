@@ -14,8 +14,8 @@ interface Props {
   onSelectObject?: (objectId: string) => void;
   /** True while a movable object is selected (object moves) vs. not (camera moves). */
   hasSelectedObjectRef: RefObject<boolean>;
-  /** Moves the selected object by a world-axis delta (X, Z). */
-  onMoveObject: (dx: number, dz: number) => void;
+  /** Moves the selected object by a world-axis delta (X, Y, Z). */
+  onMoveObject: (dx: number, dy: number, dz: number) => void;
   /** Clears the current selection (clicking empty space). */
   onDeselect: () => void;
 }
@@ -128,14 +128,13 @@ export function GameCanvas({
 interface KeyboardControllerProps {
   controlsRef: RefObject<OrbitControlsRef | null>;
   hasSelectedObjectRef: RefObject<boolean>;
-  onMoveObject: (dx: number, dz: number) => void;
+  onMoveObject: (dx: number, dy: number, dz: number) => void;
   step?: number;
 }
 
 /**
- * WASD keyboard handling. When an object is selected, WASD moves it on the world
- * X/Z plane; otherwise WASD pans the camera (and its orbit target) along the
- * camera-relative ground plane.
+ * WASD/QE keyboard handling. When an object is selected, WASD moves it on the
+ * world X/Z plane and Q/E moves it up/down; otherwise WASD pans the camera.
  */
 function KeyboardController({
   controlsRef,
@@ -148,7 +147,9 @@ function KeyboardController({
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       const key = event.key.toLowerCase();
-      if (key !== "w" && key !== "a" && key !== "s" && key !== "d") return;
+      const isMovKey = key === "w" || key === "a" || key === "s" || key === "d";
+      const isVertKey = key === "q" || key === "e";
+      if (!isMovKey && !isVertKey) return;
 
       // Don't hijack typing in the prompt box or other inputs.
       const target = event.target as HTMLElement | null;
@@ -156,6 +157,14 @@ function KeyboardController({
         return;
       }
       event.preventDefault();
+
+      // Q/E: vertical movement — only when an object is selected.
+      if (isVertKey) {
+        if (!hasSelectedObjectRef.current) return;
+        const dy = key === "q" ? step : -step;
+        onMoveObject(0, dy, 0);
+        return;
+      }
 
       // Camera-relative ground direction, shared by object-move and camera-pan so
       // both feel consistent: W = away from camera, S = toward, A = left, D = right.
@@ -175,7 +184,7 @@ function KeyboardController({
 
       if (hasSelectedObjectRef.current) {
         // Move the selected object along the camera-relative ground plane.
-        onMoveObject(move.x, move.z);
+        onMoveObject(move.x, 0, move.z);
         return;
       }
 

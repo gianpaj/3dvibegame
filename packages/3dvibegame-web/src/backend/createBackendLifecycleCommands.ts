@@ -29,7 +29,7 @@ export interface BackendLifecycleCommands {
   editSelectedObject(prompt: string): Promise<void>;
   lockSelectedObject(): Promise<void>;
   releaseSelectedLock(): Promise<void>;
-  moveSelectedObject(dx: number, dz: number): Promise<void>;
+  moveSelectedObject(dx: number, dy: number, dz: number): Promise<void>;
   deleteSelectedObject(): Promise<void>;
   updateWorldSettings(input: BackendUpdateWorldSettingsInput): Promise<void>;
   createSnapshot(reason?: string): Promise<void>;
@@ -52,7 +52,7 @@ export function createBackendLifecycleCommands(
   // parallel races (one move's cancelEdit lands after another's lock), producing
   // "expected edit_locked but got public". So we serialize moves and coalesce any
   // that arrive while one is in flight into a single summed delta.
-  let movePending: { dx: number; dz: number } | null = null;
+  let movePending: { dx: number; dy: number; dz: number } | null = null;
   let moveRunning = false;
 
   async function drainMoves() {
@@ -60,16 +60,16 @@ export function createBackendLifecycleCommands(
     moveRunning = true;
     try {
       while (movePending) {
-        const { dx, dz } = movePending;
+        const { dx, dy, dz } = movePending;
         movePending = null;
-        await performMove(dx, dz);
+        await performMove(dx, dy, dz);
       }
     } finally {
       moveRunning = false;
     }
   }
 
-  async function performMove(dx: number, dz: number) {
+  async function performMove(dx: number, dy: number, dz: number) {
     const snapshot = bridge.getSnapshot();
     const object = selectBackendObject(snapshot, selectedObjectId());
     if (!object) {
@@ -80,9 +80,10 @@ export function createBackendLifecycleCommands(
     const [px, py, pz] = object.transform.position;
     const [rx, ry, rz] = object.transform.rotation;
     const [sx, sy, sz] = object.transform.scale;
+    const newY = Math.min(4.0, Math.max(-1.0, py + dy));
     const transform = {
       positionX: px + dx,
-      positionY: py,
+      positionY: newY,
       positionZ: pz + dz,
       rotationX: rx,
       rotationY: ry,
@@ -92,11 +93,12 @@ export function createBackendLifecycleCommands(
       scaleZ: sz,
     };
     console.log(
-      "[backend.move] start id=%s state=%s version=%s dx=%s dz=%s",
+      "[backend.move] start id=%s state=%s version=%s dx=%s dy=%s dz=%s",
       object.object_id,
       object.state,
       object.version,
       dx.toFixed(2),
+      dy.toFixed(2),
       dz.toFixed(2),
     );
 
@@ -370,10 +372,10 @@ export function createBackendLifecycleCommands(
       }
     },
 
-    async moveSelectedObject(dx: number, dz: number) {
+    async moveSelectedObject(dx: number, dy: number, dz: number) {
       movePending = movePending
-        ? { dx: movePending.dx + dx, dz: movePending.dz + dz }
-        : { dx, dz };
+        ? { dx: movePending.dx + dx, dy: movePending.dy + dy, dz: movePending.dz + dz }
+        : { dx, dy, dz };
       await drainMoves();
     },
     async deleteSelectedObject() {
