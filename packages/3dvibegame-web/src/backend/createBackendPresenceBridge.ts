@@ -894,7 +894,9 @@ function mapChatMessage(
     senderId,
     senderNickname: message.senderNickname,
     body: message.body,
-    createdAt: message.createdAt.toString(),
+    // SpacetimeDB's Timestamp has no toString(); emit ISO 8601 (UTC) so ChatPanel can
+    // render a readable time and messages stay orderable by recency.
+    createdAt: timestampToIso(message.createdAt),
     isLocal: localIdentityHex === senderId,
   };
 }

@@ -7,6 +7,10 @@ import {
 import { checkProfanity } from "glin-profanity";
 
 import spacetimedb from "./schema";
+import {
+  bootstrapModeratorIdentities,
+  ownerAdminIdentities,
+} from "./moderation-config";
 
 const defaultWorldName = "Vibe Test Room";
 // The shared test room is private + destructive so players can delete objects.
@@ -33,15 +37,8 @@ const maxPromptLength = 500;
 const maxChatBodyLength = 280;
 // Cap persisted chat per world; oldest messages beyond this are pruned on send.
 const maxChatHistoryPerWorld = 200;
-// Identity hex strings auto-promoted to the "moderator" role on join — the bootstrap
-// set of moderators. Moderators can delete any chat message, but cannot assign roles.
-const bootstrapModeratorIdentities: string[] = [];
-// Owner/admin identity hex strings. ONLY these may call set_player_role (assign/revoke
-// roles). Fill with your own identity from `spacetime login show`. Keep this short — it's
-// the root of trust for who can mint moderators.
-const ownerAdminIdentities: string[] = [
-  "c20044ae9d90f6ef205b0dfd2c13ca7fff6ad7160480eda6ccdd0eae51bdf28e",
-];
+// Moderator/owner trust-roots live in ./moderation-config (resolved at build time from
+// env vars; empty by default so no personal identity is committed).
 // Roles that set_player_role may assign. "host"/"platform_admin" are reserved.
 const assignableRoles = new Set(["player", "moderator"]);
 const maxSourceSpecJsonLength = 300_000;
