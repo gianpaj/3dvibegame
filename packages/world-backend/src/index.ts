@@ -1,4 +1,9 @@
-import { SenderError, t, type InferSchema, type ReducerCtx } from "spacetimedb/server";
+import {
+  SenderError,
+  t,
+  type InferSchema,
+  type ReducerCtx,
+} from "spacetimedb/server";
 import { checkProfanity } from "glin-profanity";
 
 import spacetimedb from "./schema";
@@ -28,6 +33,17 @@ const maxPromptLength = 500;
 const maxChatBodyLength = 280;
 // Cap persisted chat per world; oldest messages beyond this are pruned on send.
 const maxChatHistoryPerWorld = 200;
+// Identity hex strings auto-promoted to the "moderator" role on join — the bootstrap
+// set of moderators. Moderators can delete any chat message, but cannot assign roles.
+const bootstrapModeratorIdentities: string[] = [];
+// Owner/admin identity hex strings. ONLY these may call set_player_role (assign/revoke
+// roles). Fill with your own identity from `spacetime login show`. Keep this short — it's
+// the root of trust for who can mint moderators.
+const ownerAdminIdentities: string[] = [
+  "c20044ae9d90f6ef205b0dfd2c13ca7fff6ad7160480eda6ccdd0eae51bdf28e",
+];
+// Roles that set_player_role may assign. "host"/"platform_admin" are reserved.
+const assignableRoles = new Set(["player", "moderator"]);
 const maxSourceSpecJsonLength = 300_000;
 const maxBuilderSpecJsonLength = 200_000;
 const maxHorizontalDistance = 256;
@@ -157,7 +173,10 @@ export const send_chat_message = spacetimedb.reducer(
     if (trimmed.length > maxChatBodyLength) {
       throw new SenderError("chat message is too long");
     }
-    if (checkProfanity(trimmed, { detectLeetspeak: true }).containsProfanity) {
+    if (
+      checkProfanity(trimmed, { languages: ["english"], detectLeetspeak: true })
+        .containsProfanity
+    ) {
       throw new SenderError("chat message contains blocked language");
     }
 
@@ -171,6 +190,57 @@ export const send_chat_message = spacetimedb.reducer(
     });
 
     pruneChatHistory(ctx, player.worldId);
+  },
+);
+
+export const delete_chat_message = spacetimedb.reducer(
+  { messageId: t.u64() },
+  (ctx, { messageId }) => {
+    const player = requireActivePlayer(ctx);
+    const message = ctx.db.chatMessage.messageId.find(messageId);
+    if (!message) {
+      throw new SenderError("chat message not found");
+    }
+    if (message.worldId !== player.worldId) {
+      throw new SenderError("chat message is not in the active player world");
+    }
+
+    const isAuthor = sameIdentity(message.senderIdentity, ctx.sender);
+    if (!isAuthor && !canManageWorldLifecycle(player)) {
+      throw new SenderError(
+        "only the author or a moderator can delete this message",
+      );
+    }
+
+    ctx.db.chatMessage.messageId.delete(messageId);
+  },
+);
+
+export const set_player_role = spacetimedb.reducer(
+  { targetIdentityHex: t.string(), role: t.string() },
+  (ctx, { targetIdentityHex, role }) => {
+    // Owner/admin only — identity-gated, not role-gated, so moderators cannot mint more
+    // moderators. The caller does not need to have joined the world.
+    if (!isOwnerAdmin(ctx)) {
+      throw new SenderError("only an owner/admin can set player roles");
+    }
+    if (!assignableRoles.has(role)) {
+      throw new SenderError("unsupported role");
+    }
+
+    const wanted = normalizeHex(targetIdentityHex);
+    const target = Array.from(ctx.db.playerSession.iter()).find(
+      (player) => normalizeHex(player.identity.toHexString()) === wanted,
+    );
+    if (!target) {
+      throw new SenderError("target player not found");
+    }
+
+    ctx.db.playerSession.identity.update({
+      ...target,
+      role,
+      lastSeenAt: ctx.timestamp,
+    });
   },
 );
 
@@ -195,7 +265,12 @@ export const update_world_settings = spacetimedb.reducer(
       throw new SenderError("public worlds cannot enable destructive edits");
     }
     assertU32Range("maxPlayers", input.maxPlayers, 1, maxAllowedPlayers);
-    assertU32Range("maxLiveObjects", input.maxLiveObjects, 1, maxAllowedLiveObjects);
+    assertU32Range(
+      "maxLiveObjects",
+      input.maxLiveObjects,
+      1,
+      maxAllowedLiveObjects,
+    );
     assertU32Range(
       "maxObjectsPerPlayer",
       input.maxObjectsPerPlayer,
@@ -224,7 +299,9 @@ export const update_world_settings = spacetimedb.reducer(
       throw new SenderError("maxObjectsPerPlayer cannot exceed maxLiveObjects");
     }
     if (input.maxPlayers < activePlayersInWorld(ctx, world.worldId)) {
-      throw new SenderError("maxPlayers cannot be lower than current active players");
+      throw new SenderError(
+        "maxPlayers cannot be lower than current active players",
+      );
     }
 
     ctx.db.world.worldId.update({
@@ -409,7 +486,10 @@ export const update_draft_transform = spacetimedb.reducer(
   },
   (ctx, input) => {
     const player = requireActivePlayer(ctx);
-    const object = requireWorldObject(ctx, normalizeId("objectId", input.objectId));
+    const object = requireWorldObject(
+      ctx,
+      normalizeId("objectId", input.objectId),
+    );
     assertSameWorld(player.worldId, object.worldId);
     assertObjectState(object.state, "grace");
     if (!sameIdentity(object.graceOwner, ctx.sender)) {
@@ -503,7 +583,10 @@ export const update_locked_transform = spacetimedb.reducer(
   },
   (ctx, input) => {
     const player = requireActivePlayer(ctx);
-    const object = requireWorldObject(ctx, normalizeId("objectId", input.objectId));
+    const object = requireWorldObject(
+      ctx,
+      normalizeId("objectId", input.objectId),
+    );
     assertSameWorld(player.worldId, object.worldId);
     assertObjectState(object.state, "edit_locked");
     if (!sameIdentity(object.lockOwner, ctx.sender)) {
@@ -605,7 +688,8 @@ export const delete_object = spacetimedb.reducer(
     // Within the protection window, only the creator may delete a freshly created
     // object so other players can't immediately wipe someone's new creation.
     const ageMicros =
-      ctx.timestamp.microsSinceUnixEpoch - object.createdAt.microsSinceUnixEpoch;
+      ctx.timestamp.microsSinceUnixEpoch -
+      object.createdAt.microsSinceUnixEpoch;
     if (
       !sameIdentity(object.createdBy, ctx.sender) &&
       ageMicros < deletionProtectionMicros
@@ -736,7 +820,10 @@ function ensureDefaultWorld(ctx: BackendCtx) {
 
 function findDefaultWorld(ctx: BackendCtx) {
   for (const world of ctx.db.world.iter()) {
-    if (world.name === defaultWorldName && world.visibility === defaultWorldVisibility) {
+    if (
+      world.name === defaultWorldName &&
+      world.visibility === defaultWorldVisibility
+    ) {
       return world;
     }
   }
@@ -763,9 +850,14 @@ function joinWorld(
   const existing = ctx.db.playerSession.identity.find(ctx.sender);
   const movingWorlds = existing ? existing.worldId !== world.worldId : true;
 
-  if (movingWorlds && activePlayersInWorld(ctx, world.worldId) >= world.maxPlayers) {
+  if (
+    movingWorlds &&
+    activePlayersInWorld(ctx, world.worldId) >= world.maxPlayers
+  ) {
     throw new SenderError("world is full");
   }
+
+  const bootstrapRole = bootstrapModeratorRole(ctx);
 
   if (existing) {
     ctx.db.playerSession.identity.update({
@@ -773,7 +865,9 @@ function joinWorld(
       connectionId: currentConnectionId(ctx),
       worldId: world.worldId,
       nickname: normalizedNickname,
-      role: existing.worldId === world.worldId ? existing.role : role,
+      role:
+        bootstrapRole ??
+        (existing.worldId === world.worldId ? existing.role : role),
       presenceState: "active",
       lastSeenAt: ctx.timestamp,
     });
@@ -785,7 +879,7 @@ function joinWorld(
     worldId: world.worldId,
     connectionId: currentConnectionId(ctx),
     nickname: normalizedNickname,
-    role,
+    role: bootstrapRole ?? role,
     presenceState: "active",
     positionX: 0,
     positionY: 0,
@@ -898,13 +992,19 @@ function isLiveObjectState(state: string) {
   );
 }
 
-function assertCanManageWorldLifecycle(player: ReturnType<typeof requireActivePlayer>) {
+function assertCanManageWorldLifecycle(
+  player: ReturnType<typeof requireActivePlayer>,
+) {
   if (!canManageWorldLifecycle(player)) {
-    throw new SenderError("only a host or moderator can snapshot or reset this world");
+    throw new SenderError(
+      "only a host or moderator can snapshot or reset this world",
+    );
   }
 }
 
-function canManageWorldLifecycle(player: ReturnType<typeof requireActivePlayer>) {
+function canManageWorldLifecycle(
+  player: ReturnType<typeof requireActivePlayer>,
+) {
   return (
     player.role === "host" ||
     player.role === "moderator" ||
@@ -920,8 +1020,13 @@ function assertCanFailAiJob(
   if (job.worldId !== player.worldId) {
     throw new SenderError("AI job is not in the active player world");
   }
-  if (!sameIdentity(job.playerIdentity, sender) && !canManageWorldLifecycle(player)) {
-    throw new SenderError("only the job owner or world staff can fail this AI job");
+  if (
+    !sameIdentity(job.playerIdentity, sender) &&
+    !canManageWorldLifecycle(player)
+  ) {
+    throw new SenderError(
+      "only the job owner or world staff can fail this AI job",
+    );
   }
 }
 
@@ -960,7 +1065,8 @@ function createWorldSnapshot(
   });
 
   const liveObjects = Array.from(ctx.db.worldObject.iter()).filter(
-    (object) => object.worldId === world.worldId && isLiveObjectState(object.state),
+    (object) =>
+      object.worldId === world.worldId && isLiveObjectState(object.state),
   );
   liveObjects.forEach((object, index) => {
     const snapshotObjectId = normalizeSnapshotObjectId(
@@ -1038,10 +1144,32 @@ function failPendingWorldJobs(ctx: BackendCtx, worldId: bigint) {
   });
 }
 
+function normalizeHex(value: string): string {
+  return value.trim().toLowerCase().replace(/^0x/, "");
+}
+
+function isOwnerAdmin(ctx: BackendCtx): boolean {
+  const sender = normalizeHex(ctx.sender.toHexString());
+  return ownerAdminIdentities.some(
+    (identity) => normalizeHex(identity) === sender,
+  );
+}
+
+function bootstrapModeratorRole(ctx: BackendCtx): string | null {
+  const sender = normalizeHex(ctx.sender.toHexString());
+  return bootstrapModeratorIdentities.some(
+    (identity) => normalizeHex(identity) === sender,
+  )
+    ? "moderator"
+    : null;
+}
+
 function pruneChatHistory(ctx: BackendCtx, worldId: bigint) {
   const messages = Array.from(ctx.db.chatMessage.iter())
     .filter((message) => message.worldId === worldId)
-    .sort((a, b) => (a.messageId < b.messageId ? -1 : a.messageId > b.messageId ? 1 : 0));
+    .sort((a, b) =>
+      a.messageId < b.messageId ? -1 : a.messageId > b.messageId ? 1 : 0,
+    );
   const excess = messages.length - maxChatHistoryPerWorld;
   for (let i = 0; i < excess; i += 1) {
     ctx.db.chatMessage.messageId.delete(messages[i].messageId);
@@ -1091,7 +1219,9 @@ function assertSameWorld(playerWorldId: bigint, objectWorldId: bigint) {
 
 function assertObjectState(actual: string, expected: string) {
   if (actual !== expected) {
-    throw new SenderError(`invalid object state, expected ${expected} but got ${actual}`);
+    throw new SenderError(
+      `invalid object state, expected ${expected} but got ${actual}`,
+    );
   }
 }
 
@@ -1235,7 +1365,9 @@ function normalizeId(label: string, value: string) {
     throw new SenderError(`${label} is required`);
   }
   if (normalized.length > maxIdLength) {
-    throw new SenderError(`${label} must be ${maxIdLength} characters or fewer`);
+    throw new SenderError(
+      `${label} must be ${maxIdLength} characters or fewer`,
+    );
   }
   return normalized;
 }
@@ -1256,7 +1388,9 @@ function normalizeSnapshotObjectId(value: string) {
 function normalizeSnapshotReason(reason: string) {
   const normalized = reason.trim();
   if (normalized !== "manual_reset" && normalized !== "scheduled_reset") {
-    throw new SenderError("snapshot reason must be manual_reset or scheduled_reset");
+    throw new SenderError(
+      "snapshot reason must be manual_reset or scheduled_reset",
+    );
   }
   return normalized;
 }
@@ -1275,12 +1409,19 @@ function normalizeWorldName(name: string) {
     throw new SenderError("world name is required");
   }
   if (normalized.length > maxWorldNameLength) {
-    throw new SenderError(`world name must be ${maxWorldNameLength} characters or fewer`);
+    throw new SenderError(
+      `world name must be ${maxWorldNameLength} characters or fewer`,
+    );
   }
   return normalized;
 }
 
-function assertU32Range(label: string, value: number, min: number, max: number) {
+function assertU32Range(
+  label: string,
+  value: number,
+  min: number,
+  max: number,
+) {
   if (!Number.isInteger(value) || value < min || value > max) {
     throw new SenderError(`${label} must be between ${min} and ${max}`);
   }
@@ -1309,7 +1450,9 @@ function normalizeNickname(nickname: string) {
     throw new SenderError("nickname is required");
   }
   if (normalized.length > maxNicknameLength) {
-    throw new SenderError(`nickname must be ${maxNicknameLength} characters or fewer`);
+    throw new SenderError(
+      `nickname must be ${maxNicknameLength} characters or fewer`,
+    );
   }
   return normalized;
 }
@@ -1320,7 +1463,9 @@ function normalizePrompt(prompt: string) {
     throw new SenderError("source prompt is required");
   }
   if (normalized.length > maxPromptLength) {
-    throw new SenderError(`source prompt must be ${maxPromptLength} characters or fewer`);
+    throw new SenderError(
+      `source prompt must be ${maxPromptLength} characters or fewer`,
+    );
   }
   return normalized;
 }
@@ -1411,7 +1556,9 @@ function parseBuilderSpecJson(builderSpecJson: string) {
     throw new SenderError("builder spec part count does not match parts");
   }
   if (instanceCount !== instances.length) {
-    throw new SenderError("builder spec instance count does not match instances");
+    throw new SenderError(
+      "builder spec instance count does not match instances",
+    );
   }
 
   parts.forEach((part, index) => {
@@ -1461,13 +1608,19 @@ function assertArtifactMatchesSource(
   },
 ) {
   if (sourceSpec.operation !== builderSpec.operation) {
-    throw new SenderError("builder artifact operation does not match source spec");
+    throw new SenderError(
+      "builder artifact operation does not match source spec",
+    );
   }
   if (sourceSpec.category !== builderSpec.category) {
-    throw new SenderError("builder artifact category does not match source spec");
+    throw new SenderError(
+      "builder artifact category does not match source spec",
+    );
   }
   if (sourceSpec.sizeTier !== builderSpec.sizeTier) {
-    throw new SenderError("builder artifact size tier does not match source spec");
+    throw new SenderError(
+      "builder artifact size tier does not match source spec",
+    );
   }
 }
 
@@ -1539,7 +1692,10 @@ function readNumberArrayField(value: Record<string, unknown>, field: string) {
   return fieldValue;
 }
 
-function readSourceNumberArrayField(value: Record<string, unknown>, field: string) {
+function readSourceNumberArrayField(
+  value: Record<string, unknown>,
+  field: string,
+) {
   const fieldValue = value[field];
   if (!Array.isArray(fieldValue) || fieldValue.length !== 3) {
     throw new SenderError(`source spec ${field} must be a vector3`);
@@ -1556,7 +1712,9 @@ function assertBoundedNumberVector(
 ) {
   const isValid = values.every((value) => {
     if (typeof value !== "number" || !Number.isFinite(value)) return false;
-    return allowMin ? value >= min && value <= max : value > min && value <= max;
+    return allowMin
+      ? value >= min && value <= max
+      : value > min && value <= max;
   });
 
   if (!isValid) {

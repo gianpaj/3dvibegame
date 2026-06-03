@@ -575,6 +575,43 @@ body {
   color: var(--text-muted);
 }
 
+.chat-message {
+  position: relative;
+}
+
+.chat-delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.12s,
+    background 0.12s,
+    color 0.12s;
+}
+
+.chat-message:hover .chat-delete {
+  opacity: 1;
+}
+
+.chat-delete:hover {
+  background: rgba(224, 80, 80, 0.14);
+  color: var(--red);
+}
+
 .chat-message--player {
   border-color: rgba(47, 143, 161, 0.32);
 }

@@ -130,6 +130,7 @@ export interface BackendPresenceBridge {
   getSnapshot(): BackendPresenceSnapshot;
   updateLocalTransform(transform: BackendPlayerTransform): void;
   sendChat(body: string): Promise<void>;
+  deleteChatMessage(messageId: string): Promise<void>;
   requestCreateObject(input: BackendRequestCreateObjectInput): Promise<void>;
   submitAiDraft(input: BackendSubmitAiDraftInput): Promise<void>;
   updateDraftTransform(input: BackendObjectTransformInput): Promise<void>;
@@ -232,6 +233,7 @@ export function createBackendPresenceBridge({
       getSnapshot: () => snapshot,
       updateLocalTransform() {},
       sendChat: rejectDisabledBackend,
+      deleteChatMessage: rejectDisabledBackend,
       requestCreateObject: rejectDisabledBackend,
       submitAiDraft: rejectDisabledBackend,
       updateDraftTransform: rejectDisabledBackend,
@@ -420,6 +422,11 @@ export function createBackendPresenceBridge({
     sendChat(body) {
       return callLiveReducer("Chat message rejected", (conn) =>
         conn.reducers.sendChatMessage({ body }),
+      );
+    },
+    deleteChatMessage(messageId) {
+      return callLiveReducer("Chat delete rejected", (conn) =>
+        conn.reducers.deleteChatMessage({ messageId: BigInt(messageId) }),
       );
     },
     requestCreateObject(input) {

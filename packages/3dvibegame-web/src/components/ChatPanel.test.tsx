@@ -82,6 +82,24 @@ describe("ChatPanel", () => {
     expect(debug).toHaveClass("chat-message--debug");
   });
 
+  it("shows a delete button on own messages and calls onDelete", async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn();
+    render(<ChatPanel messages={messages} onSend={() => {}} onDelete={onDelete} />);
+
+    // Local (own) message has a delete control; the remote one does not (non-moderator).
+    expect(screen.getByRole("button", { name: /delete message from alice/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /delete message from bob/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /delete message from alice/i }));
+    expect(onDelete).toHaveBeenCalledWith("1");
+  });
+
+  it("lets a moderator delete any message", () => {
+    render(<ChatPanel messages={messages} onSend={() => {}} onDelete={() => {}} canModerate />);
+    expect(screen.getByRole("button", { name: /delete message from bob/i })).toBeInTheDocument();
+  });
+
   it("collapses and expands via the header toggle", async () => {
     const user = userEvent.setup();
     render(<ChatPanel messages={messages} onSend={() => {}} />);

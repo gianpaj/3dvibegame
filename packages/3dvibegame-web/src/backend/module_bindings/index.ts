@@ -37,6 +37,7 @@ import {
 import CancelEditReducer from "./cancel_edit_reducer";
 import CreateSnapshotReducer from "./create_snapshot_reducer";
 import CreateWorldReducer from "./create_world_reducer";
+import DeleteChatMessageReducer from "./delete_chat_message_reducer";
 import DeleteObjectReducer from "./delete_object_reducer";
 import ExpireAiJobReducer from "./expire_ai_job_reducer";
 import ExpireCooldownReducer from "./expire_cooldown_reducer";
@@ -53,6 +54,7 @@ import RequestCreateObjectReducer from "./request_create_object_reducer";
 import RequestEditLockReducer from "./request_edit_lock_reducer";
 import ResetWorldReducer from "./reset_world_reducer";
 import SendChatMessageReducer from "./send_chat_message_reducer";
+import SetPlayerRoleReducer from "./set_player_role_reducer";
 import SubmitAiDraftReducer from "./submit_ai_draft_reducer";
 import SubmitObjectEditReducer from "./submit_object_edit_reducer";
 import UpdateDraftTransformReducer from "./update_draft_transform_reducer";
@@ -200,6 +202,7 @@ const reducersSchema = __reducers(
   __reducerSchema("cancel_edit", CancelEditReducer),
   __reducerSchema("create_snapshot", CreateSnapshotReducer),
   __reducerSchema("create_world", CreateWorldReducer),
+  __reducerSchema("delete_chat_message", DeleteChatMessageReducer),
   __reducerSchema("delete_object", DeleteObjectReducer),
   __reducerSchema("expire_ai_job", ExpireAiJobReducer),
   __reducerSchema("expire_cooldown", ExpireCooldownReducer),
@@ -216,6 +219,7 @@ const reducersSchema = __reducers(
   __reducerSchema("request_edit_lock", RequestEditLockReducer),
   __reducerSchema("reset_world", ResetWorldReducer),
   __reducerSchema("send_chat_message", SendChatMessageReducer),
+  __reducerSchema("set_player_role", SetPlayerRoleReducer),
   __reducerSchema("submit_ai_draft", SubmitAiDraftReducer),
   __reducerSchema("submit_object_edit", SubmitObjectEditReducer),
   __reducerSchema("update_draft_transform", UpdateDraftTransformReducer),

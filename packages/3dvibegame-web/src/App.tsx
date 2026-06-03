@@ -302,6 +302,17 @@ export function App() {
       .catch((err: unknown) => setContextMsg(errorMessage(err, "Chat failed")));
   }
 
+  function handleDeleteChat(messageId: string) {
+    void bridgeRef.current
+      ?.deleteChatMessage(messageId)
+      .catch((err: unknown) => setContextMsg(errorMessage(err, "Delete failed")));
+  }
+
+  // The local player can moderate (delete others' messages) when their backend role is
+  // host/moderator/platform_admin.
+  const localRole = backendSnap.players.find((player) => player.isLocal)?.role;
+  const canModerateChat = localRole === "host" || localRole === "moderator" || localRole === "platform_admin";
+
   return (
     <div className="app-root">
       <div className="canvas-wrapper">
@@ -323,6 +334,8 @@ export function App() {
           <ChatPanel
             messages={backendSnap.chatMessages}
             onSend={handleSendChat}
+            onDelete={handleDeleteChat}
+            canModerate={canModerateChat}
             disabled={!isLive}
             debugMessages={DEBUG ? aiTranscript : undefined}
           />

@@ -70,6 +70,49 @@ try {
   assert(!finalOutput.includes("sneaking in"), "rejected sends should not persist messages");
   assert(!finalOutput.includes('"Carol"'), "non-joined sender should never appear in chat");
 
+  // ── Moderation (delete_chat_message) ──────────────────────────────────────
+  // (set_player_role authorization is covered by typecheck/build + the app path; the
+  // spacetime CLI's Identity argument encoding makes it awkward to drive from a smoke.)
+  const messageIdOf = (body) => {
+    const out = harness.query(`SELECT message_id FROM chat_message WHERE body = '${body}'`);
+    const id = out.match(/\b\d+\b/)?.[0];
+    assert(id, `expected a message id for "${body}"`);
+    return id;
+  };
+
+  const aliceMsgId = messageIdOf("hello bob"); // authored by Alice
+  const bobMsgId = messageIdOf("hi alice"); // authored by Bob
+
+  // A normal player cannot delete someone else's message.
+  harness.activatePlayers();
+  expectReducerFailure(
+    () => harness.callAs(bob, "delete_chat_message", [aliceMsgId]),
+    "only the author or a moderator can delete this message",
+    "a non-moderator cannot delete another player's message",
+  );
+
+  // …but can delete their own.
+  harness.activatePlayers();
+  harness.callAs(bob, "delete_chat_message", [bobMsgId]);
+  assert(
+    !harness.query("SELECT body FROM chat_message").includes('"hi alice"'),
+    "an author can delete their own message",
+  );
+
+  // Promote Alice to moderator (the bootstrap allowlist is empty in tests); a moderator
+  // can delete a message authored by someone else.
+  harness.query("UPDATE player_session SET role = 'moderator' WHERE nickname = 'Alice'");
+  harness.activatePlayers();
+  harness.callAs(bob, "send_chat_message", ["bob again"]); // a fresh peer-authored message
+  const bobAgainId = messageIdOf("bob again");
+
+  harness.activatePlayers();
+  harness.callAs(alice, "delete_chat_message", [bobAgainId]);
+  assert(
+    !harness.query("SELECT body FROM chat_message").includes('"bob again"'),
+    "a moderator can delete a peer's message",
+  );
+
   console.log("chat smoke passed");
   console.log(`database: ${harness.database}`);
 } finally {

@@ -6,6 +6,10 @@ import type { ChatMessage } from "../hooks/useChatTranscript";
 interface Props {
   messages: BackendChatMessage[];
   onSend?: (text: string) => void;
+  /** Delete a message by id (own message, or any message when a moderator). */
+  onDelete?: (messageId: string) => void;
+  /** Whether the local player can delete other players' messages. */
+  canModerate?: boolean;
   /** Disable the composer (e.g. offline / not in a live room). */
   disabled?: boolean;
   /**
@@ -23,7 +27,14 @@ function formatTimestamp(value?: string) {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-export function ChatPanel({ messages, onSend, disabled = false, debugMessages }: Props) {
+export function ChatPanel({
+  messages,
+  onSend,
+  onDelete,
+  canModerate = false,
+  disabled = false,
+  debugMessages,
+}: Props) {
   const [open, setOpen] = useState(true);
   const [draft, setDraft] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -69,16 +80,30 @@ export function ChatPanel({ messages, onSend, disabled = false, debugMessages }:
           <div className="chat-log" role="log" aria-label="Chat transcript">
             {!hasContent && <p className="chat-empty">No messages yet.</p>}
 
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`chat-message chat-message--${message.isLocal ? "player" : "remote"}`}
-              >
-                <strong>{message.senderNickname}</strong>
-                <p>{message.body}</p>
-                {message.createdAt && <time>{formatTimestamp(message.createdAt)}</time>}
-              </div>
-            ))}
+            {messages.map((message) => {
+              const canDelete = onDelete && (message.isLocal || canModerate);
+              return (
+                <div
+                  key={message.id}
+                  className={`chat-message chat-message--${message.isLocal ? "player" : "remote"}`}
+                >
+                  {canDelete && (
+                    <button
+                      type="button"
+                      className="chat-delete"
+                      aria-label={`Delete message from ${message.senderNickname}`}
+                      title="Delete message"
+                      onClick={() => onDelete(message.id)}
+                    >
+                      ×
+                    </button>
+                  )}
+                  <strong>{message.senderNickname}</strong>
+                  <p>{message.body}</p>
+                  {message.createdAt && <time>{formatTimestamp(message.createdAt)}</time>}
+                </div>
+              );
+            })}
 
             {debugMessages?.map((message) => (
               <div
