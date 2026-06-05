@@ -16,21 +16,27 @@ interface Props {
 
 /**
  * Asks the local player to rate (👍/👎) their most recent AI create/edit. Shows once
- * per operation: rating (or any operation already rated) hides the card immediately and
- * keeps it hidden, so a player can't resubmit for the same create/edit.
+ * per operation: rating or dismissing (or any operation already handled) hides the card
+ * immediately and keeps it hidden, so a player can't resubmit for the same create/edit.
  */
 export function FeedbackCard({ operation, onRate, viewerMode = false, offline = false }: Props) {
-  const [submitted, setSubmitted] = useState<ReadonlySet<string>>(() => new Set());
+  // Operations the player has already rated or dismissed — either way the card stays hidden.
+  const [handled, setHandled] = useState<ReadonlySet<string>>(() => new Set());
 
   if (!operation || viewerMode || offline) return null;
-  if (submitted.has(operation.operationId)) return null;
+  if (handled.has(operation.operationId)) return null;
+
+  function dismiss() {
+    if (!operation) return;
+    setHandled((prev) => new Set(prev).add(operation.operationId));
+  }
 
   function rate(rating: FeedbackRating) {
     if (!operation) return;
     const { operationId } = operation;
     // Hide immediately (don't wait for the round-trip); the reducer reject path is a
     // safety net for double-clicks / reconnects.
-    setSubmitted((prev) => new Set(prev).add(operationId));
+    setHandled((prev) => new Set(prev).add(operationId));
     onRate({ operationId, rating });
   }
 
@@ -51,6 +57,14 @@ export function FeedbackCard({ operation, onRate, viewerMode = false, offline = 
           onClick={() => rate("down")}
         >
           👎
+        </button>
+        <button
+          className="btn-feedback-dismiss"
+          aria-label="Dismiss"
+          title="Dismiss"
+          onClick={dismiss}
+        >
+          ✕
         </button>
       </div>
     </div>

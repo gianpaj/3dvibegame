@@ -8,6 +8,7 @@ Builds on the AI create/edit pipelines (`createBackendLifecycleCommands.ts`) and
 backend world module (`packages/world-backend`).
 
 ## Decisions (resolved)
+
 - **Rating:** thumbs **up / down** only (binary is the cleanest signal to aggregate).
 - **Scope of v1:** **rating only** — no free-text comment yet. (Comment + profanity check
   is a clean follow-up; the table leaves room for it.)
@@ -19,6 +20,7 @@ backend world module (`packages/world-backend`).
 - **Persistence:** a new SpacetimeDB table `object_feedback` in `world-backend`.
 
 ## Can we reconstruct/analyse a piece of feedback? — yes (we snapshot)
+
 Each feedback row is **self-contained**: we copy the three things needed to understand it
 *at submit time* rather than pointing at live tables that change underneath us.
 
@@ -80,6 +82,7 @@ client also tracks submitted `operation_id`s locally and hides the card immediat
 reject path is just a safety net (e.g. double-click / reconnect).
 
 ## Backend reducer (`packages/world-backend/src/index.ts`)
+
 `submit_object_feedback({ operationId, objectId, objectVersion, operation, rating, sourcePrompt, sourceSpecJson, builderSpecJson, modelId, promptVersion })`:
 - `requireActivePlayer` (must be joined to a world).
 - Validate: `operation ∈ {create, edit}`, `rating ∈ {up, down}`, non-empty `operationId`;
@@ -92,11 +95,13 @@ reject path is just a safety net (e.g. double-click / reconnect).
 - *(v1 has no comment, so no profanity check yet — added with the comment field later.)*
 
 ## Prompt versioning (`packages/ai-planning`)
+
 Add `export const PROMPT_VERSION = "v1";` (bump on any edit to `voxelBuilderSystemPrompt` /
 `voxelEditSystemPrompt`). Export so the web client can stamp it onto feedback. This is what
 makes "did prompt v2 lift the 👍 rate?" a one-line query.
 
 ## Client (`packages/3dvibegame-web`)
+
 - Regenerate `module_bindings` (`object_feedback` table + `submit_object_feedback`).
 - **Thread provenance + operation id through the AI result:** include `modelId` on
   `AiWorkerDraftResult` / edit result (the configured Gemini model string), and import
@@ -114,17 +119,21 @@ makes "did prompt v2 lift the 👍 rate?" a one-line query.
 - App: render `FeedbackCard` in the HUD (its own slot); wire `onRate`.
 
 ## Analysing the data
+
 Export for offline analysis (no aggregates/ORDER BY in the SQL subset, so pull rows and
 crunch locally):
-```bash
+
+```sh
 spacetime sql --server <url> 3dvibegame \
   "SELECT rating, operation, model_id, prompt_version, source_prompt FROM object_feedback"
 ```
+
 Then bucket 👍/👎 by `model_id` × `prompt_version` × `operation`, and pull `source_prompt` +
 `source_spec_json` + `builder_spec_json` for the 👎 rows to inspect failure patterns and feed
 prompt revisions.
 
 ## Tests
+
 - `world-backend/scripts/smoke-feedback.mjs`: submit up/down; validation (bad `rating`,
   bad `operation`, empty `operationId`, over-long JSON); **resubmit rejected** (second
   submit for the same `operationId` → `SenderError`, still one row); non-joined caller
@@ -134,7 +143,7 @@ prompt revisions.
   `operationId`; hidden in viewer mode); bridge call-shape test.
 
 ## Out of scope (v1)
+
 Free-text comment + profanity check, editing/withdrawing a rating from the UI, per-object
 aggregate display ("87% liked this"), moderation of feedback, rate-limiting, and an
 in-app analytics dashboard (export + offline analysis only for now).
-```

@@ -68,6 +68,23 @@ describe("FeedbackCard", () => {
     expect(onRate).toHaveBeenCalledTimes(1);
   });
 
+  it("dismisses the card without rating and keeps it hidden for that operation", async () => {
+    const onRate = vi.fn();
+    const user = userEvent.setup();
+    const operation = makeOperation();
+    const { rerender, container } = render(
+      <FeedbackCard operation={operation} onRate={onRate} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(container).toBeEmptyDOMElement();
+    expect(onRate).not.toHaveBeenCalled();
+
+    // Re-rendering with the same operation must not bring the card back.
+    rerender(<FeedbackCard operation={operation} onRate={onRate} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it("shows the card again for a different operation", async () => {
     const user = userEvent.setup();
     const { rerender } = render(
