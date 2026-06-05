@@ -3,14 +3,166 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>3D Vibe Game</title>
+
+    <title>
+      3dvibegame.com — Multiplayer AI Voxel Sandbox Game in Your Browser
+    </title>
+    <meta
+      name="description"
+      content="A shared 3D world where players create, move, remix, duplicate, and delete AI-built voxel objects."
+    />
+    <meta
+      name="keywords"
+      content="AI voxel game, multiplayer sandbox, 3D building game, browser game, AI 3D objects, vibe coding game, voxel sandbox, prompt to 3D"
+    />
+    <meta name="author" content="Gianfranco (@gianpaj)" />
+    <meta name="theme-color" content="#ebe4d7" />
+    <link rel="canonical" href="https://3dvibegame.com/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="3dvibegame" />
+    <meta
+      property="og:title"
+      content="3dvibegame — Multiplayer AI Voxel Sandbox Game"
+    />
+    <meta
+      property="og:description"
+      content="Build voxel 3D objects with AI prompts, then move, remix, duplicate and share them with other players in a shared real-time world. Free and runs in your browser."
+    />
+    <meta property="og:url" content="https://3dvibegame.com/" />
+    <meta property="og:image" content="https://3dvibegame.com/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="3dvibegame — Multiplayer AI Voxel Sandbox Game"
+    />
+    <meta
+      name="twitter:description"
+      content="Build voxel 3D objects with AI prompts, then move, remix, duplicate and share them with other players in a shared real-time world. Free, in your browser."
+    />
+    <meta name="twitter:image" content="https://3dvibegame.com/og-image.jpg" />
+
+    <!-- Structured data: the game itself (helps Google + AI engines cite it) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        "name": "3dvibegame",
+        "url": "https://3dvibegame.com/",
+        "description": "A shared 3D world where players create, move, remix, duplicate and delete AI-built voxel objects in real time, directly in the browser.",
+        "image": "https://3dvibegame.com/og-image.jpg",
+        "applicationCategory": "Game",
+        "genre": ["Sandbox", "Multiplayer", "Creative"],
+        "gamePlatform": "Web browser",
+        "operatingSystem": "Any (modern web browser with WebGL)",
+        "browserRequirements": "Requires WebGL. Works best on desktop.",
+        "playMode": "MultiPlayer",
+        "inLanguage": "en",
+        "author": {
+          "@type": "Person",
+          "name": "Gianfranco",
+          "url": "https://github.com/gianpaj"
+        },
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD",
+          "availability": "https://schema.org/InStock"
+        },
+        "sameAs": ["https://github.com/gianpaj/3dvibegame"]
+      }
+    </script>
+
+    <!-- Structured data: FAQ (high citation rate in AI search / Perplexity) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is 3Dvibegame?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "3Dvibegame is a free, browser-based multiplayer sandbox where players create 3D voxel objects from AI text prompts, then move, remix, duplicate and delete them in a shared real-time world."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is 3Dvibegame free to play?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. 3Dvibegame is free and runs directly in a modern web browser with WebGL. No install is required and it works best on desktop."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How do you build objects in 3Dvibegame?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "You type a text prompt and the game generates a voxel object with AI. You can then move it with WASD, raise or lower it with Q and E, copy and paste it, remix it with another prompt, or delete it."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is 3Dvibegame multiplayer?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. All players share one live 3D world, so objects you create and edit appear for everyone in real time."
+            }
+          }
+        ]
+      }
+    </script>
+
     <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { overflow: hidden; background: #ebe4d7; }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        overflow: hidden;
+        background: #ebe4d7;
+      }
     </style>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <main
+        style="
+          max-width: 640px;
+          margin: 10vh auto;
+          padding: 0 24px;
+          font-family:
+            -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;
+          color: #1a1a1a;
+        "
+      >
+        <h1>3dvibegame.com — Multiplayer AI Voxel Sandbox</h1>
+        <p>
+          3dvibegame.com is a free, browser-based multiplayer sandbox where you
+          build 3D voxel objects from AI text prompts, then move, remix,
+          duplicate and delete them in a shared real-time world.
+        </p>
+        <p>
+          The game needs JavaScript and WebGL. Please enable JavaScript to play.
+          Works best on desktop.
+        </p>
+        <p>
+          Source code:
+          <a href="https://github.com/gianpaj/3dvibegame"
+            >github.com/gianpaj/3dvibegame</a
+          >
+        </p>
+      </main>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

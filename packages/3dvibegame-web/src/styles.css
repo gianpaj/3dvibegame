@@ -76,6 +76,13 @@ body {
   pointer-events: auto;
 }
 
+.hud-bottom-left {
+  position: absolute;
+  bottom: 20px;
+  left: 16px;
+  pointer-events: auto;
+}
+
 /* ── Status badge ─────────────────────────────── */
 .status-badge {
   display: inline-flex;
@@ -300,6 +307,108 @@ body {
   gap: 6px;
 }
 
+/* ── Info modal ──────────────────────────────── */
+.info-button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    transform 0.12s,
+    background 0.12s,
+    border-color 0.12s;
+}
+
+.info-button:hover {
+  transform: translateY(-1px);
+  background: #fff;
+  border-color: #bbb;
+}
+
+.info-modal {
+  max-width: 520px;
+}
+
+.info-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.info-modal-close {
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.info-modal-close:hover {
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.info-section h3 {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.shortcut-list {
+  display: grid;
+  gap: 6px;
+}
+
+.shortcut-row {
+  display: grid;
+  grid-template-columns: minmax(110px, max-content) 1fr;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.shortcut-row dt {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.shortcut-row dd {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.info-link {
+  align-self: flex-start;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .btn-feedback {
   padding: 4px 10px;
   border-radius: 7px;
@@ -452,6 +561,10 @@ body {
   font-size: 14px;
   color: var(--text-muted);
   line-height: 1.5;
+
+  .small {
+    font-size: 12px;
+  }
 }
 
 .modal-input {

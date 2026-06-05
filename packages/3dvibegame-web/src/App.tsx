@@ -21,6 +21,7 @@ import type { createBackendGenerationSnapshot } from "./backend/createBackendGen
 import { GameCanvas, type SpawnPoint } from "./scene/GameCanvas";
 import { GenerationCard } from "./components/GenerationCard";
 import { FeedbackCard, type FeedbackRating } from "./components/FeedbackCard";
+import { InfoButton } from "./components/InfoButton";
 import {
   GeminiKeyModal,
   loadStoredGeminiKey,
@@ -551,6 +552,10 @@ export function App() {
             disabled={!isLive}
             debugMessages={DEBUG ? aiTranscript : undefined}
           />
+        </div>
+
+        <div className="hud-bottom-left">
+          <InfoButton />
         </div>
 
         <div className="hud-top-right">
