@@ -347,13 +347,22 @@ export function createBackendLifecycleCommands(
       }
 
       const localPlayerId = localBackendPlayerId(snapshot);
+      // The creator can edit their fresh draft while it's still in grace (before
+      // releasing it). The backend has no grace-edit path, so we release it to the
+      // world first (below) and run the normal public edit flow.
+      const isOwnedGrace =
+        object.state === "grace" && object.grace_owner_id === localPlayerId;
       if (object.state === "edit_locked" && object.lock_owner_id !== localPlayerId) {
         throw new Error("Object is being edited by another player.");
       }
-      if (object.state === "grace" && object.grace_owner_id !== localPlayerId) {
+      if (object.state === "grace" && !isOwnedGrace) {
         throw new Error("Object is in another player's grace window.");
       }
-      if (object.state !== "public" && object.state !== "edit_locked") {
+      if (
+        object.state !== "public" &&
+        object.state !== "edit_locked" &&
+        !isOwnedGrace
+      ) {
         throw new Error(`Object cannot be edited in ${object.state} state.`);
       }
 
@@ -374,8 +383,15 @@ export function createBackendLifecycleCommands(
         throw userFacingAiWorkerError(error);
       }
 
-      // Public objects need a lock first; if we already hold it (from selection), skip.
-      if (object.state === "public") {
+      // A grace draft can't be edit-locked directly (request_edit_lock requires the
+      // object to be `public`), so release it to the world first. The owner keeps
+      // exclusive control by immediately acquiring the edit lock below.
+      if (isOwnedGrace) {
+        await bridge.releaseObject({ objectId: object.object_id });
+      }
+      // Public (and just-released grace) objects need a lock first; if we already hold
+      // it (e.g. from selection), skip.
+      if (object.state === "public" || isOwnedGrace) {
         await bridge.requestEditLock({
           objectId: object.object_id,
           baseVersion: object.version,
