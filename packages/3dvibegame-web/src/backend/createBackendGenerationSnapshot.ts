@@ -14,6 +14,9 @@ import type {
 
 type BackendAuthorityObject = AuthorityWorld["objects"][number];
 
+const EDIT_LOCK_ACTIVE_MESSAGE =
+  "Backend edit lock active. Submit or release the locked edit.";
+
 export function createBackendGenerationSnapshot(
   backendSnapshot: BackendPresenceSnapshot,
   fallback: GenerationSnapshot,
@@ -22,14 +25,33 @@ export function createBackendGenerationSnapshot(
   const world = visibleBackendWorld(backendSnapshot) ?? fallback.world;
   const object = selectBackendObject(backendSnapshot, selectedObjectId);
   const aiJob = object ? null : selectBackendAiJob(backendSnapshot);
-  const stage = object ? stageForBackendObject(object) : stageForBackendAiJob(aiJob);
+
+  // Optimistic edit lock: the player just clicked a public object and we've fired an
+  // edit-lock request (lockSelectedObject) that hasn't round-tripped yet. Present it as
+  // edit_locked everywhere — stage (badge), message, and the transcript event id — so
+  // selection feels instant and never flashes the still-"public" stage/"…is public."
+  // message before snapping to the lock. App clears the selection if the lock request
+  // fails, so this override stops applying. Any non-public state reflects real ownership.
+  const optimisticEditLock =
+    object !== null &&
+    object.state === "public" &&
+    object.object_id === selectedObjectId;
+  const effectiveState = optimisticEditLock ? "edit_locked" : object?.state;
+
+  const stage = object
+    ? optimisticEditLock
+      ? "edit_locked"
+      : stageForBackendObject(object)
+    : stageForBackendAiJob(aiJob);
   const lastMessage = object
-    ? backendMessageForObject(backendSnapshot, object)
+    ? optimisticEditLock
+      ? EDIT_LOCK_ACTIVE_MESSAGE
+      : backendMessageForObject(backendSnapshot, object)
     : backendMessageForAiJob(aiJob);
   const stageEvents = [
     {
       id: object
-        ? `backend:${object.object_id}:${object.version}:${object.state}`
+        ? `backend:${object.object_id}:${object.version}:${effectiveState}`
         : aiJob
           ? `backend-ai-job:${aiJob.jobId}:${aiJob.status}:${aiJob.errorCode ?? "none"}`
           : "backend:idle",
@@ -213,7 +235,7 @@ function backendMessageForObject(
         : `Backend draft is in another player's grace window for ${object.grace_remaining_seconds}s.`;
     case "edit_locked":
       return object.lock_owner_id === localPlayerId
-        ? "Backend edit lock active. Submit or release the locked edit."
+        ? EDIT_LOCK_ACTIVE_MESSAGE
         : "Backend object is locked by another editor.";
     case "cooldown":
       return `Backend edit accepted. ${object.cooldown_remaining_seconds}s cooldown remain.`;
