@@ -1,5 +1,6 @@
 # TODO
 
+x 2026-06-05 allow to copy and paste to duplicate (also add button in GenerationCard)
 x 2026-06-03 add reconnection functiontionality if network issue in browser
 x 2026-06-03 when generating a new object, create it in front of the user - not always in some hard coded area
 x 2026-06-03 add the ability to move items up and down.

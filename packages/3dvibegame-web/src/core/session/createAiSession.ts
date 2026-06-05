@@ -16,6 +16,13 @@ import {
 } from "@3dvibegame/scene-authority-ts";
 
 import type { AiWorkerClient, AiWorkerDraftResult } from "../aiWorker/fixtureAiWorkerClient";
+import {
+  canCopyObject,
+  cloneBuilderSpec,
+  createObjectCopyTemplate,
+  type ObjectCopyTemplate,
+  type ObjectPastePoint,
+} from "../objectClipboard";
 import type { GenerationActionId } from "./generationSession";
 import type { SceneDocument, SceneObjectRecord, PlayerSessionState } from "../state/contracts";
 
@@ -350,6 +357,83 @@ export function createAiSession(aiClient: AiWorkerClient) {
       notify();
     },
 
+    canCopySelectedObject() {
+      return canCopyObject(currentObject(), playerId);
+    },
+
+    copySelectedObject(): ObjectCopyTemplate {
+      const object = currentObject();
+      if (!object) {
+        throw new Error("Select an object before copying it.");
+      }
+      return createObjectCopyTemplate({ object, localPlayerId: playerId });
+    },
+
+    releaseSelectedObjectForPaste() {
+      const object = currentObject();
+      if (!object) return;
+      try {
+        if (object.state === "grace") {
+          world = releaseObject(world, { objectId: object.object_id, playerId }).world;
+        } else if (object.state === "edit_locked") {
+          world = releaseEditLock(world, { objectId: object.object_id, playerId }).world;
+        }
+        activeObjectId = null;
+      } catch (error) {
+        lastMessage =
+          error instanceof Error ? error.message : "Failed to release selected object.";
+        notify();
+        throw error;
+      }
+      notify();
+    },
+
+    async pasteCopiedObject(
+      template: ObjectCopyTemplate,
+      pastePoint: ObjectPastePoint,
+    ) {
+      const n = ++requestCounter;
+      const jobId = `local_duplicate_${n}`;
+      const objectId = `${slug(template.category)}_copy_${n}`;
+
+      try {
+        world = requestCreateObject(world, {
+          jobId,
+          playerId,
+          sourcePrompt: `duplicate ${template.category}`,
+        }).world;
+        world = submitAIDraft(world, {
+          jobId,
+          objectId,
+          creatorId: playerId,
+          builderSpec: cloneBuilderSpec(template.builderSpec),
+          graceSeconds: 30,
+        }).world;
+        const [rotationX, rotationY, rotationZ] = template.transform.rotation;
+        const [scaleX, scaleY, scaleZ] = template.transform.scale;
+        world = updateDraftTransform(world, {
+          objectId,
+          playerId,
+          patch: {
+            position: { x: pastePoint.x, y: pastePoint.y, z: pastePoint.z },
+            rotation: { x: rotationX, y: rotationY, z: rotationZ },
+            scale: { x: scaleX, y: scaleY, z: scaleZ },
+          },
+        }).world;
+        activeObjectId = objectId;
+        stage = "grace";
+        lastMessage = `Duplicated ${template.category}. Move, rotate, scale, then release.`;
+      } catch (error) {
+        stage = "failed";
+        lastMessage = error instanceof Error ? error.message : "Duplicate failed.";
+        notify();
+        throw error;
+      }
+
+      notify();
+      return objectId;
+    },
+
     selectObject(objectId: string | null) {
       const obj = objectId
         ? (world.objects.find((o) => o.object_id === objectId) ?? null)
@@ -443,4 +527,14 @@ function createInitialWorld(): AuthorityWorld {
       protected_spawn_enabled: false,
     },
   });
+}
+
+function slug(value: string) {
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 36) || "object"
+  );
 }

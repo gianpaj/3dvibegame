@@ -9,9 +9,17 @@ interface Props {
   snapshot: AiSessionSnapshot;
   onDispatch: (actionId: GenerationActionId) => void;
   onDelete: () => void;
+  onDuplicate?: () => void;
+  canDuplicate?: boolean;
 }
 
-export function GenerationCard({ snapshot, onDispatch, onDelete }: Props) {
+export function GenerationCard({
+  snapshot,
+  onDispatch,
+  onDelete,
+  onDuplicate,
+  canDuplicate = false,
+}: Props) {
   const { stage, lastMessage, object, availableActions } = snapshot;
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -26,6 +34,7 @@ export function GenerationCard({ snapshot, onDispatch, onDelete }: Props) {
   const showScaleUp = availableActions.includes("scale_draft");
   const showScaleDown = availableActions.includes("scale_down_draft");
   const showRelease = availableActions.includes("release_object");
+  const showDuplicate = object !== null && canDuplicate && onDuplicate;
 
   return (
     <div className="generation-card">
@@ -37,7 +46,12 @@ export function GenerationCard({ snapshot, onDispatch, onDelete }: Props) {
       </div>
       <p className="generation-card-message">{lastMessage}</p>
 
-      {(showMove || showRotate || showScaleUp || showScaleDown || showRelease) && (
+      {(showMove ||
+        showRotate ||
+        showScaleUp ||
+        showScaleDown ||
+        showRelease ||
+        showDuplicate) && (
         <div className="action-buttons">
           {showMove && (
             <button className="btn-action" onClick={() => onDispatch("nudge_draft")}>
@@ -57,6 +71,11 @@ export function GenerationCard({ snapshot, onDispatch, onDelete }: Props) {
           {showScaleDown && (
             <button className="btn-action" onClick={() => onDispatch("scale_down_draft")}>
               Scale ↓
+            </button>
+          )}
+          {showDuplicate && (
+            <button className="btn-action" onClick={onDuplicate}>
+              Duplicate
             </button>
           )}
           {showRelease && (

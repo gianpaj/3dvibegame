@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createConfiguredAiWorkerClient,
   isMissingBrowserGeminiKeyError,
+  pastePositionForTemplate,
   resolveAiClientMode,
+  type ObjectCopyTemplate,
 } from "./core";
 import { createAiSession } from "./core/session/createAiSession";
 import type { AiSessionSnapshot } from "./core/session/createAiSession";
@@ -55,6 +57,11 @@ const DISABLED_BACKEND_SNAPSHOT: BackendPresenceSnapshot = {
   chatMessages: [],
 };
 
+interface ObjectClipboardState {
+  template: ObjectCopyTemplate;
+  pasteCount: number;
+}
+
 export function App() {
   // --- Gemini key ---
   const [geminiKey, setGeminiKey] = useState<string | null>(() =>
@@ -100,6 +107,7 @@ export function App() {
   >(null);
   const bridgeRef = useRef<BackendPresenceBridge | null>(null);
   const spawnPointRef = useRef<(() => SpawnPoint) | null>(null);
+  const objectClipboardRef = useRef<ObjectClipboardState | null>(null);
 
   // Connect to the backend once the player has entered a name (so we join the
   // world with their chosen nickname). Recreated cleanly across React StrictMode's
@@ -345,6 +353,116 @@ export function App() {
     sessionRef.current?.deleteSelected();
   }
 
+  const canCopySelectedObject = useCallback(() => {
+    if (viewerMode) return false;
+    if (backendCommandsRef.current?.canHandle()) {
+      return backendCommandsRef.current.canCopySelectedObject();
+    }
+    return sessionRef.current?.canCopySelectedObject() ?? false;
+  }, [viewerMode]);
+
+  const copySelectedObjectTemplate = useCallback(() => {
+    if (backendCommandsRef.current?.canHandle()) {
+      return backendCommandsRef.current.copySelectedObject();
+    }
+    const template = sessionRef.current?.copySelectedObject();
+    if (!template) {
+      throw new Error("Select an object before copying it.");
+    }
+    return template;
+  }, []);
+
+  const pasteObjectTemplate = useCallback(
+    async (template: ObjectCopyTemplate, pasteCount: number) => {
+      const pastePoint = pastePositionForTemplate(
+        template,
+        pasteCount,
+        spawnPointRef.current?.() ?? { x: 0, y: 0, z: 0 },
+      );
+
+      if (backendCommandsRef.current?.canHandle()) {
+        await backendCommandsRef.current.releaseSelectedObjectForPaste();
+        const objectId = await backendCommandsRef.current.pasteCopiedObject(
+          template,
+          pastePoint,
+        );
+        setSelectedObjectId(objectId);
+        selectedObjectIdRef.current = objectId;
+        return objectId;
+      }
+
+      sessionRef.current?.releaseSelectedObjectForPaste();
+      return sessionRef.current?.pasteCopiedObject(template, pastePoint);
+    },
+    [],
+  );
+
+  const handleCopySelectedObject = useCallback(() => {
+    setContextMsg("");
+    try {
+      const template = copySelectedObjectTemplate();
+      objectClipboardRef.current = { template, pasteCount: 0 };
+      setContextMsg(`Copied ${template.category}.`);
+    } catch (err: unknown) {
+      setContextMsg(errorMessage(err, "Copy failed"));
+    }
+  }, [copySelectedObjectTemplate]);
+
+  const handlePasteCopiedObject = useCallback(async () => {
+    setContextMsg("");
+    const clipboard = objectClipboardRef.current;
+    if (!clipboard) {
+      setContextMsg("Copy an object before pasting.");
+      return;
+    }
+
+    try {
+      await pasteObjectTemplate(clipboard.template, clipboard.pasteCount);
+      clipboard.pasteCount += 1;
+      setContextMsg(`Pasted ${clipboard.template.category}.`);
+    } catch (err: unknown) {
+      setContextMsg(errorMessage(err, "Paste failed"));
+    }
+  }, [pasteObjectTemplate]);
+
+  const handleDuplicateSelectedObject = useCallback(async () => {
+    setContextMsg("");
+    try {
+      const template = copySelectedObjectTemplate();
+      await pasteObjectTemplate(template, 0);
+      setContextMsg(`Duplicated ${template.category}.`);
+    } catch (err: unknown) {
+      setContextMsg(errorMessage(err, "Duplicate failed"));
+    }
+  }, [copySelectedObjectTemplate, pasteObjectTemplate]);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const key = event.key.toLowerCase();
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+      if (key !== "c" && key !== "v") return;
+      if (isEditableTarget(event.target)) return;
+
+      if (key === "c") {
+        if (!canCopySelectedObject()) return;
+        event.preventDefault();
+        handleCopySelectedObject();
+        return;
+      }
+
+      if (!objectClipboardRef.current) return;
+      event.preventDefault();
+      void handlePasteCopiedObject();
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    canCopySelectedObject,
+    handleCopySelectedObject,
+    handlePasteCopiedObject,
+  ]);
+
   function handleRateFeedback({
     operationId,
     rating,
@@ -401,6 +519,7 @@ export function App() {
     localRole === "host" ||
     localRole === "moderator" ||
     localRole === "platform_admin";
+  const canDuplicateSelected = canCopySelectedObject();
 
   return (
     <div className="app-root">
@@ -453,6 +572,8 @@ export function App() {
               snapshot={displaySnapshot}
               onDispatch={handleDispatch}
               onDelete={handleDelete}
+              onDuplicate={handleDuplicateSelectedObject}
+              canDuplicate={canDuplicateSelected}
             />
           )}
           <FeedbackCard
@@ -498,4 +619,14 @@ function errorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message)
     return `${fallback}: ${error.message}`;
   return fallback;
+}
+
+function isEditableTarget(target: EventTarget | null) {
+  const element = target instanceof HTMLElement ? target : null;
+  if (!element) return false;
+  return (
+    element.tagName === "INPUT" ||
+    element.tagName === "TEXTAREA" ||
+    element.isContentEditable
+  );
 }

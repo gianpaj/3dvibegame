@@ -9,7 +9,11 @@ import type {
 import {
   AiWorkerError,
   aiWorkerFailureLabel,
+  canCopyObject,
+  createObjectCopyTemplate,
   createFixtureAiWorkerClient,
+  type ObjectCopyTemplate,
+  type ObjectPastePoint,
   normalizeAiWorkerError,
   scenarios,
 } from "../core";
@@ -33,6 +37,13 @@ export interface BackendLifecycleCommands {
   releaseSelectedLock(): Promise<void>;
   moveSelectedObject(dx: number, dy: number, dz: number): Promise<void>;
   deleteSelectedObject(): Promise<void>;
+  canCopySelectedObject(): boolean;
+  copySelectedObject(): ObjectCopyTemplate;
+  releaseSelectedObjectForPaste(): Promise<void>;
+  pasteCopiedObject(
+    template: ObjectCopyTemplate,
+    pastePoint: ObjectPastePoint,
+  ): Promise<string>;
   updateWorldSettings(input: BackendUpdateWorldSettingsInput): Promise<void>;
   createSnapshot(reason?: string): Promise<void>;
   resetWorld(reason?: string): Promise<void>;
@@ -486,6 +497,94 @@ export function createBackendLifecycleCommands(
 
       await bridge.deleteObject({ objectId: object.object_id });
     },
+    canCopySelectedObject() {
+      const snapshot = bridge.getSnapshot();
+      return canCopyObject(
+        selectBackendObject(snapshot, selectedObjectId()),
+        localBackendPlayerId(snapshot),
+      );
+    },
+    copySelectedObject() {
+      const snapshot = bridge.getSnapshot();
+      const object = selectBackendObject(snapshot, selectedObjectId());
+      if (!object) {
+        throw new Error("Select an object before copying it.");
+      }
+      const artifact = snapshot.objectArtifacts.find(
+        (candidate) => candidate.objectId === object.object_id,
+      );
+      if (!artifact?.sourceSpecJson) {
+        throw new Error("This object is missing its source spec and cannot be copied.");
+      }
+      return createObjectCopyTemplate({
+        object,
+        localPlayerId: localBackendPlayerId(snapshot),
+        sourceSpecJson: artifact.sourceSpecJson,
+        builderSpecJson: artifact.builderSpecJson,
+      });
+    },
+    async releaseSelectedObjectForPaste() {
+      const snapshot = bridge.getSnapshot();
+      const object = selectBackendObject(snapshot, selectedObjectId());
+      if (!object) return;
+
+      const localPlayerId = localBackendPlayerId(snapshot);
+      if (object.state === "grace" && object.grace_owner_id === localPlayerId) {
+        await bridge.releaseObject({ objectId: object.object_id });
+        return;
+      }
+      if (object.state === "edit_locked" && object.lock_owner_id === localPlayerId) {
+        await bridge.cancelEdit({ objectId: object.object_id });
+      }
+    },
+    async pasteCopiedObject(template, pastePoint) {
+      if (!isBackendReady(bridge)) {
+        throw new Error("Backend room is not ready yet.");
+      }
+      if (!template.sourceSpecJson) {
+        throw new Error("Copied object is missing its source spec.");
+      }
+
+      const idSuffix = `${Date.now().toString(36)}_${sequence++}`;
+      const jobId = `backend_duplicate_${idSuffix}`;
+      const objectId = `${slug(template.category)}_copy_${idSuffix}`;
+
+      await bridge.requestCreateObject({
+        jobId,
+        sourcePrompt: `duplicate ${template.category}`,
+      });
+      try {
+        await bridge.submitAiDraft({
+          jobId,
+          objectId,
+          sourceSpecJson: template.sourceSpecJson,
+          builderSpecJson: template.builderSpecJson,
+          positionX: pastePoint.x,
+          positionY: pastePoint.y,
+          positionZ: pastePoint.z,
+        });
+      } catch (error) {
+        await failCreateJob(bridge, jobId, "validation_failed");
+        throw error;
+      }
+
+      const [rotationX, rotationY, rotationZ] = template.transform.rotation;
+      const [scaleX, scaleY, scaleZ] = template.transform.scale;
+      await bridge.updateDraftTransform({
+        objectId,
+        positionX: pastePoint.x,
+        positionY: pastePoint.y,
+        positionZ: pastePoint.z,
+        rotationX,
+        rotationY,
+        rotationZ,
+        scaleX,
+        scaleY,
+        scaleZ,
+      });
+
+      return objectId;
+    },
   };
 }
 
@@ -540,6 +639,16 @@ function sourcePromptForAction(actionId: ScenarioActionId) {
 function sourceSpecJsonForObject(snapshot: BackendPresenceSnapshot, objectId: string) {
   return snapshot.objectArtifacts.find((artifact) => artifact.objectId === objectId)
     ?.sourceSpecJson;
+}
+
+function slug(value: string) {
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 36) || "object"
+  );
 }
 
 function isScenarioAction(actionId: GenerationActionId): actionId is ScenarioActionId {
