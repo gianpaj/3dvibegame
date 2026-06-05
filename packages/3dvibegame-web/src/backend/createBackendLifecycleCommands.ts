@@ -1,3 +1,5 @@
+import { PROMPT_VERSION } from "@3dvibegame/ai-planning";
+
 import type {
   AiWorkerClient,
   AiWorkerFailureCode,
@@ -36,9 +38,25 @@ export interface BackendLifecycleCommands {
   resetWorld(reason?: string): Promise<void>;
 }
 
+// A create/edit the local player just performed and has not yet rated. Carries the
+// snapshot the FeedbackCard needs to submit a 👍/👎 without re-deriving anything.
+export interface PendingObjectFeedback {
+  operationId: string;
+  objectId: string;
+  objectVersion: number;
+  operation: "create" | "edit";
+  sourcePrompt: string;
+  sourceSpecJson: string;
+  builderSpecJson: string;
+  modelId: string;
+  promptVersion: string;
+}
+
 export interface BackendLifecycleCommandsOptions {
   getSelectedObjectId?: () => string | null;
   getSpawnPoint?: () => { x: number; y: number; z: number };
+  /** Fired after a successful create/edit so the HUD can offer a feedback rating. */
+  onOperation?: (feedback: PendingObjectFeedback) => void;
 }
 
 const MAX_MULTI_OBJECT_COUNT = 4;
@@ -47,7 +65,7 @@ const MULTI_SPAWN_SPACING = 2.5; // world units between copies
 export function createBackendLifecycleCommands(
   bridge: BackendPresenceBridge,
   aiWorker: AiWorkerClient = createFixtureAiWorkerClient(),
-  { getSelectedObjectId, getSpawnPoint }: BackendLifecycleCommandsOptions = {},
+  { getSelectedObjectId, getSpawnPoint, onOperation }: BackendLifecycleCommandsOptions = {},
 ): BackendLifecycleCommands {
   let sequence = 0;
   const selectedObjectId = () => getSelectedObjectId?.() ?? null;
@@ -220,6 +238,20 @@ export function createBackendLifecycleCommands(
         // via the normal grace flow, then clicks each subsequent object to move it.
         if (i > 0) {
           await bridge.releaseObject({ objectId }).catch(() => {});
+        } else {
+          // Offer feedback on the first object only — one rating per prompt. The
+          // job_id is the create operation's dedupe key (see object-feedback plan).
+          onOperation?.({
+            operationId: jobId,
+            objectId,
+            objectVersion: 1,
+            operation: "create",
+            sourcePrompt: trimmed,
+            sourceSpecJson: draft.sourceSpecJson,
+            builderSpecJson: draft.builderSpecJson,
+            modelId: draft.modelId,
+            promptVersion: PROMPT_VERSION,
+          });
         }
       }
     },
@@ -356,6 +388,20 @@ export function createBackendLifecycleCommands(
         builderSpecJson: edit.builderSpecJson,
       });
       await bridge.expireCooldown({ objectId: object.object_id });
+
+      // Edits don't create an ai_job, so mint an op id here as the feedback dedupe key.
+      // submitObjectEdit bumps the version, so the rated version is base + 1.
+      onOperation?.({
+        operationId: `backend_edit_${Date.now().toString(36)}_${sequence++}`,
+        objectId: object.object_id,
+        objectVersion: object.version + 1,
+        operation: "edit",
+        sourcePrompt: prompt,
+        sourceSpecJson: edit.sourceSpecJson,
+        builderSpecJson: edit.builderSpecJson,
+        modelId: edit.modelId,
+        promptVersion: PROMPT_VERSION,
+      });
     },
     // Acquire an exclusive edit lock on the selected object so other players can't
     // move it. Public objects get locked (held until release); grace drafts are

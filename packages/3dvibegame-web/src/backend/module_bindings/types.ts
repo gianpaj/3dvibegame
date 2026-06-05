@@ -34,6 +34,25 @@ export const ChatMessage = __t.object("ChatMessage", {
 });
 export type ChatMessage = __Infer<typeof ChatMessage>;
 
+export const ObjectFeedback = __t.object("ObjectFeedback", {
+  feedbackId: __t.u64(),
+  worldId: __t.u64(),
+  objectId: __t.string(),
+  objectVersion: __t.u32(),
+  operationId: __t.string(),
+  operation: __t.string(),
+  rating: __t.string(),
+  sourcePrompt: __t.string(),
+  sourceSpecJson: __t.string(),
+  builderSpecJson: __t.string(),
+  modelId: __t.string(),
+  promptVersion: __t.string(),
+  playerIdentity: __t.identity(),
+  playerNickname: __t.string(),
+  createdAt: __t.timestamp(),
+});
+export type ObjectFeedback = __Infer<typeof ObjectFeedback>;
+
 export const ObjectLock = __t.object("ObjectLock", {
   objectId: __t.string(),
   worldId: __t.u64(),

@@ -52,7 +52,7 @@ export function createHttpAiWorkerClient({
           objectIdBase:
             response.object_id_base ?? response.objectIdBase ?? "http_worker_object",
           quantity: 1,
-          ...workerResponseToArtifact(response),
+          ...workerResponseToArtifact(response, "http-worker"),
         };
       } catch (error) {
         throw normalizeAiWorkerError(error);
@@ -70,7 +70,7 @@ export function createHttpAiWorkerClient({
         };
         const response = await postWorkerJson(fetchImpl, endpoint, timeoutMs, body);
 
-        return workerResponseToArtifact(response);
+        return workerResponseToArtifact(response, "http-worker");
       } catch (error) {
         throw normalizeAiWorkerError(error);
       }

@@ -57,6 +57,7 @@ import SendChatMessageReducer from "./send_chat_message_reducer";
 import SetPlayerRoleReducer from "./set_player_role_reducer";
 import SubmitAiDraftReducer from "./submit_ai_draft_reducer";
 import SubmitObjectEditReducer from "./submit_object_edit_reducer";
+import SubmitObjectFeedbackReducer from "./submit_object_feedback_reducer";
 import UpdateDraftTransformReducer from "./update_draft_transform_reducer";
 import UpdateLockedTransformReducer from "./update_locked_transform_reducer";
 import UpdateWorldSettingsReducer from "./update_world_settings_reducer";
@@ -222,6 +223,7 @@ const reducersSchema = __reducers(
   __reducerSchema("set_player_role", SetPlayerRoleReducer),
   __reducerSchema("submit_ai_draft", SubmitAiDraftReducer),
   __reducerSchema("submit_object_edit", SubmitObjectEditReducer),
+  __reducerSchema("submit_object_feedback", SubmitObjectFeedbackReducer),
   __reducerSchema("update_draft_transform", UpdateDraftTransformReducer),
   __reducerSchema("update_locked_transform", UpdateLockedTransformReducer),
   __reducerSchema("update_world_settings", UpdateWorldSettingsReducer),

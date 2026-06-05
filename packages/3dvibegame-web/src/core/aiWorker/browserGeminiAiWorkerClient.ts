@@ -67,7 +67,7 @@ export function createBrowserGeminiAiWorkerClient({
           jobIdBase: response.job_id_base,
           objectIdBase: response.object_id_base,
           quantity: voxel.quantity ?? 1,
-          ...toArtifact(response.source_spec, response.builder_spec),
+          ...toArtifact(response.source_spec, response.builder_spec, model),
         };
       } catch (error) {
         throw normalizeAiWorkerError(error);
@@ -106,7 +106,7 @@ export function createBrowserGeminiAiWorkerClient({
           changePrompt,
         });
         const response = buildVoxelResponse(request, voxel, ["browser Gemini BYOK edit"]);
-        return toArtifact(response.source_spec, response.builder_spec);
+        return toArtifact(response.source_spec, response.builder_spec, model);
       } catch (error) {
         throw normalizeAiWorkerError(error);
       }
@@ -114,7 +114,11 @@ export function createBrowserGeminiAiWorkerClient({
   };
 }
 
-function toArtifact(sourceSpec: unknown, builderSpec: unknown): AiWorkerArtifact {
+function toArtifact(
+  sourceSpec: unknown,
+  builderSpec: unknown,
+  modelId: string,
+): AiWorkerArtifact {
   try {
     const parsedSourceSpec = parseVoxelBuilderSpec(sourceSpec);
     const parsedBuilderSpec = builderSpec as BuilderSpec;
@@ -124,6 +128,7 @@ function toArtifact(sourceSpec: unknown, builderSpec: unknown): AiWorkerArtifact
       builderSpec: parsedBuilderSpec,
       sourceSpecJson: JSON.stringify(parsedSourceSpec),
       builderSpecJson: JSON.stringify(parsedBuilderSpec),
+      modelId,
     };
   } catch (error) {
     throw normalizeAiWorkerError(error, "validation_failed");

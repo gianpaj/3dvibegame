@@ -43,6 +43,12 @@ const maxChatHistoryPerWorld = 200;
 const assignableRoles = new Set(["player", "moderator"]);
 const maxSourceSpecJsonLength = 300_000;
 const maxBuilderSpecJsonLength = 200_000;
+// Feedback snapshots are small (the prompt + both spec JSONs); cap them so a single
+// row can't be used to bloat the submit-only table.
+const maxFeedbackPromptLength = 1_000;
+const maxFeedbackJsonLength = 16_000;
+const feedbackOperations = new Set(["create", "edit"]);
+const feedbackRatings = new Set(["up", "down"]);
 const maxHorizontalDistance = 256;
 const minPlayerY = -8;
 const maxPlayerY = 128;
@@ -758,6 +764,81 @@ export const expire_cooldown = spacetimedb.reducer(
   },
 );
 
+export const submit_object_feedback = spacetimedb.reducer(
+  {
+    operationId: t.string(),
+    objectId: t.string(),
+    objectVersion: t.u32(),
+    operation: t.string(),
+    rating: t.string(),
+    sourcePrompt: t.string(),
+    sourceSpecJson: t.string(),
+    builderSpecJson: t.string(),
+    modelId: t.string(),
+    promptVersion: t.string(),
+  },
+  (ctx, input) => {
+    const player = requireActivePlayer(ctx);
+
+    const operationId = normalizeId("operationId", input.operationId);
+    const objectId = normalizeId("objectId", input.objectId);
+    if (!feedbackOperations.has(input.operation)) {
+      throw new SenderError("feedback operation must be create or edit");
+    }
+    if (!feedbackRatings.has(input.rating)) {
+      throw new SenderError("feedback rating must be up or down");
+    }
+    const sourcePrompt = normalizeFeedbackText(
+      "source prompt",
+      input.sourcePrompt,
+      maxFeedbackPromptLength,
+    );
+    const sourceSpecJson = normalizeFeedbackText(
+      "source spec JSON",
+      input.sourceSpecJson,
+      maxFeedbackJsonLength,
+    );
+    const builderSpecJson = normalizeFeedbackText(
+      "builder spec JSON",
+      input.builderSpecJson,
+      maxFeedbackJsonLength,
+    );
+    const modelId = normalizeFeedbackText("model id", input.modelId, maxIdLength);
+    const promptVersion = normalizeFeedbackText(
+      "prompt version",
+      input.promptVersion,
+      maxIdLength,
+    );
+
+    // Submit-once: one rating per operation. No composite unique index in the SQL
+    // subset, so scan for an existing row with this operationId and reject if found
+    // (no upsert — the client also hides the card locally, so this is the safety net).
+    for (const existing of ctx.db.objectFeedback.iter()) {
+      if (existing.operationId === operationId) {
+        throw new SenderError("feedback already submitted for this operation");
+      }
+    }
+
+    ctx.db.objectFeedback.insert({
+      feedbackId: 0n, // autoInc assigns the real id
+      worldId: player.worldId,
+      objectId,
+      objectVersion: input.objectVersion,
+      operationId,
+      operation: input.operation,
+      rating: input.rating,
+      sourcePrompt,
+      sourceSpecJson,
+      builderSpecJson,
+      modelId,
+      promptVersion,
+      playerIdentity: ctx.sender,
+      playerNickname: player.nickname,
+      createdAt: ctx.timestamp,
+    });
+  },
+);
+
 export const create_snapshot = spacetimedb.reducer(
   {
     snapshotId: t.string(),
@@ -1453,6 +1534,17 @@ function normalizeNickname(nickname: string) {
     throw new SenderError(
       `nickname must be ${maxNicknameLength} characters or fewer`,
     );
+  }
+  return normalized;
+}
+
+function normalizeFeedbackText(label: string, value: string, maxLength: number) {
+  const normalized = value.trim();
+  if (!normalized) {
+    throw new SenderError(`${label} is required`);
+  }
+  if (normalized.length > maxLength) {
+    throw new SenderError(`${label} must be ${maxLength} characters or fewer`);
   }
   return normalized;
 }

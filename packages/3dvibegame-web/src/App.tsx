@@ -7,11 +7,15 @@ import {
 import { createAiSession } from "./core/session/createAiSession";
 import type { AiSessionSnapshot } from "./core/session/createAiSession";
 import type { GenerationActionId } from "./core/session/generationSession";
-import type { BackendLifecycleCommands } from "./backend/createBackendLifecycleCommands";
+import type {
+  BackendLifecycleCommands,
+  PendingObjectFeedback,
+} from "./backend/createBackendLifecycleCommands";
 import type { BackendPresenceBridge, BackendPresenceSnapshot } from "./backend/createBackendPresenceBridge";
 import type { createBackendGenerationSnapshot } from "./backend/createBackendGenerationSnapshot";
 import { GameCanvas, type SpawnPoint } from "./scene/GameCanvas";
 import { GenerationCard } from "./components/GenerationCard";
+import { FeedbackCard, type FeedbackRating } from "./components/FeedbackCard";
 import { GeminiKeyModal, loadStoredGeminiKey } from "./components/GeminiKeyModal";
 import { NameModal, loadStoredPlayerName } from "./components/NameModal";
 import { PlayerList } from "./components/PlayerList";
@@ -70,6 +74,7 @@ export function App() {
   // --- Backend presence ---
   const [backendSnap, setBackendSnap] = useState<BackendPresenceSnapshot>(DISABLED_BACKEND_SNAPSHOT);
   const [contextMsg, setContextMsg] = useState("");
+  const [pendingFeedback, setPendingFeedback] = useState<PendingObjectFeedback | null>(null);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const selectedObjectIdRef = useRef<string | null>(null);
   const backendCommandsRef = useRef<BackendLifecycleCommands | null>(null);
@@ -104,6 +109,7 @@ export function App() {
         backendCommandsRef.current = createBackendLifecycleCommands(bridge, aiClient, {
           getSelectedObjectId: () => selectedObjectIdRef.current,
           getSpawnPoint: () => spawnPointRef.current?.() ?? { x: 0, y: 0, z: 0 },
+          onOperation: (feedback) => setPendingFeedback(feedback),
         });
         backendSnapshotFnRef.current = createSnapshotFn;
       },
@@ -288,6 +294,23 @@ export function App() {
     sessionRef.current?.deleteSelected();
   }
 
+  function handleRateFeedback({
+    operationId,
+    rating,
+  }: {
+    operationId: string;
+    rating: FeedbackRating;
+  }) {
+    const pending = pendingFeedback;
+    if (!pending || pending.operationId !== operationId) return;
+    // Fire-and-forget: the card already hid itself; clear our copy too. A rejected
+    // submit (e.g. double rate after reconnect) is a no-op for the player.
+    setPendingFeedback(null);
+    void bridgeRef.current
+      ?.submitObjectFeedback({ ...pending, rating })
+      .catch(() => {});
+  }
+
   function handleApiKeySave(key: string) {
     setGeminiKey(key);
     geminiKeyRef.current = key;
@@ -372,6 +395,12 @@ export function App() {
               onDelete={handleDelete}
             />
           )}
+          <FeedbackCard
+            operation={pendingFeedback}
+            onRate={handleRateFeedback}
+            viewerMode={viewerMode}
+            offline={!isLive}
+          />
         </div>
 
         <div className="hud-bottom">

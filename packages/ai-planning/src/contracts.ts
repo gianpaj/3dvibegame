@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+// Version of the create/edit system prompts below. Bump on any edit to
+// `voxelBuilderSystemPrompt` / `voxelEditSystemPrompt` so feedback rows can be
+// correlated to the exact prompt revision that produced the rated result
+// ("did prompt v2 lift the 👍 rate?" becomes a one-line query).
+export const PROMPT_VERSION = "v1";
+
 export const createPlanSystemPrompt =
   "You plan simple voxel objects for Vibe World. If the player prompt is meaningless (random characters, gibberish, or not interpretable as a 3D object concept), set `rejection` to a brief reason and provide minimal valid values for all other required fields. Otherwise leave `rejection` unset and return a small, safe, world-native create plan only. Do not request terrain edits, accounts, economy, combat, scripting, raw meshes, or destructive actions.";
 

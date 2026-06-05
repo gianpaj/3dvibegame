@@ -247,6 +247,41 @@ export const ChatMessage = table(
   },
 );
 
+// Player ratings (👍/👎) on an AI create/edit. Not `public`: submit-only, never
+// broadcast to clients. Each row snapshots the prompt + both spec JSONs + the model
+// and prompt version so a rating stays analysable even after the object is later
+// edited or deleted. Analysed offline via `spacetime sql`.
+export const ObjectFeedback = table(
+  {
+    name: "object_feedback",
+    indexes: [
+      {
+        name: "object_feedback_operation_id",
+        accessor: "byOperationId",
+        algorithm: "btree",
+        columns: ["operationId"],
+      },
+    ],
+  },
+  {
+    feedbackId: t.u64().primaryKey().autoInc(),
+    worldId: t.u64(),
+    objectId: t.string(),
+    objectVersion: t.u32(),
+    operationId: t.string(),
+    operation: t.string(),
+    rating: t.string(),
+    sourcePrompt: t.string(),
+    sourceSpecJson: t.string(),
+    builderSpecJson: t.string(),
+    modelId: t.string(),
+    promptVersion: t.string(),
+    playerIdentity: t.identity(),
+    playerNickname: t.string(),
+    createdAt: t.timestamp(),
+  },
+);
+
 const spacetimedb = schema({
   world: World,
   playerSession: PlayerSession,
@@ -256,6 +291,7 @@ const spacetimedb = schema({
   worldSnapshot: WorldSnapshot,
   snapshotObject: SnapshotObject,
   chatMessage: ChatMessage,
+  objectFeedback: ObjectFeedback,
 });
 
 export default spacetimedb;

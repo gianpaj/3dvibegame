@@ -141,6 +141,7 @@ export interface BackendPresenceBridge {
   cancelEdit(input: BackendObjectIdInput): Promise<void>;
   deleteObject(input: BackendObjectIdInput): Promise<void>;
   expireCooldown(input: BackendObjectIdInput): Promise<void>;
+  submitObjectFeedback(input: BackendSubmitObjectFeedbackInput): Promise<void>;
   failAiJob(input: BackendFailAiJobInput): Promise<void>;
   expireAiJob(input: BackendAiJobIdInput): Promise<void>;
   updateWorldSettings(input: BackendUpdateWorldSettingsInput): Promise<void>;
@@ -166,6 +167,19 @@ export interface BackendSubmitAiDraftInput {
 
 export interface BackendObjectIdInput {
   objectId: string;
+}
+
+export interface BackendSubmitObjectFeedbackInput {
+  operationId: string;
+  objectId: string;
+  objectVersion: number;
+  operation: string;
+  rating: string;
+  sourcePrompt: string;
+  sourceSpecJson: string;
+  builderSpecJson: string;
+  modelId: string;
+  promptVersion: string;
 }
 
 export interface BackendAiJobIdInput {
@@ -250,6 +264,7 @@ export function createBackendPresenceBridge({
       cancelEdit: rejectDisabledBackend,
       deleteObject: rejectDisabledBackend,
       expireCooldown: rejectDisabledBackend,
+      submitObjectFeedback: rejectDisabledBackend,
       failAiJob: rejectDisabledBackend,
       expireAiJob: rejectDisabledBackend,
       updateWorldSettings: rejectDisabledBackend,
@@ -517,6 +532,11 @@ export function createBackendPresenceBridge({
     expireCooldown(input) {
       return callLiveReducer("Cooldown expiry rejected", (conn) =>
         conn.reducers.expireCooldown(input),
+      );
+    },
+    submitObjectFeedback(input) {
+      return callLiveReducer("Feedback submit rejected", (conn) =>
+        conn.reducers.submitObjectFeedback(input),
       );
     },
     failAiJob(input) {

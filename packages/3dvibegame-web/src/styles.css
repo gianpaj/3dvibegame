@@ -275,6 +275,49 @@ body {
   align-self: flex-start;
 }
 
+.feedback-card {
+  margin-top: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.feedback-card-message {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.feedback-card-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-feedback {
+  padding: 4px 10px;
+  border-radius: 7px;
+  border: 1.5px solid var(--border);
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+
+.btn-feedback:hover {
+  background: #fff;
+  border-color: #bbb;
+}
+
 .confirm-actions {
   display: flex;
   gap: 8px;

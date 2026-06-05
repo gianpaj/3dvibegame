@@ -7,6 +7,8 @@ export interface AiWorkerArtifact {
   builderSpec: BuilderSpec;
   sourceSpecJson: string;
   builderSpecJson: string;
+  /** The model that authored this result (e.g. "gemini-2.5-flash"); stamped onto feedback. */
+  modelId: string;
 }
 
 export interface AiWorkerDraftResult extends AiWorkerArtifact {
@@ -66,5 +68,6 @@ function toArtifact(sourceSpec: VoxelBuilderSpec, builderSpec: BuilderSpec): AiW
     builderSpec,
     sourceSpecJson: JSON.stringify(sourceSpec),
     builderSpecJson: JSON.stringify(builderSpec),
+    modelId: "fixture",
   };
 }
