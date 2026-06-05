@@ -12,7 +12,9 @@ describe("InfoButton", () => {
 
     await user.click(screen.getByRole("button", { name: "Open game info" }));
 
-    expect(screen.getByRole("heading", { name: "Vibe World" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "3dvibegame" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Cmd/Ctrl + C")).toBeInTheDocument();
     expect(screen.getByText("Delete / Backspace")).toBeInTheDocument();
   });
