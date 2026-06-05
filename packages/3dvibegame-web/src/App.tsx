@@ -11,12 +11,18 @@ import type {
   BackendLifecycleCommands,
   PendingObjectFeedback,
 } from "./backend/createBackendLifecycleCommands";
-import type { BackendPresenceBridge, BackendPresenceSnapshot } from "./backend/createBackendPresenceBridge";
+import type {
+  BackendPresenceBridge,
+  BackendPresenceSnapshot,
+} from "./backend/createBackendPresenceBridge";
 import type { createBackendGenerationSnapshot } from "./backend/createBackendGenerationSnapshot";
 import { GameCanvas, type SpawnPoint } from "./scene/GameCanvas";
 import { GenerationCard } from "./components/GenerationCard";
 import { FeedbackCard, type FeedbackRating } from "./components/FeedbackCard";
-import { GeminiKeyModal, loadStoredGeminiKey } from "./components/GeminiKeyModal";
+import {
+  GeminiKeyModal,
+  loadStoredGeminiKey,
+} from "./components/GeminiKeyModal";
 import { NameModal, loadStoredPlayerName } from "./components/NameModal";
 import { PlayerList } from "./components/PlayerList";
 import { ConnectionStatus } from "./components/ConnectionStatus";
@@ -26,7 +32,11 @@ import { useSession } from "./hooks/useGenerationSession";
 import { useChatTranscript } from "./hooks/useChatTranscript";
 import { DEBUG } from "./debug";
 
-const GENERATING_STAGES = new Set(["queued", "planning", "compiled_artifact_ready"]);
+const GENERATING_STAGES = new Set([
+  "queued",
+  "planning",
+  "compiled_artifact_ready",
+]);
 
 const DISABLED_BACKEND_SNAPSHOT: BackendPresenceSnapshot = {
   enabled: false,
@@ -47,7 +57,9 @@ const DISABLED_BACKEND_SNAPSHOT: BackendPresenceSnapshot = {
 
 export function App() {
   // --- Gemini key ---
-  const [geminiKey, setGeminiKey] = useState<string | null>(() => loadStoredGeminiKey());
+  const [geminiKey, setGeminiKey] = useState<string | null>(() =>
+    loadStoredGeminiKey(),
+  );
   const [viewerMode, setViewerMode] = useState(false);
   const geminiKeyRef = useRef(geminiKey);
   useEffect(() => {
@@ -55,7 +67,9 @@ export function App() {
   }, [geminiKey]);
 
   // --- Player name (asked on first load) ---
-  const [playerName, setPlayerName] = useState<string | null>(() => loadStoredPlayerName());
+  const [playerName, setPlayerName] = useState<string | null>(() =>
+    loadStoredPlayerName(),
+  );
   const playerNameRef = useRef(playerName);
   useEffect(() => {
     playerNameRef.current = playerName;
@@ -72,13 +86,18 @@ export function App() {
   const snapshot = useSession(sessionRef.current);
 
   // --- Backend presence ---
-  const [backendSnap, setBackendSnap] = useState<BackendPresenceSnapshot>(DISABLED_BACKEND_SNAPSHOT);
+  const [backendSnap, setBackendSnap] = useState<BackendPresenceSnapshot>(
+    DISABLED_BACKEND_SNAPSHOT,
+  );
   const [contextMsg, setContextMsg] = useState("");
-  const [pendingFeedback, setPendingFeedback] = useState<PendingObjectFeedback | null>(null);
+  const [pendingFeedback, setPendingFeedback] =
+    useState<PendingObjectFeedback | null>(null);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const selectedObjectIdRef = useRef<string | null>(null);
   const backendCommandsRef = useRef<BackendLifecycleCommands | null>(null);
-  const backendSnapshotFnRef = useRef<typeof createBackendGenerationSnapshot | null>(null);
+  const backendSnapshotFnRef = useRef<
+    typeof createBackendGenerationSnapshot | null
+  >(null);
   const bridgeRef = useRef<BackendPresenceBridge | null>(null);
   const spawnPointRef = useRef<(() => SpawnPoint) | null>(null);
 
@@ -106,11 +125,16 @@ export function App() {
         });
         localBridge = bridge;
         bridgeRef.current = bridge;
-        backendCommandsRef.current = createBackendLifecycleCommands(bridge, aiClient, {
-          getSelectedObjectId: () => selectedObjectIdRef.current,
-          getSpawnPoint: () => spawnPointRef.current?.() ?? { x: 0, y: 0, z: 0 },
-          onOperation: (feedback) => setPendingFeedback(feedback),
-        });
+        backendCommandsRef.current = createBackendLifecycleCommands(
+          bridge,
+          aiClient,
+          {
+            getSelectedObjectId: () => selectedObjectIdRef.current,
+            getSpawnPoint: () =>
+              spawnPointRef.current?.() ?? { x: 0, y: 0, z: 0 },
+            onOperation: (feedback) => setPendingFeedback(feedback),
+          },
+        );
         backendSnapshotFnRef.current = createSnapshotFn;
       },
     );
@@ -138,7 +162,11 @@ export function App() {
   // In backend mode wrap into a compatible AiSessionSnapshot shape
   const displaySnapshot: AiSessionSnapshot = (() => {
     if (isLive && backendSnapshotFnRef.current) {
-      const merged = backendSnapshotFnRef.current(backendSnap, snapshot as never, selectedObjectId);
+      const merged = backendSnapshotFnRef.current(
+        backendSnap,
+        snapshot as never,
+        selectedObjectId,
+      );
       return {
         document: merged.document,
         world: merged.world,
@@ -153,14 +181,18 @@ export function App() {
   })();
 
   // Local AI generation transcript — kept for DEBUG only (see debug.ts).
-  const { messages: aiTranscript, appendPlayerMessage } = useChatTranscript(displaySnapshot);
+  const { messages: aiTranscript, appendPlayerMessage } =
+    useChatTranscript(displaySnapshot);
 
   const effectiveSelectedId = isLive
     ? selectedObjectId
-    : (displaySnapshot.document.player_sessions_by_id["player_1"]?.selection.selected_object_id ?? null);
+    : (displaySnapshot.document.player_sessions_by_id["player_1"]?.selection
+        .selected_object_id ?? null);
 
-  const needsApiKey = resolveAiClientMode() === "browser-gemini" && !geminiKey && !viewerMode;
-  const inputDisabled = viewerMode || GENERATING_STAGES.has(displaySnapshot.stage);
+  const needsApiKey =
+    resolveAiClientMode() === "browser-gemini" && !geminiKey && !viewerMode;
+  const inputDisabled =
+    viewerMode || GENERATING_STAGES.has(displaySnapshot.stage);
 
   // A manually-clicked object in a live room (we hold its lock) → the prompt box
   // edits that object with AI instead of creating a new one.
@@ -174,7 +206,9 @@ export function App() {
     if (backendCommandsRef.current?.canHandle()) {
       void backendCommandsRef.current
         .moveSelectedObject(dx, dy, dz)
-        .catch((err: unknown) => setContextMsg(errorMessage(err, "Move failed")));
+        .catch((err: unknown) =>
+          setContextMsg(errorMessage(err, "Move failed")),
+        );
       return;
     }
     sessionRef.current?.moveSelected(dx, dy, dz);
@@ -226,8 +260,11 @@ export function App() {
         if (isMissingBrowserGeminiKeyError(err)) {
           setGeminiKey(null);
         } else {
-          setContextMsg(errorMessage(err, editingNow ? "Edit failed" : "Prompt failed"));
+          setContextMsg(
+            errorMessage(err, editingNow ? "Edit failed" : "Prompt failed"),
+          );
         }
+        console.error(err);
         throw err;
       }
       return;
@@ -244,10 +281,14 @@ export function App() {
   function handleDispatch(actionId: GenerationActionId) {
     setContextMsg("");
     const usingBackend = backendCommandsRef.current?.canHandle() ?? false;
-    console.log("[handleDispatch] actionId=%s usingBackend=%s", actionId, usingBackend);
+    console.log(
+      "[handleDispatch] actionId=%s usingBackend=%s",
+      actionId,
+      usingBackend,
+    );
     if (usingBackend) {
-      void backendCommandsRef.current!
-        .dispatchAction(actionId)
+      void backendCommandsRef
+        .current!.dispatchAction(actionId)
         .then(() => {
           if (actionId === "release_object") handleDeselect();
         })
@@ -257,7 +298,10 @@ export function App() {
       return;
     }
     sessionRef.current?.dispatch(actionId);
-    console.log("[handleDispatch] local session snapshot after dispatch:", sessionRef.current?.getSnapshot());
+    console.log(
+      "[handleDispatch] local session snapshot after dispatch:",
+      sessionRef.current?.getSnapshot(),
+    );
   }
 
   function handleSelectObject(objectId: string) {
@@ -266,17 +310,22 @@ export function App() {
       // Only one object can be selected at a time: release the previously selected
       // object's lock before locking the new one. releaseSelectedLock reads the
       // current selection synchronously, so call it before updating the ref.
-      if (selectedObjectIdRef.current && selectedObjectIdRef.current !== objectId) {
+      if (
+        selectedObjectIdRef.current &&
+        selectedObjectIdRef.current !== objectId
+      ) {
         void backendCommandsRef.current.releaseSelectedLock().catch(() => {});
       }
       setSelectedObjectId(objectId);
       selectedObjectIdRef.current = objectId;
       // Acquire an exclusive edit lock; if another player holds it, undo selection.
-      void backendCommandsRef.current.lockSelectedObject().catch((err: unknown) => {
-        setSelectedObjectId(null);
-        selectedObjectIdRef.current = null;
-        setContextMsg(errorMessage(err, "Can't edit that object"));
-      });
+      void backendCommandsRef.current
+        .lockSelectedObject()
+        .catch((err: unknown) => {
+          setSelectedObjectId(null);
+          selectedObjectIdRef.current = null;
+          setContextMsg(errorMessage(err, "Can't edit that object"));
+        });
     } else {
       sessionRef.current?.selectObject(objectId);
     }
@@ -288,7 +337,9 @@ export function App() {
       void backendCommandsRef.current
         .deleteSelectedObject()
         .then(() => handleDeselect())
-        .catch((err: unknown) => setContextMsg(errorMessage(err, "Delete failed")));
+        .catch((err: unknown) =>
+          setContextMsg(errorMessage(err, "Delete failed")),
+        );
       return;
     }
     sessionRef.current?.deleteSelected();
@@ -338,13 +389,18 @@ export function App() {
   function handleDeleteChat(messageId: string) {
     void bridgeRef.current
       ?.deleteChatMessage(messageId)
-      .catch((err: unknown) => setContextMsg(errorMessage(err, "Delete failed")));
+      .catch((err: unknown) =>
+        setContextMsg(errorMessage(err, "Delete failed")),
+      );
   }
 
   // The local player can moderate (delete others' messages) when their backend role is
   // host/moderator/platform_admin.
   const localRole = backendSnap.players.find((player) => player.isLocal)?.role;
-  const canModerateChat = localRole === "host" || localRole === "moderator" || localRole === "platform_admin";
+  const canModerateChat =
+    localRole === "host" ||
+    localRole === "moderator" ||
+    localRole === "platform_admin";
 
   return (
     <div className="app-root">
@@ -362,7 +418,10 @@ export function App() {
 
       <div className="hud-overlay">
         <div className="hud-top-left">
-          <ConnectionStatus status={backendSnap.status} message={backendSnap.message} />
+          <ConnectionStatus
+            status={backendSnap.status}
+            message={backendSnap.message}
+          />
           <PlayerList players={backendSnap.players} />
           {contextMsg && <p className="context-msg">{contextMsg}</p>}
           <ChatPanel
@@ -379,7 +438,8 @@ export function App() {
           {viewerMode ? (
             <div className="viewer-card">
               <p className="viewer-card-message">
-                You&apos;re viewing as a guest. Add your Gemini API key to create and edit objects.
+                You&apos;re viewing as a guest. Add your Gemini API key to
+                create and edit objects.
               </p>
               <button
                 className="viewer-card-cta"
@@ -408,7 +468,9 @@ export function App() {
             onSubmit={handlePromptSubmit}
             disabled={inputDisabled}
             editing={editing}
-            placeholder={viewerMode ? "Add a Gemini key to create objects…" : undefined}
+            placeholder={
+              viewerMode ? "Add a Gemini key to create objects…" : undefined
+            }
           />
         </div>
       </div>
@@ -416,7 +478,10 @@ export function App() {
       {!playerName ? (
         <NameModal onSave={handleNameSave} />
       ) : needsApiKey ? (
-        <GeminiKeyModal onSave={handleApiKeySave} onDismiss={handleJoinAsViewer} />
+        <GeminiKeyModal
+          onSave={handleApiKeySave}
+          onDismiss={handleJoinAsViewer}
+        />
       ) : null}
     </div>
   );
@@ -424,11 +489,13 @@ export function App() {
 
 function hasBackendConfig() {
   return Boolean(
-    import.meta.env.VITE_SPACETIMEDB_URI && import.meta.env.VITE_SPACETIMEDB_DATABASE,
+    import.meta.env.VITE_SPACETIMEDB_URI &&
+    import.meta.env.VITE_SPACETIMEDB_DATABASE,
   );
 }
 
 function errorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message) return `${fallback}: ${error.message}`;
+  if (error instanceof Error && error.message)
+    return `${fallback}: ${error.message}`;
   return fallback;
 }
