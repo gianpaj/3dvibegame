@@ -4,7 +4,7 @@ import { z } from "zod";
 // `voxelBuilderSystemPrompt` / `voxelEditSystemPrompt` so feedback rows can be
 // correlated to the exact prompt revision that produced the rated result
 // ("did prompt v2 lift the 👍 rate?" becomes a one-line query).
-export const PROMPT_VERSION = "v2";
+export const PROMPT_VERSION = "v3";
 
 export const createPlanSystemPrompt =
   "You plan simple voxel objects for Vibe World. If the player prompt is meaningless (random characters, gibberish, or not interpretable as a 3D object concept), set `rejection` to a brief reason and provide minimal valid values for all other required fields. Otherwise leave `rejection` unset and return a small, safe, world-native create plan only. Do not request terrain edits, accounts, economy, combat, scripting, raw meshes, or destructive actions.";
@@ -76,6 +76,9 @@ export const voxelBuilderSystemPrompt = [
   "- Every op_id is unique; every material_id used must be declared in materials.",
   "- Use ONLY these material ids so colors render: moss_stone, wood, neon, glass_block,",
   "  jelly, cloud, lava_light, void, red, stone.",
+  "- For specific colors, keep `material_id` in the allowed list and set `color_hint`",
+  '  to a hex color like "#7a4a24" or "#1f7a3a". Prefer hex color_hint values over',
+  "  descriptive names such as brown, dark_green, or forest_green.",
   "- Build the real silhouette of the requested object and make different prompts produce",
   "  different geometry (a palm tree = tall slender trunk + splayed fronds; a pine =",
   "  conical layered canopy; a barrel = stacked cylinders/boxes).",
@@ -122,6 +125,8 @@ export const voxelEditSystemPrompt = [
   "- For a recolor, change the relevant `material_id`s (and declare them in materials).",
   '  Use ONLY these material ids so colors render: moss_stone, wood, neon, glass_block,',
   "  jelly, cloud, lava_light, void, red, stone.",
+  '  For specific colors, prefer `color_hint` hex values like "#c63a36" or "#1f7a3a"',
+  "  instead of descriptive names.",
   '- For "add X", append new operations with new unique op_ids.',
   '- For "remove X" or "make it smaller", drop or shrink the relevant operations.',
   "- y is up; keep it grounded near y=0. Every op_id unique; every material_id declared.",
