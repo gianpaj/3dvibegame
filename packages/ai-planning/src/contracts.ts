@@ -4,7 +4,7 @@ import { z } from "zod";
 // `voxelBuilderSystemPrompt` / `voxelEditSystemPrompt` so feedback rows can be
 // correlated to the exact prompt revision that produced the rated result
 // ("did prompt v2 lift the 👍 rate?" becomes a one-line query).
-export const PROMPT_VERSION = "v1";
+export const PROMPT_VERSION = "v2";
 
 export const createPlanSystemPrompt =
   "You plan simple voxel objects for Vibe World. If the player prompt is meaningless (random characters, gibberish, or not interpretable as a 3D object concept), set `rejection` to a brief reason and provide minimal valid values for all other required fields. Otherwise leave `rejection` unset and return a small, safe, world-native create plan only. Do not request terrain edits, accounts, economy, combat, scripting, raw meshes, or destructive actions.";
@@ -79,6 +79,11 @@ export const voxelBuilderSystemPrompt = [
   "- Build the real silhouette of the requested object and make different prompts produce",
   "  different geometry (a palm tree = tall slender trunk + splayed fronds; a pine =",
   "  conical layered canopy; a barrel = stacked cylinders/boxes).",
+  "- Multi-part objects must look physically assembled: supports, legs, tops, roofs,",
+  "  shelves, handles, and decorations should touch or slightly overlap the parts they",
+  "  connect to. Check box center/size math so table legs reach the tabletop underside,",
+  "  seats sit on legs, roofs sit on walls, and parts do not float unless explicitly",
+  "  requested.",
   "- Aim for 4-14 operations.",
   "- quantity: set to 2-4 ONLY when the player asks for multiple SEPARATE INDEPENDENT",
   "  objects (e.g. '2 palm trees', 'three barrels'). Describe ONE of them in operations.",

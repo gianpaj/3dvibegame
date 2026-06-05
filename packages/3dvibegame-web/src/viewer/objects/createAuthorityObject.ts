@@ -255,6 +255,10 @@ function resolveMaterialColor(name: string) {
     case "red":    return "#c63a36";
     case "blue":   return "#2255cc";
     case "green":  return "#22aa44";
+    case "dark_green": return "#2f6f3e";
+    case "dark green": return "#2f6f3e";
+    case "forest_green": return "#1f7a3a";
+    case "forest green": return "#1f7a3a";
     case "yellow": return "#eecc22";
     case "black":  return "#222222";
     case "white":  return "#eeeeee";
