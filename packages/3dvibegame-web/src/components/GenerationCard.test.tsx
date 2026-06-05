@@ -154,4 +154,36 @@ describe("GenerationCard", () => {
     );
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
+
+  it("opens delete confirmation with the Delete key", async () => {
+    const user = userEvent.setup();
+    render(
+      <GenerationCard
+        snapshot={makeSnapshot("released", allActions, fakeObject)}
+        onDispatch={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    await user.keyboard("{Delete}");
+
+    expect(screen.getByText("Delete this object?")).toBeInTheDocument();
+  });
+
+  it("confirms delete with Enter while the modal is open", async () => {
+    const onDelete = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <GenerationCard
+        snapshot={makeSnapshot("released", allActions, fakeObject)}
+        onDispatch={vi.fn()}
+        onDelete={onDelete}
+      />,
+    );
+
+    await user.keyboard("{Delete}");
+    await user.keyboard("{Enter}");
+
+    expect(onDelete).toHaveBeenCalledTimes(1);
+  });
 });
