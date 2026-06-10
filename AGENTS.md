@@ -9,7 +9,7 @@ This document provides orientation for AI agents (and human contributors) workin
 The game is **in active development**. The core multiplayer stack is implemented and deployed:
 
 - `packages/world-backend` — SpacetimeDB module (TypeScript); runs at `stdb.3dvibegame.com`
-- `packages/3dvibegame-web` — React + R3F player app; deployed on Vercel
+- `packages/3dvibegame-web` — React + R3F player app; deployed on Cloudflare Pages
 - `packages/ai-worker` — Cloudflare Worker that compiles Gemini voxel plans into geometry
 - `packages/scene-authority-ts` — shared authority logic (pure reducers, compiler, contracts)
 - `packages/ai-planning` — AI prompt contracts, voxel schema, system prompts
@@ -30,6 +30,7 @@ See `packages/3dvibegame-web/AGENTS.md` for package-specific dev/test/deploy ins
 | Target scale | ~20 concurrent players per room |
 | AI pipeline | `prompt → voxel core (Gemini) → builder spec → SpacetimeDB reducer` |
 | Voxel material colors | Resolved by `color_hint` in source spec; renderer maps to hex via `resolveMaterialColor` |
+| Avatars | Third-person voxel avatars; non-solid players; client-side capsule-vs-AABB collision (no physics engine); body stored in `player_avatar`, outside the object lifecycle |
 
 ---
 
@@ -77,6 +78,18 @@ pending job → grace (creator can reposition) → public → edit_locked → co
 - Grace period: only the creator can move/delete. Released via `release_object` reducer or automatic release (e.g. batch creation of extra copies).
 - Edit lock: one player at a time; 30 s auto-expiry; `release_edit_lock` or `submit_object_edit` clears it.
 - Private rooms: destructive edits (overwrite, delete by non-creator) are permitted on public objects.
+
+---
+
+## Avatars
+
+Players are embodied as third-person voxel avatars (design spec: `docs/superpowers/specs/2026-06-10-voxel-avatars-design.md`).
+
+- Movement: client-side character controller (WASD + Space jump) in `3dvibegame-web/src/scene/avatar/`; capsule-vs-AABB collision against world-object bounds via a module-level `CollisionRegistry`; other players are non-solid.
+- Sync: existing `move_player` reducer, throttled ≤10 Hz and only-on-change; remote avatars interpolate (~150 ms) and derive their procedural gait from interpolated velocity.
+- Body: `player_avatar` table (keyed by identity, persists across sessions) + `set_avatar_spec` reducer (JSON validation, ≤2×3×2 size clamp, 10 s rate limit). Default hue-tinted body when no row exists or the stored spec fails to parse — never bodiless.
+- Editing: "Edit avatar" in PlayerList → prompt box avatar mode → same Gemini/compile pipeline → `set_avatar_spec`. Avatars do **not** use locks, grace periods, cooldowns, or any object-lifecycle state.
+- Gait is procedural and distance-driven (`phase += speed * dt`) so it works on any generated shape — do not add rigging/part-tagging without discussion.
 
 ---
 

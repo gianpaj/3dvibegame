@@ -413,6 +413,15 @@ Sub-phases:
 - Stale SpacetimeDB token recovery: `onConnectError` detects "Failed to verify token" (e.g. after a server reset), clears the localStorage token, and reloads for a fresh anonymous identity
 - Agent documentation: root `AGENTS.md` updated to reflect current implementation status; `packages/3dvibegame-web/AGENTS.md` created with dev/test/deploy/architecture guidance
 
+### Phase 4.12 — Third-Person Voxel Avatars 🔄 *(current)*
+- Players are now embodied: third-person voxel avatar with WASD walking, Space jump (gravity, landing squash), and an OrbitControls follow camera centered on the avatar; the "WASD moves the selected object" mode is preserved
+- Capsule-vs-AABB collision against world-object bounding boxes via a module-level `CollisionRegistry` — slide along walls, stand on objects; other players are non-solid (anti-griefing); fall below y=−10 respawns at origin
+- Procedural distance-driven gait (phase accumulates with distance traveled, not time): bob, lateral tilt, speed lean, idle breathe — works on any AI-generated voxel shape, no rig; nameplates via billboard text
+- Default hue-tinted body at join (no Gemini key wall); "Edit avatar" in PlayerList switches the prompt box to avatar mode — same Gemini → compile pipeline, stored via new `player_avatar` table + `set_avatar_spec` reducer (JSON validation, ≤2×3×2 clamp, 10 s rate limit)
+- Movement reuses the existing `move_player` reducer, throttled ≤10 Hz / only-on-change; remote avatars interpolate (~150 ms) with gait derived from interpolated velocity
+- Design spec: `docs/superpowers/specs/2026-06-10-voxel-avatars-design.md`
+- Remaining: wire `avatarSystemPrompt` through the browser-Gemini/worker path (avatar prompts currently use the generic object prompt; the server clamp is the only constraint), publish the updated world-backend module, and run the two-browser manual smoke
+
 ### Phase 5 — V1 Hardening & Launch 🔄 *(current)*
 - Rate limiting and abuse guardrails (the private shared room currently skips per-player create/object caps)
 - World settings UI for hosts (presets, reset schedules, permission toggles)
