@@ -4,6 +4,7 @@ import { DbConnection, type SubscriptionHandle } from "./module_bindings";
 import type {
   AiJob,
   ChatMessage,
+  PlayerAvatar,
   PlayerSession,
   SnapshotObject,
   World,
@@ -29,6 +30,17 @@ export interface BackendPlayerPresence {
   presenceState: string;
   transform: BackendPlayerTransform;
   isLocal: boolean;
+}
+
+// The voxel body a player prompt-created, synced from the player_avatar table.
+// Carried separately from BackendPlayerPresence so 10 Hz position updates don't
+// re-send the heavy spec JSON.
+export interface BackendAvatarPresence {
+  /** Identity hex of the avatar owner. */
+  id: string;
+  voxelCoreJson: string;
+  builderSpecJson: string;
+  version: number;
 }
 
 export interface BackendPlayerTransform {
@@ -111,6 +123,7 @@ export interface BackendPresenceSnapshot {
   onlineCount: number;
   world: BackendWorldPresence | null;
   players: BackendPlayerPresence[];
+  avatars: BackendAvatarPresence[];
   authorityWorld: AuthorityWorld | null;
   archiveAuthorityWorld: AuthorityWorld | null;
   objectArtifacts: BackendObjectArtifactDebug[];
@@ -129,6 +142,7 @@ interface BackendPresenceBridgeConfig {
 export interface BackendPresenceBridge {
   getSnapshot(): BackendPresenceSnapshot;
   updateLocalTransform(transform: BackendPlayerTransform): void;
+  setAvatarSpec(input: BackendSetAvatarSpecInput): Promise<void>;
   sendChat(body: string): Promise<void>;
   deleteChatMessage(messageId: string): Promise<void>;
   requestCreateObject(input: BackendRequestCreateObjectInput): Promise<void>;
@@ -148,6 +162,11 @@ export interface BackendPresenceBridge {
   createSnapshot(input: BackendWorldSnapshotInput): Promise<void>;
   resetWorld(input: BackendWorldSnapshotInput): Promise<void>;
   dispose(): void;
+}
+
+export interface BackendSetAvatarSpecInput {
+  voxelCoreJson: string;
+  builderSpecJson: string;
 }
 
 export interface BackendRequestCreateObjectInput {
@@ -252,6 +271,7 @@ export function createBackendPresenceBridge({
     return {
       getSnapshot: () => snapshot,
       updateLocalTransform() {},
+      setAvatarSpec: rejectDisabledBackend,
       sendChat: rejectDisabledBackend,
       deleteChatMessage: rejectDisabledBackend,
       requestCreateObject: rejectDisabledBackend,
@@ -406,6 +426,7 @@ export function createBackendPresenceBridge({
               "SELECT * FROM world",
               "SELECT * FROM ai_job",
               "SELECT * FROM player_session",
+              "SELECT * FROM player_avatar",
               "SELECT * FROM world_object",
               "SELECT * FROM world_snapshot",
               "SELECT * FROM snapshot_object",
@@ -473,6 +494,11 @@ export function createBackendPresenceBridge({
           flushPendingTransform();
         }, movementThrottleMs - elapsed);
       }
+    },
+    setAvatarSpec(input) {
+      return callLiveReducer("Avatar update rejected", (conn) =>
+        conn.reducers.setAvatarSpec(input),
+      );
     },
     sendChat(body) {
       return callLiveReducer("Chat message rejected", (conn) =>
@@ -661,6 +687,14 @@ function installTableListeners(connection: DbConnection, onChange: () => void) {
     Parameters<NonNullable<typeof connection.db.playerSession.onUpdate>>[0]
   > = () => onChange();
 
+  const onAvatarInsert: Parameters<typeof connection.db.playerAvatar.onInsert>[0] =
+    () => onChange();
+  const onAvatarDelete: Parameters<typeof connection.db.playerAvatar.onDelete>[0] =
+    () => onChange();
+  const onAvatarUpdate: NonNullable<
+    Parameters<NonNullable<typeof connection.db.playerAvatar.onUpdate>>[0]
+  > = () => onChange();
+
   const onWorldInsert: Parameters<typeof connection.db.world.onInsert>[0] = () =>
     onChange();
   const onWorldDelete: Parameters<typeof connection.db.world.onDelete>[0] = () =>
@@ -704,6 +738,9 @@ function installTableListeners(connection: DbConnection, onChange: () => void) {
   connection.db.playerSession.onInsert(onPlayerInsert);
   connection.db.playerSession.onDelete(onPlayerDelete);
   connection.db.playerSession.onUpdate(onPlayerUpdate);
+  connection.db.playerAvatar.onInsert(onAvatarInsert);
+  connection.db.playerAvatar.onDelete(onAvatarDelete);
+  connection.db.playerAvatar.onUpdate(onAvatarUpdate);
   connection.db.world.onInsert(onWorldInsert);
   connection.db.world.onDelete(onWorldDelete);
   connection.db.world.onUpdate(onWorldUpdate);
@@ -726,6 +763,9 @@ function installTableListeners(connection: DbConnection, onChange: () => void) {
     connection.db.playerSession.removeOnInsert(onPlayerInsert);
     connection.db.playerSession.removeOnDelete(onPlayerDelete);
     connection.db.playerSession.removeOnUpdate(onPlayerUpdate);
+    connection.db.playerAvatar.removeOnInsert(onAvatarInsert);
+    connection.db.playerAvatar.removeOnDelete(onAvatarDelete);
+    connection.db.playerAvatar.removeOnUpdate(onAvatarUpdate);
     connection.db.world.removeOnInsert(onWorldInsert);
     connection.db.world.removeOnDelete(onWorldDelete);
     connection.db.world.removeOnUpdate(onWorldUpdate);
@@ -793,6 +833,7 @@ function readSnapshotFromConnection({
     .filter((player) => !world || player.worldId === world.worldId)
     .sort(comparePlayers)
     .map((player) => mapPlayer(player, localIdentityHex));
+  const avatars = Array.from(connection.db.playerAvatar.iter()).map(mapAvatar);
   const authorityWorld = world ? mapBackendAuthorityWorld(world, worldObjects) : null;
   const archiveAuthorityWorld = world
     ? mapBackendArchiveAuthorityWorld(world, worldSnapshots[0] ?? null, snapshotObjects)
@@ -806,6 +847,7 @@ function readSnapshotFromConnection({
     onlineCount: players.filter((player) => player.presenceState === "active").length,
     world: world ? mapWorld(world) : null,
     players,
+    avatars,
     authorityWorld,
     archiveAuthorityWorld,
     objectArtifacts: worldObjects.map(mapObjectArtifactDebug),
@@ -845,6 +887,7 @@ function createBaseSnapshot({
     onlineCount: 0,
     world: null,
     players: [],
+    avatars: [],
     authorityWorld: null,
     archiveAuthorityWorld: null,
     objectArtifacts: [],
@@ -949,6 +992,15 @@ function mapPlayer(
       rotationPitch: player.rotationPitch,
     },
     isLocal: localIdentityHex === id,
+  };
+}
+
+function mapAvatar(avatar: PlayerAvatar): BackendAvatarPresence {
+  return {
+    id: avatar.identity.toHexString(),
+    voxelCoreJson: avatar.voxelCoreJson,
+    builderSpecJson: avatar.builderSpecJson,
+    version: avatar.version,
   };
 }
 

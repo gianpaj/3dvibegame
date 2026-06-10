@@ -29,6 +29,83 @@ function fakeBridge(snapshot: BackendPresenceSnapshot = readySnapshot()) {
   return { bridge, createCalls };
 }
 
+describe("createBackendLifecycleCommands avatar editing", () => {
+  it("generates a fresh body and persists it via setAvatarSpec when none exists", async () => {
+    const snapshot = readySnapshot();
+    const setAvatarSpec =
+      vi.fn<(input: { voxelCoreJson: string; builderSpecJson: string }) => Promise<void>>(
+        async () => {},
+      );
+    const bridge = {
+      getSnapshot: vi.fn(() => snapshot),
+      setAvatarSpec,
+    } as unknown as BackendPresenceBridge;
+    const commands = createBackendLifecycleCommands(
+      bridge,
+      createFixtureAiWorkerClient(),
+    );
+
+    await commands.editAvatar("a red robot with a crown");
+
+    expect(setAvatarSpec).toHaveBeenCalledTimes(1);
+    const input = setAvatarSpec.mock.calls[0][0];
+    expect(() => JSON.parse(input.voxelCoreJson)).not.toThrow();
+    expect(() => JSON.parse(input.builderSpecJson)).not.toThrow();
+  });
+
+  it("feeds the current body to createEdit when one already exists", async () => {
+    const fixture = createFixtureAiWorkerClient();
+    const draft = await fixture.createDraft({ prompt: "guardian avatar" });
+    const snapshot = readySnapshot();
+    snapshot.avatars = [
+      {
+        id: "local_player",
+        voxelCoreJson: draft.sourceSpecJson,
+        builderSpecJson: draft.builderSpecJson,
+        version: 2,
+      },
+    ];
+    const setAvatarSpec = vi.fn(async () => {});
+    const createEdit = vi.fn<(input: { baseVersion: number }) => Promise<unknown>>(
+      async () => ({
+        sourceSpec: draft.sourceSpec,
+        builderSpec: draft.builderSpec,
+        sourceSpecJson: draft.sourceSpecJson,
+        builderSpecJson: draft.builderSpecJson,
+        modelId: "fixture",
+      }),
+    );
+    const bridge = {
+      getSnapshot: vi.fn(() => snapshot),
+      setAvatarSpec,
+    } as unknown as BackendPresenceBridge;
+    const commands = createBackendLifecycleCommands(bridge, {
+      createDraft: vi.fn(),
+      createEdit,
+    } as never);
+
+    await commands.editAvatar("give it a crown");
+
+    expect(createEdit).toHaveBeenCalledTimes(1);
+    const editArg = createEdit.mock.calls[0][0];
+    expect(editArg.baseVersion).toBe(2);
+    expect(setAvatarSpec).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a blank avatar prompt", async () => {
+    const snapshot = readySnapshot();
+    const bridge = {
+      getSnapshot: vi.fn(() => snapshot),
+      setAvatarSpec: vi.fn(async () => {}),
+    } as unknown as BackendPresenceBridge;
+    const commands = createBackendLifecycleCommands(
+      bridge,
+      createFixtureAiWorkerClient(),
+    );
+    await expect(commands.editAvatar("   ")).rejects.toThrow();
+  });
+});
+
 describe("createBackendLifecycleCommands feedback provenance", () => {
   it("fires onOperation with the create snapshot after a successful prompt", async () => {
     const { bridge, createCalls } = fakeBridge();
@@ -236,6 +313,7 @@ function readySnapshot({
         isLocal: true,
       },
     ],
+    avatars: [],
     authorityWorld: {
       world_id: "1",
       settings: {

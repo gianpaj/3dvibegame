@@ -31,6 +31,12 @@ import {
 export interface BackendLifecycleCommands {
   canHandle(): boolean;
   submitPrompt(prompt: string): Promise<void>;
+  /**
+   * Generate (or re-create) the local player's voxel avatar body from a prompt and
+   * persist it via set_avatar_spec. First prompt builds from scratch; later prompts
+   * feed the current avatar voxel core + change request, mirroring object edit.
+   */
+  editAvatar(prompt: string): Promise<void>;
   dispatchAction(actionId: GenerationActionId): Promise<void>;
   editSelectedObject(prompt: string): Promise<void>;
   lockSelectedObject(): Promise<void>;
@@ -265,6 +271,51 @@ export function createBackendLifecycleCommands(
           });
         }
       }
+    },
+    async editAvatar(prompt: string) {
+      const trimmed = prompt.trim();
+      if (!trimmed) {
+        throw new Error("Describe the avatar you want.");
+      }
+      if (!isBackendReady(bridge)) {
+        throw new Error("Backend room is not ready yet.");
+      }
+
+      const snapshot = bridge.getSnapshot();
+      const localPlayerId = localBackendPlayerId(snapshot);
+      const currentAvatar = snapshot.avatars.find(
+        (avatar) => avatar.id === localPlayerId,
+      );
+
+      let artifact: Awaited<ReturnType<AiWorkerClient["createDraft"]>> | Awaited<
+        ReturnType<AiWorkerClient["createEdit"]>
+      >;
+      try {
+        if (currentAvatar) {
+          // Re-create from the existing body + change request, like object edit.
+          artifact = await aiWorker.createEdit({
+            baseObjectId: "player_avatar",
+            baseVersion: currentAvatar.version,
+            sourcePrompt: trimmed,
+            objectContext: {
+              objectId: "player_avatar",
+              version: currentAvatar.version,
+              sourceSpecJson: currentAvatar.voxelCoreJson,
+              builderSpecJson: currentAvatar.builderSpecJson,
+            },
+          });
+        } else {
+          // First-ever avatar: generate from scratch.
+          artifact = await aiWorker.createDraft({ prompt: trimmed });
+        }
+      } catch (error) {
+        throw userFacingAiWorkerError(error);
+      }
+
+      await bridge.setAvatarSpec({
+        voxelCoreJson: artifact.sourceSpecJson,
+        builderSpecJson: artifact.builderSpecJson,
+      });
     },
     async dispatchAction(actionId: GenerationActionId) {
       const snapshot = bridge.getSnapshot();
