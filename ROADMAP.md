@@ -420,7 +420,8 @@ Sub-phases:
 - Default hue-tinted body at join (no Gemini key wall); "Edit avatar" in PlayerList switches the prompt box to avatar mode — same Gemini → compile pipeline, stored via new `player_avatar` table + `set_avatar_spec` reducer (JSON validation, ≤2×3×2 clamp, 10 s rate limit)
 - Movement reuses the existing `move_player` reducer, throttled ≤10 Hz / only-on-change; remote avatars interpolate (~150 ms) with gait derived from interpolated velocity
 - Design spec: `docs/superpowers/specs/2026-06-10-voxel-avatars-design.md`
-- Remaining: wire `avatarSystemPrompt` through the browser-Gemini/worker path (avatar prompts currently use the generic object prompt; the server clamp is the only constraint), publish the updated world-backend module, and run the two-browser manual smoke
+- Avatar prompts route through `avatarSystemPrompt` (a `purpose: "avatar"` flag threads from `editAvatar` through `AiWorkerClient` into both browser Gemini clients) so "make the body red" edits the avatar instead of being rejected as a vague object request
+- Remaining: publish the updated world-backend module and run the two-browser manual smoke
 
 ### Phase 5 — V1 Hardening & Launch 🔄 *(current)*
 - Rate limiting and abuse guardrails (the private shared room currently skips per-player create/object caps)
