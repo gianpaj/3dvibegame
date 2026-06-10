@@ -139,6 +139,12 @@ interface BackendPresenceBridgeConfig {
   onSnapshot(snapshot: BackendPresenceSnapshot): void;
   /** Player-chosen display name; falls back to env / "You" when omitted. */
   nickname?: string;
+  /**
+   * Spectator mode: connect and subscribe (so the world renders) but never call
+   * join_world. A viewer has no player_session, so no avatar, no presence chip, and
+   * the write reducers (chat/avatar/movement) are rejected client-side. They just watch.
+   */
+  viewer?: boolean;
 }
 
 export interface BackendPresenceBridge {
@@ -261,6 +267,7 @@ const movementEpsilon = 0.025;
 export function createBackendPresenceBridge({
   onSnapshot,
   nickname: nicknameOverride,
+  viewer = false,
 }: BackendPresenceBridgeConfig): BackendPresenceBridge {
   const config = readBackendConfig(nicknameOverride);
 
@@ -391,8 +398,14 @@ export function createBackendPresenceBridge({
               console.log("[backend] subscription applied disposed=%o", disposed);
               if (disposed) return;
               status = "connected";
-              message = "Live room joined.";
+              message = viewer ? "Viewing room." : "Live room joined.";
               emitCurrent();
+              // Viewers only watch: subscribe to the room's chat (read-only) but never
+              // join, never heartbeat — they hold no player_session.
+              if (viewer) {
+                ensureChatSubscription(conn);
+                return;
+              }
               void conn.reducers
                 .joinWorld({ nickname: backendConfig.nickname })
                 .then(() => {
@@ -482,7 +495,9 @@ export function createBackendPresenceBridge({
       }
     },
     updateLocalTransform(transform: BackendPlayerTransform) {
-      if (disposed || !shouldQueueTransform(transform, lastQueuedTransform)) return;
+      // Viewers have no body to move; drop transforms rather than queue them.
+      if (disposed || viewer) return;
+      if (!shouldQueueTransform(transform, lastQueuedTransform)) return;
       lastQueuedTransform = cloneTransform(transform);
       pendingTransform = cloneTransform(transform);
 
@@ -609,7 +624,7 @@ export function createBackendPresenceBridge({
     if (snapshot.players.some((player) => player.isLocal && player.presenceState === "active")) {
       joined = true;
     }
-    if (connection?.isActive && joined) {
+    if (connection?.isActive && (joined || viewer)) {
       ensureChatSubscription(connection);
     }
     onSnapshot(snapshot);
@@ -617,7 +632,11 @@ export function createBackendPresenceBridge({
   }
 
   function ensureChatSubscription(conn: DbConnection) {
-    const worldId = findLocalPlayerWorldId(conn, localIdentityHex);
+    // Viewers have no player_session to derive a world from, so fall back to the
+    // default (first) world's chat — they read it but can't post.
+    const worldId =
+      findLocalPlayerWorldId(conn, localIdentityHex) ??
+      (viewer ? (first(conn.db.world.iter())?.worldId ?? null) : null);
     if (worldId === null || chatSubscriptionWorldId === worldId) return;
 
     try {
@@ -660,6 +679,9 @@ export function createBackendPresenceBridge({
     fallback: string,
     reducer: (conn: DbConnection) => Promise<unknown>,
   ) {
+    if (viewer) {
+      throw new Error("You're viewing only — add a Gemini key to take part.");
+    }
     if (disposed || !joined || !connection?.isActive) {
       throw new Error("Backend room is not ready yet.");
     }

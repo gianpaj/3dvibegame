@@ -72,6 +72,23 @@ describe("ChatPanel", () => {
     expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
   });
 
+  it("shows the read-only transcript but blocks the composer for viewers", () => {
+    render(
+      <ChatPanel messages={messages} onSend={() => Promise.resolve()} disabled viewer />,
+    );
+
+    // Viewers still see the conversation…
+    expect(screen.getByText("hey alice")).toBeInTheDocument();
+    // …but can't post.
+    const input = screen.getByLabelText("Chat message");
+    expect(input).toBeDisabled();
+    expect(input).toHaveAttribute(
+      "placeholder",
+      expect.stringMatching(/viewing only/i),
+    );
+    expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+  });
+
   it("renders debug AI transcript lines when provided", () => {
     const debugMessages: ChatMessage[] = [
       { id: "e1", role: "event", label: "Planning", text: "Structured the request." },

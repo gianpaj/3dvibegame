@@ -12,6 +12,8 @@ interface Props {
   canModerate?: boolean;
   /** Disable the composer (e.g. offline / not in a live room). */
   disabled?: boolean;
+  /** Spectator mode: read the transcript but can't post (no joined session). */
+  viewer?: boolean;
   /**
    * Local AI generation transcript, rendered as muted system lines for debugging.
    * Only passed when the in-memory DEBUG flag is on; omitted otherwise.
@@ -33,6 +35,7 @@ export function ChatPanel({
   onDelete,
   canModerate = false,
   disabled = false,
+  viewer = false,
   debugMessages,
 }: Props) {
   const [open, setOpen] = useState(true);
@@ -136,7 +139,13 @@ export function ChatPanel({
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={disabled ? "Join a room to chat…" : "Message the room…"}
+              placeholder={
+                viewer
+                  ? "Viewing only — add a Gemini key to chat…"
+                  : disabled
+                    ? "Join a room to chat…"
+                    : "Message the room…"
+              }
               disabled={disabled}
               aria-label="Chat message"
             />

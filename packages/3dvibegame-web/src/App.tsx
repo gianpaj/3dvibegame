@@ -75,6 +75,12 @@ export function App() {
     geminiKeyRef.current = geminiKey;
   }, [geminiKey]);
 
+  // Anyone without the browser Gemini key only spectates — whether the key modal is
+  // still up or they dismissed it. Viewers render the world but never join it: no
+  // avatar, no presence chip, no chat. `viewerMode` only chooses the key modal vs the
+  // dismissed "viewer card" UI; `isViewer` gates what they can actually do.
+  const isViewer = resolveAiClientMode() === "browser-gemini" && !geminiKey;
+
   // --- Player name (asked on first load) ---
   const [playerName, setPlayerName] = useState<string | null>(() =>
     loadStoredPlayerName(),
@@ -117,6 +123,8 @@ export function App() {
   // Connect to the backend once the player has entered a name (so we join the
   // world with their chosen nickname). Recreated cleanly across React StrictMode's
   // dev mount/unmount/mount, so reloads always reconnect and show the live world.
+  // Recreated too when `isViewer` flips (e.g. a viewer adds a Gemini key) so the
+  // bridge switches between spectating and a joined player_session.
   useEffect(() => {
     if (!hasBackendConfig() || !playerName) return;
     let alive = true;
@@ -135,6 +143,7 @@ export function App() {
         const bridge = createBackendPresenceBridge({
           onSnapshot: setBackendSnap,
           nickname: playerNameRef.current ?? undefined,
+          viewer: isViewer,
         });
         localBridge = bridge;
         bridgeRef.current = bridge;
@@ -160,7 +169,7 @@ export function App() {
         backendCommandsRef.current = null;
       }
     };
-  }, [playerName]);
+  }, [playerName, isViewer]);
 
   // Dispose the in-memory session on unmount.
   useEffect(() => {
@@ -205,7 +214,7 @@ export function App() {
   const needsApiKey =
     resolveAiClientMode() === "browser-gemini" && !geminiKey && !viewerMode;
   const inputDisabled =
-    viewerMode || GENERATING_STAGES.has(displaySnapshot.stage);
+    isViewer || GENERATING_STAGES.has(displaySnapshot.stage);
 
   // A manually-clicked object in a live room (we hold its lock) → the prompt box
   // edits that object with AI instead of creating a new one.
@@ -213,7 +222,7 @@ export function App() {
 
   // WASD moves the object when one is selected (local or live), else moves the camera.
   const hasSelectedObjectRef = useRef(false);
-  hasSelectedObjectRef.current = !viewerMode && displaySnapshot.object !== null;
+  hasSelectedObjectRef.current = !isViewer && displaySnapshot.object !== null;
 
   const handleMoveObject = useCallback((dx: number, dy: number, dz: number) => {
     if (backendCommandsRef.current?.canHandle()) {
@@ -396,12 +405,12 @@ export function App() {
   }
 
   const canCopySelectedObject = useCallback(() => {
-    if (viewerMode) return false;
+    if (isViewer) return false;
     if (backendCommandsRef.current?.canHandle()) {
       return backendCommandsRef.current.canCopySelectedObject();
     }
     return sessionRef.current?.canCopySelectedObject() ?? false;
-  }, [viewerMode]);
+  }, [isViewer]);
 
   const copySelectedObjectTemplate = useCallback(() => {
     if (backendCommandsRef.current?.canHandle()) {
@@ -569,7 +578,7 @@ export function App() {
         <GameCanvas
           document={displaySnapshot.document}
           selectedObjectId={effectiveSelectedId}
-          onSelectObject={viewerMode ? undefined : handleSelectObject}
+          onSelectObject={isViewer ? undefined : handleSelectObject}
           hasSelectedObjectRef={hasSelectedObjectRef}
           onMoveObject={handleMoveObject}
           onDeselect={handleDeselect}
@@ -588,7 +597,7 @@ export function App() {
           />
           <PlayerList
             players={backendSnap.players}
-            onEditAvatar={isLive && !viewerMode ? handleEditAvatar : undefined}
+            onEditAvatar={isLive && !isViewer ? handleEditAvatar : undefined}
           />
           {contextMsg && <p className="context-msg">{contextMsg}</p>}
           <ChatPanel
@@ -596,7 +605,8 @@ export function App() {
             onSend={handleSendChat}
             onDelete={handleDeleteChat}
             canModerate={canModerateChat}
-            disabled={!isLive}
+            disabled={!isLive || isViewer}
+            viewer={isViewer}
             debugMessages={DEBUG ? aiTranscript : undefined}
           />
         </div>
@@ -631,7 +641,7 @@ export function App() {
           <FeedbackCard
             operation={pendingFeedback}
             onRate={handleRateFeedback}
-            viewerMode={viewerMode}
+            viewerMode={isViewer}
             offline={!isLive}
           />
         </div>
@@ -644,7 +654,7 @@ export function App() {
             avatarMode={avatarMode}
             onExitAvatarMode={() => setAvatarMode(false)}
             placeholder={
-              viewerMode ? "Add a Gemini key to create objects…" : undefined
+              isViewer ? "Add a Gemini key to create objects…" : undefined
             }
           />
         </div>
