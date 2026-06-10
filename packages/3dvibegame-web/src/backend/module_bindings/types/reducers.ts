@@ -26,6 +26,7 @@ import RequestCreateObjectReducer from "../request_create_object_reducer";
 import RequestEditLockReducer from "../request_edit_lock_reducer";
 import ResetWorldReducer from "../reset_world_reducer";
 import SendChatMessageReducer from "../send_chat_message_reducer";
+import SetAvatarSpecReducer from "../set_avatar_spec_reducer";
 import SetPlayerRoleReducer from "../set_player_role_reducer";
 import SubmitAiDraftReducer from "../submit_ai_draft_reducer";
 import SubmitObjectEditReducer from "../submit_object_edit_reducer";
@@ -54,6 +55,7 @@ export type RequestCreateObjectParams = __Infer<typeof RequestCreateObjectReduce
 export type RequestEditLockParams = __Infer<typeof RequestEditLockReducer>;
 export type ResetWorldParams = __Infer<typeof ResetWorldReducer>;
 export type SendChatMessageParams = __Infer<typeof SendChatMessageReducer>;
+export type SetAvatarSpecParams = __Infer<typeof SetAvatarSpecReducer>;
 export type SetPlayerRoleParams = __Infer<typeof SetPlayerRoleReducer>;
 export type SubmitAiDraftParams = __Infer<typeof SubmitAiDraftReducer>;
 export type SubmitObjectEditParams = __Infer<typeof SubmitObjectEditReducer>;

@@ -54,6 +54,7 @@ import RequestCreateObjectReducer from "./request_create_object_reducer";
 import RequestEditLockReducer from "./request_edit_lock_reducer";
 import ResetWorldReducer from "./reset_world_reducer";
 import SendChatMessageReducer from "./send_chat_message_reducer";
+import SetAvatarSpecReducer from "./set_avatar_spec_reducer";
 import SetPlayerRoleReducer from "./set_player_role_reducer";
 import SubmitAiDraftReducer from "./submit_ai_draft_reducer";
 import SubmitObjectEditReducer from "./submit_object_edit_reducer";
@@ -68,6 +69,7 @@ import UpdateWorldSettingsReducer from "./update_world_settings_reducer";
 import AiJobRow from "./ai_job_table";
 import ChatMessageRow from "./chat_message_table";
 import ObjectLockRow from "./object_lock_table";
+import PlayerAvatarRow from "./player_avatar_table";
 import PlayerSessionRow from "./player_session_table";
 import SnapshotObjectRow from "./snapshot_object_table";
 import WorldRow from "./world_table";
@@ -123,6 +125,17 @@ const tablesSchema = __schema({
       { name: 'object_lock_object_id_key', constraint: 'unique', columns: ['objectId'] },
     ],
   }, ObjectLockRow),
+  playerAvatar: __table({
+    name: 'player_avatar',
+    indexes: [
+      { name: 'identity', algorithm: 'btree', columns: [
+        'identity',
+      ] },
+    ],
+    constraints: [
+      { name: 'player_avatar_identity_key', constraint: 'unique', columns: ['identity'] },
+    ],
+  }, PlayerAvatarRow),
   playerSession: __table({
     name: 'player_session',
     indexes: [
@@ -220,6 +233,7 @@ const reducersSchema = __reducers(
   __reducerSchema("request_edit_lock", RequestEditLockReducer),
   __reducerSchema("reset_world", ResetWorldReducer),
   __reducerSchema("send_chat_message", SendChatMessageReducer),
+  __reducerSchema("set_avatar_spec", SetAvatarSpecReducer),
   __reducerSchema("set_player_role", SetPlayerRoleReducer),
   __reducerSchema("submit_ai_draft", SubmitAiDraftReducer),
   __reducerSchema("submit_object_edit", SubmitObjectEditReducer),

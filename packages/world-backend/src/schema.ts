@@ -282,9 +282,28 @@ export const ObjectFeedback = table(
   },
 );
 
+// One row per player identity holding the voxel avatar body they prompt-created.
+// Kept separate from `PlayerSession` so the heavy spec JSON is not re-sent with the
+// 10 Hz `move_player` position updates, and so the body persists across sessions
+// (the anonymous identity persists in the client's localStorage).
+export const PlayerAvatar = table(
+  {
+    name: "player_avatar",
+    public: true,
+  },
+  {
+    identity: t.identity().primaryKey(),
+    voxelCoreJson: t.string(),
+    builderSpecJson: t.string(),
+    version: t.u32(),
+    updatedAt: t.timestamp(),
+  },
+);
+
 const spacetimedb = schema({
   world: World,
   playerSession: PlayerSession,
+  playerAvatar: PlayerAvatar,
   aiJob: AiJob,
   worldObject: WorldObject,
   objectLock: ObjectLock,

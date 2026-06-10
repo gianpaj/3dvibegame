@@ -53,6 +53,15 @@ const maxHorizontalDistance = 256;
 const minPlayerY = -8;
 const maxPlayerY = 128;
 const maxPitchRadians = Math.PI / 2;
+// Avatar bodies are small standing characters; cap the JSON like other specs and
+// reject anything whose compiled builder parts exceed the avatar clamp.
+const maxAvatarVoxelCoreJsonLength = 200_000;
+const maxAvatarBuilderSpecJsonLength = 200_000;
+const avatarClampWidth = 2;
+const avatarClampHeight = 3;
+const avatarClampDepth = 2;
+// Avatar editing must not become a spam channel: reject updates < 10 s apart.
+const avatarUpdateCooldownMicros = 10n * 1_000_000n;
 const maxObjectPosition = 512;
 const maxObjectRotation = Math.PI * 2;
 const minObjectScale = 0.05;
@@ -159,6 +168,53 @@ export const move_player = spacetimedb.reducer(
       positionZ,
       rotationYaw: normalizeAngle(rotationYaw),
       rotationPitch,
+      lastSeenAt: ctx.timestamp,
+    });
+  },
+);
+
+export const set_avatar_spec = spacetimedb.reducer(
+  {
+    voxelCoreJson: t.string(),
+    builderSpecJson: t.string(),
+  },
+  (ctx, { voxelCoreJson, builderSpecJson }) => {
+    const player = requireActivePlayer(ctx);
+
+    const voxelCore = parseAvatarVoxelCoreJson(voxelCoreJson);
+    const builderSpec = parseAvatarBuilderSpecJson(builderSpecJson);
+
+    const existing = ctx.db.playerAvatar.identity.find(ctx.sender);
+    if (existing) {
+      const elapsedMicros =
+        ctx.timestamp.microsSinceUnixEpoch -
+        existing.updatedAt.microsSinceUnixEpoch;
+      if (elapsedMicros < avatarUpdateCooldownMicros) {
+        throw new SenderError("avatar was updated too recently");
+      }
+    }
+
+    if (existing) {
+      ctx.db.playerAvatar.identity.update({
+        ...existing,
+        voxelCoreJson: voxelCore.normalizedJson,
+        builderSpecJson: builderSpec.normalizedJson,
+        version: existing.version + 1,
+        updatedAt: ctx.timestamp,
+      });
+    } else {
+      ctx.db.playerAvatar.insert({
+        identity: ctx.sender,
+        voxelCoreJson: voxelCore.normalizedJson,
+        builderSpecJson: builderSpec.normalizedJson,
+        version: 1,
+        updatedAt: ctx.timestamp,
+      });
+    }
+
+    // Touch the session so presence stays warm after an avatar swap.
+    ctx.db.playerSession.identity.update({
+      ...player,
       lastSeenAt: ctx.timestamp,
     });
   },
@@ -1685,6 +1741,110 @@ function parseBuilderSpecJson(builderSpecJson: string) {
     sizeTier: readStringField(parsed, "size_tier"),
     normalizedJson,
   };
+}
+
+function parseAvatarVoxelCoreJson(voxelCoreJson: string) {
+  const normalizedJson = voxelCoreJson.trim();
+  if (!normalizedJson) {
+    throw new SenderError("avatar voxel core JSON is required");
+  }
+  if (normalizedJson.length > maxAvatarVoxelCoreJsonLength) {
+    throw new SenderError(
+      `avatar voxel core JSON must be ${maxAvatarVoxelCoreJsonLength} characters or fewer`,
+    );
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(normalizedJson);
+  } catch {
+    throw new SenderError("avatar voxel core JSON is malformed");
+  }
+  if (!isRecord(parsed)) {
+    throw new SenderError("avatar voxel core must be an object");
+  }
+
+  return { normalizedJson };
+}
+
+function parseAvatarBuilderSpecJson(builderSpecJson: string) {
+  const normalizedJson = builderSpecJson.trim();
+  if (!normalizedJson) {
+    throw new SenderError("avatar builder spec JSON is required");
+  }
+  if (normalizedJson.length > maxAvatarBuilderSpecJsonLength) {
+    throw new SenderError(
+      `avatar builder spec JSON must be ${maxAvatarBuilderSpecJsonLength} characters or fewer`,
+    );
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(normalizedJson);
+  } catch {
+    throw new SenderError("avatar builder spec JSON is malformed");
+  }
+  if (!isRecord(parsed)) {
+    throw new SenderError("avatar builder spec must be an object");
+  }
+
+  const parts = readArrayField(parsed, "parts");
+  if (!parts.length) {
+    throw new SenderError("avatar builder spec parts must not be empty");
+  }
+
+  // Compiled bounds must fit the avatar clamp (≤ 2 × 3 × 2 units pre-normalization).
+  // Each part contributes an AABB centered on its local_position (default origin)
+  // and sized by its dimensions.
+  let minX = Infinity;
+  let minY = Infinity;
+  let minZ = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let maxZ = -Infinity;
+
+  parts.forEach((part, index) => {
+    if (!isRecord(part)) {
+      throw new SenderError(`avatar builder spec part ${index} must be an object`);
+    }
+    const dimensions = readNumberArrayField(part, "dimensions");
+    const [dx, dy, dz] = dimensions as number[];
+    const center = isVector3(part.local_position)
+      ? (part.local_position as number[])
+      : [0, 0, 0];
+    minX = Math.min(minX, center[0] - dx / 2);
+    maxX = Math.max(maxX, center[0] + dx / 2);
+    minY = Math.min(minY, center[1] - dy / 2);
+    maxY = Math.max(maxY, center[1] + dy / 2);
+    minZ = Math.min(minZ, center[2] - dz / 2);
+    maxZ = Math.max(maxZ, center[2] + dz / 2);
+  });
+
+  const width = maxX - minX;
+  const height = maxY - minY;
+  const depth = maxZ - minZ;
+  if (
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    !Number.isFinite(depth) ||
+    width > avatarClampWidth ||
+    height > avatarClampHeight ||
+    depth > avatarClampDepth
+  ) {
+    throw new SenderError(
+      `avatar exceeds the ${avatarClampWidth}x${avatarClampHeight}x${avatarClampDepth} size clamp`,
+    );
+  }
+
+  return { normalizedJson };
+}
+
+function isVector3(value: unknown): value is [number, number, number] {
+  return (
+    Array.isArray(value) &&
+    value.length === 3 &&
+    value.every((entry) => typeof entry === "number" && Number.isFinite(entry))
+  );
 }
 
 function assertArtifactMatchesSource(

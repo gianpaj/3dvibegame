@@ -63,6 +63,15 @@ export const ObjectLock = __t.object("ObjectLock", {
 });
 export type ObjectLock = __Infer<typeof ObjectLock>;
 
+export const PlayerAvatar = __t.object("PlayerAvatar", {
+  identity: __t.identity(),
+  voxelCoreJson: __t.string(),
+  builderSpecJson: __t.string(),
+  version: __t.u32(),
+  updatedAt: __t.timestamp(),
+});
+export type PlayerAvatar = __Infer<typeof PlayerAvatar>;
+
 export const PlayerSession = __t.object("PlayerSession", {
   identity: __t.identity(),
   worldId: __t.u64(),
