@@ -295,10 +295,14 @@ export const PlayerAvatar = table(
     identity: t.identity().primaryKey(),
     voxelCoreJson: t.string(),
     builderSpecJson: t.string(),
-    /** Rendered size multiplier (1 = human height, up to 4). */
-    scale: t.f64(),
     version: t.u32(),
     updatedAt: t.timestamp(),
+    // Rendered size multiplier (1 = human height, up to 4). Added after the table
+    // shipped, so it must live at the END of the column list with a default value —
+    // SpacetimeDB only auto-migrates columns appended last and backfills existing
+    // rows from the default (1 = normal size). Inserting it mid-table would force a
+    // manual migration.
+    scale: t.f64().default(1),
   },
 );
 

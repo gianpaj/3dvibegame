@@ -14,7 +14,7 @@ export default __t.row({
   identity: __t.identity().primaryKey(),
   voxelCoreJson: __t.string().name("voxel_core_json"),
   builderSpecJson: __t.string().name("builder_spec_json"),
-  scale: __t.f64(),
   version: __t.u32(),
   updatedAt: __t.timestamp().name("updated_at"),
+  scale: __t.f64().default(1),
 });
