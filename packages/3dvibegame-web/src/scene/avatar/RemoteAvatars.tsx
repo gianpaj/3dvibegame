@@ -11,6 +11,8 @@ export interface RemoteAvatarData {
   id: string;
   nickname: string;
   spec: BuilderSpec;
+  /** Rendered size multiplier (1 = human height); from player_avatar.scale. */
+  scaleFactor?: number;
   tintHue?: number;
   target: { x: number; y: number; z: number; yaw: number };
   /** Bumped when the body spec changes so we can squash-pop on swap. */
@@ -84,6 +86,7 @@ function RemoteAvatar({ data }: { data: RemoteAvatarData }) {
   return (
     <Avatar
       spec={data.spec}
+      scaleFactor={data.scaleFactor}
       tintHue={data.tintHue}
       motionRef={motionRef}
       nickname={data.nickname}

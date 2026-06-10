@@ -13,4 +13,5 @@ import {
 export default {
   voxelCoreJson: __t.string(),
   builderSpecJson: __t.string(),
+  scale: __t.f64(),
 };

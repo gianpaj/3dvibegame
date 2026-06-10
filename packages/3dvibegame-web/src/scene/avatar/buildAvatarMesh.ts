@@ -29,13 +29,13 @@ function asAuthorityObject(spec: BuilderSpec): AuthorityObject {
 
 /**
  * Build a normalized avatar group from a builder spec: voxel mesh path, scaled so
- * its height is ~1.8 u with feet at the group origin. When `tintHue` is provided
- * (default body), every mesh material is HSL-tinted with that hue so each player's
- * default body is visually distinct.
+ * its height is ~1.8 u × scaleFactor with feet at the group origin. When `tintHue`
+ * is provided (default body), every mesh material is HSL-tinted with that hue so
+ * each player's default body is visually distinct.
  */
 export function buildAvatarMesh(
   spec: BuilderSpec,
-  options: { tintHue?: number } = {},
+  options: { tintHue?: number; scaleFactor?: number } = {},
 ): THREE.Group {
   const inner = createAuthorityObject({
     object: asAuthorityObject(spec),
@@ -43,7 +43,7 @@ export function buildAvatarMesh(
     resolveAnchor: () => null,
   }).group;
 
-  const { scale, offsetY } = avatarNormalization(spec);
+  const { scale, offsetY } = avatarNormalization(spec, options.scaleFactor);
   inner.scale.setScalar(scale);
   inner.position.y = offsetY;
 

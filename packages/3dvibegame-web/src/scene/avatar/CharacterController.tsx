@@ -29,6 +29,8 @@ export interface CharacterControllerProps {
   objectSelectedRef: RefObject<boolean>;
   registry: CollisionRegistry;
   spec: BuilderSpec;
+  /** Rendered size multiplier (1 = human height); from player_avatar.scale. */
+  scaleFactor?: number;
   tintHue?: number;
   nickname: string;
   /** Whether the body was just swapped (triggers the in-place squash-pop). */
@@ -47,6 +49,7 @@ export function CharacterController({
   objectSelectedRef,
   registry,
   spec,
+  scaleFactor = 1,
   tintHue,
   nickname,
   spawnPop,
@@ -54,11 +57,11 @@ export function CharacterController({
 }: CharacterControllerProps) {
   const camera = useThree((state) => state.camera);
 
-  // Follow camera looks at the rendered head, which rises for oversized bodies.
+  // Follow camera looks at the rendered head, which rises for scaled-up bodies.
   // The physics capsule stays PLAYER_HEIGHT regardless — big avatars are cosmetic.
   const cameraHeadY = useMemo(
-    () => avatarNormalization(spec).renderedHeight * 0.9,
-    [spec],
+    () => avatarNormalization(spec, scaleFactor).renderedHeight * 0.9,
+    [spec, scaleFactor],
   );
 
   const posRef = useRef(
@@ -206,6 +209,7 @@ export function CharacterController({
   return (
     <Avatar
       spec={spec}
+      scaleFactor={scaleFactor}
       tintHue={tintHue}
       motionRef={motionRef}
       nickname={nickname}

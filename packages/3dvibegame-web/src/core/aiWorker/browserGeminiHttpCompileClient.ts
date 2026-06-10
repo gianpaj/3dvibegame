@@ -81,6 +81,7 @@ export function createBrowserGeminiHttpCompileClient({
           objectIdBase: response.object_id_base ?? response.objectIdBase ?? "compile_object",
           quantity: voxel.quantity ?? 1,
           ...workerResponseToArtifact(response, model),
+          avatarScale: voxel.scale,
         };
       } catch (error) {
         throw normalizeAiWorkerError(error);
@@ -124,7 +125,10 @@ export function createBrowserGeminiHttpCompileClient({
           workerTimeoutMs,
           body,
         );
-        return workerResponseToArtifact(response, model);
+        return {
+          ...workerResponseToArtifact(response, model),
+          avatarScale: voxel.scale,
+        };
       } catch (error) {
         throw normalizeAiWorkerError(error);
       }

@@ -7,9 +7,10 @@ import {
   expectReducerFailure,
 } from "./spacetime-smoke-harness.mjs";
 
-// A small standing body that fits the 2x3x2 avatar clamp. The voxel core is opaque
-// to the reducer (it only checks that it parses); the builder spec must have a
-// non-empty parts array whose combined AABB fits the clamp.
+// A small standing body that fits the 8x12x8 avatar geometry clamp. The voxel
+// core is opaque to the reducer (it only checks that it parses); the builder spec
+// must have a non-empty parts array whose combined AABB fits the clamp. Rendered
+// size comes from the separate `scale` arg (0.25–4).
 const voxelCore = JSON.stringify({
   object_category: "avatar",
   size_tier: "medium",
@@ -22,7 +23,7 @@ function builderSpec({ tall = false } = {}) {
       {
         part_id: "legs",
         primitive: "box",
-        dimensions: [1.4, tall ? 4 : 0.9, 1.4],
+        dimensions: [1.4, tall ? 14 : 0.9, 1.4],
         local_position: [0, 0.45, 0],
       },
       {
@@ -51,8 +52,8 @@ try {
   harness.callAs(bob, "join_world", ["Bob"]);
   harness.activatePlayers();
 
-  // 1. Upsert: first set_avatar_spec inserts a version-1 row.
-  harness.callAs(alice, "set_avatar_spec", [arg(voxelCore), arg(builderSpec())]);
+  // 1. Upsert: first set_avatar_spec inserts a version-1 row (scale 2 = giant).
+  harness.callAs(alice, "set_avatar_spec", [arg(voxelCore), arg(builderSpec()), "2"]);
   const afterInsert = harness.query("SELECT version FROM player_avatar");
   expectIncludes(afterInsert, "1", "first avatar set should create a version-1 row");
 
@@ -60,29 +61,40 @@ try {
   harness.activatePlayers();
   expectReducerFailure(
     () =>
-      harness.callAs(alice, "set_avatar_spec", [arg(voxelCore), arg(builderSpec())]),
+      harness.callAs(alice, "set_avatar_spec", [arg(voxelCore), arg(builderSpec()), "1"]),
     "updated too recently",
     "rapid avatar updates should be rate limited",
   );
 
-  // 3. Size rejection: a body taller than the 3-unit clamp is rejected.
+  // 3. Size rejection: geometry taller than the 12-unit clamp is rejected.
   harness.activatePlayers();
   expectReducerFailure(
     () =>
       harness.callAs(bob, "set_avatar_spec", [
         arg(voxelCore),
         arg(builderSpec({ tall: true })),
+        "1",
       ]),
     "size clamp",
-    "oversized avatars should be rejected",
+    "oversized avatar geometry should be rejected",
   );
 
   // 4. Malformed JSON is rejected.
   harness.activatePlayers();
   expectReducerFailure(
-    () => harness.callAs(bob, "set_avatar_spec", [arg("{nope"), arg(builderSpec())]),
+    () =>
+      harness.callAs(bob, "set_avatar_spec", [arg("{nope"), arg(builderSpec()), "1"]),
     "malformed",
     "malformed avatar voxel core should be rejected",
+  );
+
+  // 4b. Out-of-range scale is rejected.
+  harness.activatePlayers();
+  expectReducerFailure(
+    () =>
+      harness.callAs(bob, "set_avatar_spec", [arg(voxelCore), arg(builderSpec()), "9"]),
+    "scale must be",
+    "out-of-range avatar scale should be rejected",
   );
 
   // 5. Only one row per identity (upsert, not insert).

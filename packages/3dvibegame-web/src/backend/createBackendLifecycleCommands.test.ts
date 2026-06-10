@@ -51,6 +51,8 @@ describe("createBackendLifecycleCommands avatar editing", () => {
     const input = setAvatarSpec.mock.calls[0][0];
     expect(() => JSON.parse(input.voxelCoreJson)).not.toThrow();
     expect(() => JSON.parse(input.builderSpecJson)).not.toThrow();
+    // First body with no size request renders at human height.
+    expect((input as { scale?: number }).scale).toBe(1);
   });
 
   it("feeds the current body to createEdit when one already exists", async () => {
@@ -62,10 +64,13 @@ describe("createBackendLifecycleCommands avatar editing", () => {
         id: "local_player",
         voxelCoreJson: draft.sourceSpecJson,
         builderSpecJson: draft.builderSpecJson,
+        scale: 2,
         version: 2,
       },
     ];
-    const setAvatarSpec = vi.fn(async () => {});
+    const setAvatarSpec = vi.fn<
+      (input: { scale: number }) => Promise<void>
+    >(async () => {});
     const createEdit = vi.fn<
       (input: { baseVersion: number; purpose?: string }) => Promise<unknown>
     >(
@@ -94,6 +99,8 @@ describe("createBackendLifecycleCommands avatar editing", () => {
     // Avatar edits must use the avatar system prompt, not the generic object one.
     expect(editArg.purpose).toBe("avatar");
     expect(setAvatarSpec).toHaveBeenCalledTimes(1);
+    // The AI said nothing about size, so the player's current scale is preserved.
+    expect(setAvatarSpec.mock.calls[0][0].scale).toBe(2);
   });
 
   it("rejects a blank avatar prompt", async () => {

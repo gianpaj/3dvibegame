@@ -40,6 +40,8 @@ export interface BackendAvatarPresence {
   id: string;
   voxelCoreJson: string;
   builderSpecJson: string;
+  /** Rendered size multiplier (1 = human height, up to 4). */
+  scale: number;
   version: number;
 }
 
@@ -167,6 +169,8 @@ export interface BackendPresenceBridge {
 export interface BackendSetAvatarSpecInput {
   voxelCoreJson: string;
   builderSpecJson: string;
+  /** Rendered size multiplier (1 = human height, up to 4). */
+  scale: number;
 }
 
 export interface BackendRequestCreateObjectInput {
@@ -1000,6 +1004,7 @@ function mapAvatar(avatar: PlayerAvatar): BackendAvatarPresence {
     id: avatar.identity.toHexString(),
     voxelCoreJson: avatar.voxelCoreJson,
     builderSpecJson: avatar.builderSpecJson,
+    scale: avatar.scale,
     version: avatar.version,
   };
 }

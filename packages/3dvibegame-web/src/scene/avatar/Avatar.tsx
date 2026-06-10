@@ -27,6 +27,8 @@ export interface AvatarMotion {
 export interface AvatarProps {
   /** The body to render. */
   spec: BuilderSpec;
+  /** Rendered size multiplier (1 = human height); from player_avatar.scale. */
+  scaleFactor?: number;
   /** HSL hue used to tint the default body; omit for prompt-made bodies. */
   tintHue?: number;
   /** Ref holding the live motion, updated each frame by the owning controller. */
@@ -44,6 +46,7 @@ export interface AvatarProps {
  */
 export function Avatar({
   spec,
+  scaleFactor = 1,
   tintHue,
   motionRef,
   nickname,
@@ -57,13 +60,13 @@ export function Avatar({
   const wasLandedRef = useRef(false);
 
   const mesh = useMemo(
-    () => buildAvatarMesh(spec, { tintHue }),
-    [spec, tintHue],
+    () => buildAvatarMesh(spec, { tintHue, scaleFactor }),
+    [spec, tintHue, scaleFactor],
   );
-  // Oversized bodies render oversized — keep the nameplate above the head.
+  // Scaled bodies render scaled — keep the nameplate above the head.
   const renderedHeight = useMemo(
-    () => avatarNormalization(spec).renderedHeight,
-    [spec],
+    () => avatarNormalization(spec, scaleFactor).renderedHeight,
+    [spec, scaleFactor],
   );
 
   useEffect(() => {

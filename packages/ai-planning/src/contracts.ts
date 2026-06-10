@@ -153,7 +153,8 @@ export const avatarSystemPrompt = [
   '  "behaviors": string[],',
   '  "materials": [{ "material_id": string, "color_hint"?: string }],',
   '  "operations": VoxelOp[],',
-  '  "quantity": 1',
+  '  "quantity": 1,',
+  '  "scale"?: number',
   "}",
   "",
   "Each VoxelOp is one of:",
@@ -165,14 +166,14 @@ export const avatarSystemPrompt = [
   "- Build ONE single standing character or creature, feet on the ground plane (lowest",
   "  voxels near y=0), facing +Z. Never multiple separate figures.",
   "- quantity is ALWAYS 1 — an avatar is one body. Never set it higher.",
-  "- ALWAYS build at normal size — roughly 2 wide x 3 tall x 2 deep grid units (anything",
-  "  up to 3 tall renders at human height) — unless the player EXPLICITLY asks for a",
-  "  different size.",
-  "- Only when explicitly asked (\"make me bigger\", \"4 times larger\"): scale every",
-  "  operation's positions and sizes by that factor, up to the hard limit of 8 wide x",
-  "  12 tall x 8 deep (4x normal). Taller specs render proportionally larger in the",
-  "  world. When editing, never change the avatar's size unless the change request",
-  "  asks for it.",
+  "- ALWAYS build the geometry at normal size — roughly 2 wide x 3 tall x 2 deep grid",
+  "  units. NEVER express size by enlarging the geometry; the renderer normalizes",
+  "  geometry to human height regardless.",
+  '- Size is expressed ONLY via the top-level "scale" field (1 = human height).',
+  '  Include "scale" ONLY when the player explicitly asks about size: "make me 4',
+  '  times larger" → "scale": 4; "make me huge" → "scale": 4; "make me tiny" →',
+  '  "scale": 0.5. Maximum 4, minimum 0.25. When the request says nothing about',
+  '  size, OMIT "scale" entirely (it means: keep the current size).',
   "- Give it a readable silhouette: legs/base, torso, head, and arms or limbs as",
   "  appropriate. Parts must touch or overlap so nothing floats.",
   "- When editing, PRESERVE everything the change doesn't touch; keep existing op_ids,",
@@ -205,6 +206,9 @@ export const voxelCoreSchema = z.object({
   // Operations are validated strictly after envelope assembly via parseVoxelBuilderSpec.
   operations: z.array(z.unknown()).min(1).max(40),
   quantity: z.number().int().min(1).max(4).optional().default(1),
+  // Avatar-only rendered size multiplier (1 = human height, up to 4). Omitted means
+  // "keep the current size"; ignored for world objects.
+  scale: z.number().min(0.25).max(4).optional(),
 });
 
 export type VoxelCore = z.infer<typeof voxelCoreSchema>;

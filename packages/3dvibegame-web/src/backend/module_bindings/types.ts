@@ -67,6 +67,7 @@ export const PlayerAvatar = __t.object("PlayerAvatar", {
   identity: __t.identity(),
   voxelCoreJson: __t.string(),
   builderSpecJson: __t.string(),
+  scale: __t.f64(),
   version: __t.u32(),
   updatedAt: __t.timestamp(),
 });

@@ -4,6 +4,7 @@ import type { BuilderSpec } from "@3dvibegame/scene-authority-ts";
 import {
   AVATAR_TARGET_HEIGHT,
   avatarNormalization,
+  clampAvatarScale,
   computeBuilderBounds,
   defaultAvatarBuilderSpec,
   fitsAvatarClamp,
@@ -65,7 +66,7 @@ describe("fitsAvatarClamp", () => {
 });
 
 describe("avatarNormalization", () => {
-  it("scales small bodies up to the target height and lifts feet to y=0", () => {
+  it("normalizes any geometry to the target height and lifts feet to y=0", () => {
     // Body from y=1 to y=2 (height 1), so scale = 1.8 and feet lift to origin.
     const norm = avatarNormalization(
       specFromParts([{ dimensions: [1, 1, 1], local_position: [0, 1.5, 0] }]),
@@ -75,13 +76,30 @@ describe("avatarNormalization", () => {
     expect(norm.renderedHeight).toBeCloseTo(AVATAR_TARGET_HEIGHT);
   });
 
-  it("renders bodies taller than the 3-unit base proportionally larger", () => {
-    // A 12-tall spec is 4x the 3-unit base, so it renders at 4x human height.
-    const norm = avatarNormalization(
-      specFromParts([{ dimensions: [2, 12, 2], local_position: [0, 6, 0] }]),
-    );
-    expect(norm.scale).toBeCloseTo(AVATAR_TARGET_HEIGHT / 3);
+  it("geometry size never changes rendered size — only scaleFactor does", () => {
+    // A 12-tall spec still renders at human height without an explicit scale…
+    const tall = specFromParts([{ dimensions: [2, 12, 2], local_position: [0, 6, 0] }]);
+    expect(avatarNormalization(tall).renderedHeight).toBeCloseTo(AVATAR_TARGET_HEIGHT);
+    // …and a scaleFactor of 4 renders any geometry at 4x human height.
+    const norm = avatarNormalization(tall, 4);
     expect(norm.renderedHeight).toBeCloseTo(AVATAR_TARGET_HEIGHT * 4);
+  });
+});
+
+describe("clampAvatarScale", () => {
+  it("passes valid scales through and clamps to [0.25, 4]", () => {
+    expect(clampAvatarScale(1)).toBe(1);
+    expect(clampAvatarScale(4)).toBe(4);
+    expect(clampAvatarScale(9)).toBe(4);
+    expect(clampAvatarScale(0.1)).toBe(0.25);
+  });
+
+  it("falls back to 1 for missing or bad data", () => {
+    expect(clampAvatarScale(undefined)).toBe(1);
+    expect(clampAvatarScale(null)).toBe(1);
+    expect(clampAvatarScale(Number.NaN)).toBe(1);
+    expect(clampAvatarScale(0)).toBe(1);
+    expect(clampAvatarScale(-2)).toBe(1);
   });
 });
 

@@ -27,6 +27,7 @@ import {
   localBackendPlayerId,
   selectBackendObject,
 } from "./createBackendGenerationSnapshot";
+import { clampAvatarScale } from "../scene/avatar/avatarSpec";
 
 export interface BackendLifecycleCommands {
   canHandle(): boolean;
@@ -313,9 +314,15 @@ export function createBackendLifecycleCommands(
         throw userFacingAiWorkerError(error);
       }
 
+      // AI omitting scale means "the request said nothing about size" — keep the
+      // player's current scale (or human size for a first body).
+      const scale = clampAvatarScale(
+        artifact.avatarScale ?? currentAvatar?.scale ?? 1,
+      );
       await bridge.setAvatarSpec({
         voxelCoreJson: artifact.sourceSpecJson,
         builderSpecJson: artifact.builderSpecJson,
+        scale,
       });
     },
     async dispatchAction(actionId: GenerationActionId) {

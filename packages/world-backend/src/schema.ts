@@ -295,6 +295,8 @@ export const PlayerAvatar = table(
     identity: t.identity().primaryKey(),
     voxelCoreJson: t.string(),
     builderSpecJson: t.string(),
+    /** Rendered size multiplier (1 = human height, up to 4). */
+    scale: t.f64(),
     version: t.u32(),
     updatedAt: t.timestamp(),
   },

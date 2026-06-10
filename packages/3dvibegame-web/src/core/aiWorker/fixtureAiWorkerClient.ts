@@ -9,6 +9,11 @@ export interface AiWorkerArtifact {
   builderSpecJson: string;
   /** The model that authored this result (e.g. "gemini-2.5-flash"); stamped onto feedback. */
   modelId: string;
+  /**
+   * Avatar-only rendered size multiplier the AI requested (1 = human height, up
+   * to 4). Undefined means the AI said nothing about size — keep the current one.
+   */
+  avatarScale?: number;
 }
 
 export interface AiWorkerDraftResult extends AiWorkerArtifact {

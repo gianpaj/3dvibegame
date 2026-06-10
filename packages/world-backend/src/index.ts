@@ -55,12 +55,17 @@ const maxPlayerY = 128;
 const maxPitchRadians = Math.PI / 2;
 // Avatar bodies are standing characters; cap the JSON like other specs and
 // reject anything whose compiled builder parts exceed the avatar clamp. The
-// clamp is 4× a normal 2×3×2 body so prompts like "make me 4 times larger" work.
+// clamp guards against extreme geometry only — rendered size comes from the
+// explicit `scale` field (the client normalizes geometry to human height and
+// multiplies by scale), so a roomy clamp is safe.
 const maxAvatarVoxelCoreJsonLength = 200_000;
 const maxAvatarBuilderSpecJsonLength = 200_000;
 const avatarClampWidth = 8;
 const avatarClampHeight = 12;
 const avatarClampDepth = 8;
+// Rendered size multiplier: 1 = human height; "make me 4 times larger" → 4.
+const avatarMinScale = 0.25;
+const avatarMaxScale = 4;
 // Avatar editing must not become a spam channel: reject updates < 10 s apart.
 const avatarUpdateCooldownMicros = 10n * 1_000_000n;
 const maxObjectPosition = 512;
@@ -178,12 +183,22 @@ export const set_avatar_spec = spacetimedb.reducer(
   {
     voxelCoreJson: t.string(),
     builderSpecJson: t.string(),
+    scale: t.f64(),
   },
-  (ctx, { voxelCoreJson, builderSpecJson }) => {
+  (ctx, { voxelCoreJson, builderSpecJson, scale }) => {
     const player = requireActivePlayer(ctx);
 
     const voxelCore = parseAvatarVoxelCoreJson(voxelCoreJson);
     const builderSpec = parseAvatarBuilderSpecJson(builderSpecJson);
+    if (
+      !Number.isFinite(scale) ||
+      scale < avatarMinScale ||
+      scale > avatarMaxScale
+    ) {
+      throw new SenderError(
+        `avatar scale must be between ${avatarMinScale} and ${avatarMaxScale}`,
+      );
+    }
 
     const existing = ctx.db.playerAvatar.identity.find(ctx.sender);
     if (existing) {
@@ -200,6 +215,7 @@ export const set_avatar_spec = spacetimedb.reducer(
         ...existing,
         voxelCoreJson: voxelCore.normalizedJson,
         builderSpecJson: builderSpec.normalizedJson,
+        scale,
         version: existing.version + 1,
         updatedAt: ctx.timestamp,
       });
@@ -208,6 +224,7 @@ export const set_avatar_spec = spacetimedb.reducer(
         identity: ctx.sender,
         voxelCoreJson: voxelCore.normalizedJson,
         builderSpecJson: builderSpec.normalizedJson,
+        scale,
         version: 1,
         updatedAt: ctx.timestamp,
       });

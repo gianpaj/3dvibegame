@@ -10,6 +10,7 @@ import { CharacterController } from "./CharacterController";
 import { RemoteAvatars, type RemoteAvatarData } from "./RemoteAvatars";
 import { collisionRegistry } from "./collision";
 import {
+  clampAvatarScale,
   defaultAvatarBuilderSpec,
   hueFromIdentity,
   parseStoredAvatarSpec,
@@ -26,6 +27,7 @@ export interface AvatarLayerProps {
 
 interface ResolvedBody {
   spec: BuilderSpec;
+  scaleFactor: number;
   tintHue?: number;
   version: number;
 }
@@ -39,11 +41,16 @@ function resolveBody(
   if (avatar) {
     const parsed = parseStoredAvatarSpec(avatar.builderSpecJson);
     if (parsed) {
-      return { spec: parsed, version: avatar.version };
+      return {
+        spec: parsed,
+        scaleFactor: clampAvatarScale(avatar.scale),
+        version: avatar.version,
+      };
     }
   }
   return {
     spec: defaultAvatarBuilderSpec(),
+    scaleFactor: 1,
     tintHue: hueFromIdentity(id),
     version: 0,
   };
@@ -79,6 +86,7 @@ export function AvatarLayer({
           id: player.id,
           nickname: player.nickname,
           spec: body.spec,
+          scaleFactor: body.scaleFactor,
           tintHue: body.tintHue,
           specVersion: body.version,
           target: {
@@ -99,6 +107,7 @@ export function AvatarLayer({
           objectSelectedRef={objectSelectedRef}
           registry={collisionRegistry}
           spec={localBody.spec}
+          scaleFactor={localBody.scaleFactor}
           tintHue={localBody.tintHue}
           nickname={local.nickname}
           spawnPop={localBody.version > 0}

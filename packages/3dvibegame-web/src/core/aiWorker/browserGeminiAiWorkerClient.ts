@@ -69,6 +69,7 @@ export function createBrowserGeminiAiWorkerClient({
           objectIdBase: response.object_id_base,
           quantity: voxel.quantity ?? 1,
           ...toArtifact(response.source_spec, response.builder_spec, model),
+          avatarScale: voxel.scale,
         };
       } catch (error) {
         throw normalizeAiWorkerError(error);
@@ -108,7 +109,10 @@ export function createBrowserGeminiAiWorkerClient({
           purpose,
         });
         const response = buildVoxelResponse(request, voxel, ["browser Gemini BYOK edit"]);
-        return toArtifact(response.source_spec, response.builder_spec, model);
+        return {
+          ...toArtifact(response.source_spec, response.builder_spec, model),
+          avatarScale: voxel.scale,
+        };
       } catch (error) {
         throw normalizeAiWorkerError(error);
       }
