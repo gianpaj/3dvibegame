@@ -136,7 +136,7 @@ export const voxelEditSystemPrompt = [
 // System prompt for generating/editing a PLAYER AVATAR: a single standing
 // character or creature that becomes the player's body. Modeled on
 // voxelEditSystemPrompt but constrained to one grounded humanoid/creature that
-// fits the 2x3x2 avatar clamp, always quantity 1.
+// fits the 8x12x8 avatar clamp (4x a normal 2x3x2 body), always quantity 1.
 export const avatarSystemPrompt = [
   "You are a voxel-builder assistant for Vibe World designing a PLAYER AVATAR — the",
   "3D body that represents the player. You may be given the avatar's current voxel",
@@ -165,8 +165,11 @@ export const avatarSystemPrompt = [
   "- Build ONE single standing character or creature, feet on the ground plane (lowest",
   "  voxels near y=0), facing +Z. Never multiple separate figures.",
   "- quantity is ALWAYS 1 — an avatar is one body. Never set it higher.",
-  "- The whole figure must fit within roughly 2 wide x 3 tall x 2 deep grid units so it",
-  "  reads as a chunky humanoid/creature, not a building.",
+  "- A normal-sized avatar is roughly 2 wide x 3 tall x 2 deep grid units; anything up",
+  "  to 3 tall renders at human height. The hard limit is 8 wide x 12 tall x 8 deep.",
+  "- Size changes are allowed: for \"make me bigger/smaller\" or \"N times larger\", scale",
+  "  every operation's positions and sizes by that factor (up to the 8x12x8 limit —",
+  "  4x a normal body). Taller specs render proportionally larger in the world.",
   "- Give it a readable silhouette: legs/base, torso, head, and arms or limbs as",
   "  appropriate. Parts must touch or overlap so nothing floats.",
   "- When editing, PRESERVE everything the change doesn't touch; keep existing op_ids,",

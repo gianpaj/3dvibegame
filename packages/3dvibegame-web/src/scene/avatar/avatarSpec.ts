@@ -6,14 +6,19 @@ import {
 
 import defaultAvatarVoxel from "../../fixtures/avatar-forest-guardian.voxel-builder.json";
 
-// Target rendered height for every avatar regardless of generated size. The
-// controller's capsule is 1.8 u tall, so feet sit at the group origin and the
-// head reaches ~1.8 u.
+// Rendered height of a normal-sized avatar. The controller's capsule is 1.8 u
+// tall, so feet sit at the group origin and the head reaches ~1.8 u.
 export const AVATAR_TARGET_HEIGHT = 1.8;
 
+// Spec height (in voxel grid units) that maps to AVATAR_TARGET_HEIGHT. Specs up
+// to this tall all render at 1.8 u (human-size); taller specs grow
+// proportionally, so a 12-tall spec renders at 4× human height (7.2 u).
+export const AVATAR_BASE_HEIGHT = 3;
+
 // Server-enforced clamp (kept in sync with world-backend set_avatar_spec): the
-// compiled, pre-normalization bounds must fit 2 × 3 × 2 units.
-export const AVATAR_CLAMP = { width: 2, height: 3, depth: 2 } as const;
+// compiled, pre-normalization bounds must fit 8 × 12 × 8 units (4× a normal
+// 2 × 3 × 2 body, so "make me 4 times larger" is allowed).
+export const AVATAR_CLAMP = { width: 8, height: 12, depth: 8 } as const;
 
 export interface AvatarBounds {
   min: [number, number, number];
@@ -62,20 +67,26 @@ export function fitsAvatarClamp(spec: BuilderSpec): boolean {
 }
 
 /**
- * Uniform scale + Y offset that places an avatar's feet at the group origin and
- * scales it so its height equals AVATAR_TARGET_HEIGHT. Returned as plain numbers
- * so it is testable without Three.js.
+ * Uniform scale + Y offset that places an avatar's feet at the group origin.
+ * Specs up to AVATAR_BASE_HEIGHT tall normalize to AVATAR_TARGET_HEIGHT
+ * (human-size); taller specs keep their proportion, so oversized bodies render
+ * oversized. Returned as plain numbers so it is testable without Three.js.
  */
 export function avatarNormalization(spec: BuilderSpec): {
   scale: number;
   offsetY: number;
+  /** Final rendered height in world units (nameplate / camera anchor). */
+  renderedHeight: number;
 } {
   const bounds = computeBuilderBounds(spec);
   const height = bounds.size[1];
-  const scale = height > 1e-3 ? AVATAR_TARGET_HEIGHT / height : 1;
+  const scale =
+    height > 1e-3
+      ? AVATAR_TARGET_HEIGHT / Math.min(height, AVATAR_BASE_HEIGHT)
+      : 1;
   // After scaling, lift so the lowest point sits on y=0.
   const offsetY = -bounds.min[1] * scale;
-  return { scale, offsetY };
+  return { scale, offsetY, renderedHeight: height * scale };
 }
 
 // Deterministic hue (0..1) derived from an identity hex so each player's default

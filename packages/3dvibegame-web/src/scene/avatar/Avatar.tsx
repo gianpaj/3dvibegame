@@ -14,7 +14,7 @@ import {
   triggerLandingSquash,
   type GaitState,
 } from "./gait";
-import { AVATAR_TARGET_HEIGHT } from "./avatarSpec";
+import { avatarNormalization } from "./avatarSpec";
 
 /** Live, per-frame avatar motion read inside useFrame so values never go stale. */
 export interface AvatarMotion {
@@ -59,6 +59,11 @@ export function Avatar({
   const mesh = useMemo(
     () => buildAvatarMesh(spec, { tintHue }),
     [spec, tintHue],
+  );
+  // Oversized bodies render oversized — keep the nameplate above the head.
+  const renderedHeight = useMemo(
+    () => avatarNormalization(spec).renderedHeight,
+    [spec],
   );
 
   useEffect(() => {
@@ -115,7 +120,7 @@ export function Avatar({
       <group ref={bodyRef}>
         <primitive object={mesh} />
       </group>
-      <Billboard position={[0, AVATAR_TARGET_HEIGHT + 0.35, 0]}>
+      <Billboard position={[0, renderedHeight + 0.35, 0]}>
         <Text
           fontSize={0.28}
           color="#ffffff"

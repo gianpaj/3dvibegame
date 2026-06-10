@@ -6,6 +6,7 @@ import type { BuilderSpec } from "@3dvibegame/scene-authority-ts";
 import type { OrbitControlsLike } from "./orbitControls";
 
 import { Avatar, type AvatarMotion } from "./Avatar";
+import { avatarNormalization } from "./avatarSpec";
 import {
   PLAYER_HEIGHT,
   PLAYER_RADIUS,
@@ -19,7 +20,6 @@ const GRAVITY = -22; // u/s^2
 const JUMP_HEIGHT = 1.2; // u
 const JUMP_VELOCITY = Math.sqrt(2 * -GRAVITY * JUMP_HEIGHT);
 const RESPAWN_Y = -10;
-const CAMERA_HEAD_Y = PLAYER_HEIGHT * 0.9;
 
 const MOVE_KEYS = new Set(["w", "a", "s", "d"]);
 
@@ -53,6 +53,13 @@ export function CharacterController({
   onMove,
 }: CharacterControllerProps) {
   const camera = useThree((state) => state.camera);
+
+  // Follow camera looks at the rendered head, which rises for oversized bodies.
+  // The physics capsule stays PLAYER_HEIGHT regardless — big avatars are cosmetic.
+  const cameraHeadY = useMemo(
+    () => avatarNormalization(spec).renderedHeight * 0.9,
+    [spec],
+  );
 
   const posRef = useRef(
     new THREE.Vector3((Math.random() - 0.5) * 2, 0, (Math.random() - 0.5) * 2),
@@ -168,7 +175,7 @@ export function CharacterController({
     const controls = controlsRef.current;
     if (controls) {
       const target = controls.target as THREE.Vector3;
-      const headY = pos.y + CAMERA_HEAD_Y;
+      const headY = pos.y + cameraHeadY;
       const camDelta = new THREE.Vector3(
         pos.x - target.x,
         headY - target.y,

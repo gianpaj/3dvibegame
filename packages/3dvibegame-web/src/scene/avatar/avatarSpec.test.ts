@@ -39,33 +39,49 @@ describe("computeBuilderBounds", () => {
 });
 
 describe("fitsAvatarClamp", () => {
-  it("accepts a body within 2x3x2", () => {
+  it("accepts a normal body within 2x3x2", () => {
     expect(
       fitsAvatarClamp(specFromParts([{ dimensions: [1.5, 2.8, 1.5] }])),
     ).toBe(true);
   });
 
-  it("rejects a body taller than 3 units", () => {
+  it("accepts an oversized body up to 8x12x8 (4x normal)", () => {
     expect(
-      fitsAvatarClamp(specFromParts([{ dimensions: [1, 4, 1] }])),
+      fitsAvatarClamp(specFromParts([{ dimensions: [8, 12, 8] }])),
+    ).toBe(true);
+  });
+
+  it("rejects a body taller than 12 units", () => {
+    expect(
+      fitsAvatarClamp(specFromParts([{ dimensions: [1, 12.5, 1] }])),
     ).toBe(false);
   });
 
-  it("rejects a body wider than 2 units", () => {
+  it("rejects a body wider than 8 units", () => {
     expect(
-      fitsAvatarClamp(specFromParts([{ dimensions: [2.5, 1, 1] }])),
+      fitsAvatarClamp(specFromParts([{ dimensions: [8.5, 1, 1] }])),
     ).toBe(false);
   });
 });
 
 describe("avatarNormalization", () => {
-  it("scales to the target height and lifts feet to y=0", () => {
+  it("scales small bodies up to the target height and lifts feet to y=0", () => {
     // Body from y=1 to y=2 (height 1), so scale = 1.8 and feet lift to origin.
     const norm = avatarNormalization(
       specFromParts([{ dimensions: [1, 1, 1], local_position: [0, 1.5, 0] }]),
     );
     expect(norm.scale).toBeCloseTo(AVATAR_TARGET_HEIGHT);
     expect(norm.offsetY).toBeCloseTo(-1 * AVATAR_TARGET_HEIGHT);
+    expect(norm.renderedHeight).toBeCloseTo(AVATAR_TARGET_HEIGHT);
+  });
+
+  it("renders bodies taller than the 3-unit base proportionally larger", () => {
+    // A 12-tall spec is 4x the 3-unit base, so it renders at 4x human height.
+    const norm = avatarNormalization(
+      specFromParts([{ dimensions: [2, 12, 2], local_position: [0, 6, 0] }]),
+    );
+    expect(norm.scale).toBeCloseTo(AVATAR_TARGET_HEIGHT / 3);
+    expect(norm.renderedHeight).toBeCloseTo(AVATAR_TARGET_HEIGHT * 4);
   });
 });
 

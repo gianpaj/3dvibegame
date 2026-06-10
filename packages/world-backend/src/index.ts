@@ -53,13 +53,14 @@ const maxHorizontalDistance = 256;
 const minPlayerY = -8;
 const maxPlayerY = 128;
 const maxPitchRadians = Math.PI / 2;
-// Avatar bodies are small standing characters; cap the JSON like other specs and
-// reject anything whose compiled builder parts exceed the avatar clamp.
+// Avatar bodies are standing characters; cap the JSON like other specs and
+// reject anything whose compiled builder parts exceed the avatar clamp. The
+// clamp is 4× a normal 2×3×2 body so prompts like "make me 4 times larger" work.
 const maxAvatarVoxelCoreJsonLength = 200_000;
 const maxAvatarBuilderSpecJsonLength = 200_000;
-const avatarClampWidth = 2;
-const avatarClampHeight = 3;
-const avatarClampDepth = 2;
+const avatarClampWidth = 8;
+const avatarClampHeight = 12;
+const avatarClampDepth = 8;
 // Avatar editing must not become a spam channel: reject updates < 10 s apart.
 const avatarUpdateCooldownMicros = 10n * 1_000_000n;
 const maxObjectPosition = 512;
