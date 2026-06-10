@@ -37,7 +37,7 @@ export function createBrowserGeminiAiWorkerClient({
   timeoutMs = defaultGeminiTimeoutMs,
 }: BrowserGeminiAiWorkerClientConfig): AiWorkerClient {
   return {
-    async createDraft({ prompt }) {
+    async createDraft({ prompt, purpose }) {
       const trimmedKey = apiKey()?.trim();
       if (!trimmedKey) {
         throw new AiWorkerError("generation_failed", "Browser Gemini key is not configured.");
@@ -58,6 +58,7 @@ export function createBrowserGeminiAiWorkerClient({
           fetchImpl,
           model,
           prompt: sourcePrompt,
+          purpose,
           temperature,
           timeoutMs,
         });
@@ -73,7 +74,7 @@ export function createBrowserGeminiAiWorkerClient({
         throw normalizeAiWorkerError(error);
       }
     },
-    async createEdit({ sourcePrompt, objectContext }) {
+    async createEdit({ sourcePrompt, objectContext, purpose }) {
       const trimmedKey = apiKey()?.trim();
       if (!trimmedKey) {
         throw new AiWorkerError("generation_failed", "Browser Gemini key is not configured.");
@@ -104,6 +105,7 @@ export function createBrowserGeminiAiWorkerClient({
           timeoutMs,
           currentCore,
           changePrompt,
+          purpose,
         });
         const response = buildVoxelResponse(request, voxel, ["browser Gemini BYOK edit"]);
         return toArtifact(response.source_spec, response.builder_spec, model);

@@ -19,7 +19,11 @@ export interface AiWorkerDraftResult extends AiWorkerArtifact {
 }
 
 export interface AiWorkerClient {
-  createDraft(input: { prompt: string }): Promise<AiWorkerDraftResult>;
+  createDraft(input: {
+    prompt: string;
+    /** "avatar" selects the avatar system prompt (single grounded body); default "object". */
+    purpose?: "object" | "avatar";
+  }): Promise<AiWorkerDraftResult>;
   createEdit(input: {
     // Optional: scenario refine recipes use it; free-form chat edits omit it and rely
     // on `sourcePrompt` + `objectContext`.
@@ -28,6 +32,8 @@ export interface AiWorkerClient {
     baseVersion: number;
     sourcePrompt?: string;
     objectContext?: AiWorkerObjectContext | null;
+    /** "avatar" selects the avatar system prompt (single grounded body); default "object". */
+    purpose?: "object" | "avatar";
   }): Promise<AiWorkerArtifact>;
 }
 

@@ -66,7 +66,9 @@ describe("createBackendLifecycleCommands avatar editing", () => {
       },
     ];
     const setAvatarSpec = vi.fn(async () => {});
-    const createEdit = vi.fn<(input: { baseVersion: number }) => Promise<unknown>>(
+    const createEdit = vi.fn<
+      (input: { baseVersion: number; purpose?: string }) => Promise<unknown>
+    >(
       async () => ({
         sourceSpec: draft.sourceSpec,
         builderSpec: draft.builderSpec,
@@ -89,6 +91,8 @@ describe("createBackendLifecycleCommands avatar editing", () => {
     expect(createEdit).toHaveBeenCalledTimes(1);
     const editArg = createEdit.mock.calls[0][0];
     expect(editArg.baseVersion).toBe(2);
+    // Avatar edits must use the avatar system prompt, not the generic object one.
+    expect(editArg.purpose).toBe("avatar");
     expect(setAvatarSpec).toHaveBeenCalledTimes(1);
   });
 

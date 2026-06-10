@@ -31,6 +31,18 @@ describe("generateVoxelCore", () => {
     expect(body!.contents[0].parts[0].text).toContain("a pine tree");
   });
 
+  it("uses the avatar system prompt when purpose is avatar", async () => {
+    let body: Record<string, any> | null = null;
+    const fetchImpl = (async (_url: unknown, init?: RequestInit) => {
+      body = JSON.parse(String(init?.body));
+      return geminiResponse(treeCore);
+    }) as unknown as typeof fetch;
+
+    await generateVoxelCore({ ...base, fetchImpl, prompt: "a red robot", purpose: "avatar" });
+
+    expect(body!.systemInstruction.parts[0].text).toContain("PLAYER AVATAR");
+  });
+
   it("throws on truncated (MAX_TOKENS) output", async () => {
     const fetchImpl = (async () => geminiResponse(treeCore, "MAX_TOKENS")) as unknown as typeof fetch;
     await expect(generateVoxelCore({ ...base, fetchImpl, prompt: "x" })).rejects.toMatchObject({
@@ -81,6 +93,26 @@ describe("generateVoxelEdit", () => {
     expect(body!.contents[0].parts[0].text).toContain("make it red");
     // The current core is embedded so the LLM edits rather than regenerates.
     expect(body!.contents[0].parts[0].text).toContain("pine_tree");
+  });
+
+  it("uses the avatar system prompt and avatar context label when purpose is avatar", async () => {
+    let body: Record<string, any> | null = null;
+    const fetchImpl = (async (_url: unknown, init?: RequestInit) => {
+      body = JSON.parse(String(init?.body));
+      return geminiResponse(redTreeCore);
+    }) as unknown as typeof fetch;
+
+    await generateVoxelEdit({
+      ...base,
+      fetchImpl,
+      currentCore: treeCore,
+      changePrompt: "make the body red",
+      purpose: "avatar",
+    });
+
+    expect(body!.systemInstruction.parts[0].text).toContain("PLAYER AVATAR");
+    expect(body!.contents[0].parts[0].text).toContain("Current avatar core:");
+    expect(body!.contents[0].parts[0].text).toContain("make the body red");
   });
 });
 

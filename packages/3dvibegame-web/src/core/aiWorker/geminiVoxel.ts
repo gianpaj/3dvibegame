@@ -1,4 +1,5 @@
 import {
+  avatarSystemPrompt,
   voxelBuilderSystemPrompt,
   voxelCoreSchema,
   voxelEditSystemPrompt,
@@ -33,13 +34,18 @@ interface GeminiCallOptions {
   timeoutMs: number;
 }
 
+/** What the voxel core is for: a world object (default) or the player's avatar body. */
+export type VoxelPurpose = "object" | "avatar";
+
 export interface GenerateVoxelCoreOptions extends GeminiCallOptions {
   prompt: string;
+  purpose?: VoxelPurpose;
 }
 
 export interface GenerateVoxelEditOptions extends GeminiCallOptions {
   currentCore: VoxelCore;
   changePrompt: string;
+  purpose?: VoxelPurpose;
 }
 
 /**
@@ -49,9 +55,12 @@ export interface GenerateVoxelEditOptions extends GeminiCallOptions {
  */
 export function generateVoxelCore({
   prompt,
+  purpose = "object",
   ...call
 }: GenerateVoxelCoreOptions): Promise<VoxelCore> {
-  return requestVoxelCore(call, voxelBuilderSystemPrompt, `Player prompt: ${prompt}`);
+  const systemPrompt =
+    purpose === "avatar" ? avatarSystemPrompt : voxelBuilderSystemPrompt;
+  return requestVoxelCore(call, systemPrompt, `Player prompt: ${prompt}`);
 }
 
 /**
@@ -61,15 +70,18 @@ export function generateVoxelCore({
 export function generateVoxelEdit({
   currentCore,
   changePrompt,
+  purpose = "object",
   ...call
 }: GenerateVoxelEditOptions): Promise<VoxelCore> {
   const userText = [
-    "Current object core:",
+    purpose === "avatar" ? "Current avatar core:" : "Current object core:",
     JSON.stringify(currentCore),
     "",
     `Change request: ${changePrompt}`,
   ].join("\n");
-  return requestVoxelCore(call, voxelEditSystemPrompt, userText);
+  const systemPrompt =
+    purpose === "avatar" ? avatarSystemPrompt : voxelEditSystemPrompt;
+  return requestVoxelCore(call, systemPrompt, userText);
 }
 
 async function requestVoxelCore(

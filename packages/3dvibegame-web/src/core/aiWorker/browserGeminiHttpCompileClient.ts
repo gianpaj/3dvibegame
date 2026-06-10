@@ -44,7 +44,7 @@ export function createBrowserGeminiHttpCompileClient({
   const compileEndpoint = `${normalizeEndpoint(workerUrl).replace(/\/+$/, "")}/compile`;
 
   return {
-    async createDraft({ prompt }) {
+    async createDraft({ prompt, purpose }) {
       const trimmedKey = apiKey()?.trim();
       if (!trimmedKey) {
         throw new AiWorkerError("generation_failed", "Browser Gemini key is not configured.");
@@ -58,6 +58,7 @@ export function createBrowserGeminiHttpCompileClient({
           fetchImpl,
           model,
           prompt: sourcePrompt,
+          purpose,
           temperature,
           timeoutMs: geminiTimeoutMs,
         });
@@ -85,7 +86,7 @@ export function createBrowserGeminiHttpCompileClient({
         throw normalizeAiWorkerError(error);
       }
     },
-    async createEdit({ sourcePrompt, objectContext }) {
+    async createEdit({ sourcePrompt, objectContext, purpose }) {
       const trimmedKey = apiKey()?.trim();
       if (!trimmedKey) {
         throw new AiWorkerError("generation_failed", "Browser Gemini key is not configured.");
@@ -108,6 +109,7 @@ export function createBrowserGeminiHttpCompileClient({
           timeoutMs: geminiTimeoutMs,
           currentCore,
           changePrompt,
+          purpose,
         });
 
         const body: CompileVoxelRequest = {

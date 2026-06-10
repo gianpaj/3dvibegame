@@ -297,6 +297,7 @@ export function createBackendLifecycleCommands(
             baseObjectId: "player_avatar",
             baseVersion: currentAvatar.version,
             sourcePrompt: trimmed,
+            purpose: "avatar",
             objectContext: {
               objectId: "player_avatar",
               version: currentAvatar.version,
@@ -306,7 +307,7 @@ export function createBackendLifecycleCommands(
           });
         } else {
           // First-ever avatar: generate from scratch.
-          artifact = await aiWorker.createDraft({ prompt: trimmed });
+          artifact = await aiWorker.createDraft({ prompt: trimmed, purpose: "avatar" });
         }
       } catch (error) {
         throw userFacingAiWorkerError(error);
