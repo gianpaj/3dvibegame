@@ -87,8 +87,8 @@ Players are embodied as third-person voxel avatars (design spec: `docs/superpowe
 
 - Movement: client-side character controller (WASD + Space jump) in `3dvibegame-web/src/scene/avatar/`; capsule-vs-AABB collision against world-object bounds via a module-level `CollisionRegistry`; other players are non-solid.
 - Sync: existing `move_player` reducer, throttled ≤10 Hz and only-on-change; remote avatars interpolate (~150 ms) and derive their procedural gait from interpolated velocity.
-- Body: `player_avatar` table (keyed by identity, persists across sessions) + `set_avatar_spec` reducer (JSON validation, ≤8×12×8 size clamp, 10 s rate limit). Default hue-tinted body when no row exists or the stored spec fails to parse — never bodiless.
-- Size: specs up to 3 grid units tall render at human height (1.8 u); taller specs render proportionally larger up to 4× ("make me 4 times larger" works). The physics capsule stays 1.8 u regardless — oversized bodies are cosmetic.
+- Body: `player_avatar` table (keyed by identity, persists across sessions) + `set_avatar_spec` reducer (JSON validation, ≤8×12×8 geometry clamp, scale 0.25–4, 10 s rate limit). Default hue-tinted body when no row exists or the stored spec fails to parse — never bodiless.
+- Size: rendered size comes ONLY from the explicit `player_avatar.scale` (1 = human height 1.8 u, up to 4×) — never from geometry, which is always normalized. The AI sets `scale` only when the player explicitly asks ("make me 4 times larger"); omitting it preserves the current scale. The physics capsule stays 1.8 u regardless — oversized bodies are cosmetic.
 - Editing: "Edit avatar" in PlayerList → prompt box avatar mode → same Gemini/compile pipeline → `set_avatar_spec`. Avatars do **not** use locks, grace periods, cooldowns, or any object-lifecycle state.
 - Gait is procedural and distance-driven (`phase += speed * dt`) so it works on any generated shape — do not add rigging/part-tagging without discussion.
 
