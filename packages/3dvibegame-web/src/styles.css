@@ -196,6 +196,49 @@ body {
   font-weight: 500;
 }
 
+.player-edit-avatar {
+  margin-left: 4px;
+  padding: 2px 7px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.player-edit-avatar:hover {
+  border-color: var(--mint);
+}
+
+/* ── Prompt avatar mode ──────────────────────── */
+.prompt-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 14px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.prompt-mode-avatar {
+  color: #1a1a1a;
+  background: var(--mint);
+}
+
+.prompt-mode-exit {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
 /* ── Generation card ─────────────────────────── */
 .generation-card {
   background: var(--surface);

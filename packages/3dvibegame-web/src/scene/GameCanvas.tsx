@@ -5,8 +5,14 @@ import { OrbitControls, Cloud, Clouds } from "@react-three/drei";
 
 export type SpawnPoint = { x: number; y: number; z: number };
 import type { SceneDocument } from "../core";
+import type {
+  BackendAvatarPresence,
+  BackendPlayerPresence,
+} from "../backend/createBackendPresenceBridge";
 import { ReferenceWorld } from "./ReferenceWorld";
 import { SceneObjects } from "./SceneObjects";
+import { AvatarLayer } from "./avatar";
+import type { MoveSample } from "./avatar";
 
 type OrbitControlsRef = ComponentRef<typeof OrbitControls>;
 
@@ -22,6 +28,12 @@ interface Props {
   onDeselect: () => void;
   /** Ref populated with a function that returns the world-space spawn point in front of the camera. */
   spawnPointRef?: RefObject<(() => SpawnPoint) | null>;
+  /** Backend players (presence). Avatars render only when provided (live room). */
+  players?: BackendPlayerPresence[];
+  /** Backend avatar bodies, keyed by owner identity. */
+  avatars?: BackendAvatarPresence[];
+  /** Throttled local avatar transform sink → move_player. */
+  onAvatarMove?: (sample: MoveSample) => void;
 }
 
 // Clicks that move more than this are treated as a camera drag, not a deselect.
@@ -35,6 +47,9 @@ export function GameCanvas({
   onMoveObject,
   onDeselect,
   spawnPointRef,
+  players,
+  avatars,
+  onAvatarMove,
 }: Props) {
   const controlsRef = useRef<OrbitControlsRef>(null);
   const pointerDownRef = useRef<{ x: number; y: number } | null>(null);
@@ -118,6 +133,15 @@ export function GameCanvas({
         hasSelectedObjectRef={hasSelectedObjectRef}
         onMoveObject={onMoveObject}
       />
+      {players && players.length > 0 && (
+        <AvatarLayer
+          controlsRef={controlsRef}
+          objectSelectedRef={hasSelectedObjectRef}
+          players={players}
+          avatars={avatars ?? []}
+          onMove={onAvatarMove}
+        />
+      )}
     </Canvas>
   );
 }

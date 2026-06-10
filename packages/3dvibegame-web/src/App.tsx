@@ -49,6 +49,7 @@ const DISABLED_BACKEND_SNAPSHOT: BackendPresenceSnapshot = {
   onlineCount: 0,
   world: null,
   players: [],
+  avatars: [],
   authorityWorld: null,
   archiveAuthorityWorld: null,
   objectArtifacts: [],
@@ -101,6 +102,9 @@ export function App() {
   const [pendingFeedback, setPendingFeedback] =
     useState<PendingObjectFeedback | null>(null);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+  // Avatar prompt mode: the prompt box re-creates the player's body instead of
+  // creating/editing a world object. Toggled from the PlayerList "Edit avatar".
+  const [avatarMode, setAvatarMode] = useState(false);
   const selectedObjectIdRef = useRef<string | null>(null);
   const backendCommandsRef = useRef<BackendLifecycleCommands | null>(null);
   const backendSnapshotFnRef = useRef<
@@ -223,6 +227,20 @@ export function App() {
     sessionRef.current?.moveSelected(dx, dy, dz);
   }, []);
 
+  // Local avatar transform → move_player (already gated 10 Hz / on-change by the
+  // controller; the bridge applies a second epsilon/throttle pass before sending).
+  const handleAvatarMove = useCallback(
+    (sample: {
+      positionX: number;
+      positionY: number;
+      positionZ: number;
+      rotationYaw: number;
+    }) => {
+      bridgeRef.current?.updateLocalTransform({ ...sample, rotationPitch: 0 });
+    },
+    [],
+  );
+
   const handleDeselect = useCallback(() => {
     if (backendCommandsRef.current?.canHandle()) {
       // releaseSelectedLock captures the current selection synchronously before its
@@ -243,21 +261,44 @@ export function App() {
     return () => window.clearTimeout(timer);
   }, [effectiveSelectedId, handleDeselect]);
 
-  // Esc deselects the current object.
+  // Esc exits avatar mode (if active) else deselects the current object.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" && hasSelectedObjectRef.current) {
-        handleDeselect();
+      if (event.key !== "Escape") return;
+      if (avatarMode) {
+        setAvatarMode(false);
+        return;
       }
+      if (hasSelectedObjectRef.current) handleDeselect();
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleDeselect]);
+  }, [handleDeselect, avatarMode]);
+
+  const handleEditAvatar = useCallback(() => {
+    setContextMsg("");
+    setAvatarMode(true);
+  }, []);
 
   // --- Handlers ---
   async function handlePromptSubmit(prompt: string): Promise<void> {
     setContextMsg("");
     appendPlayerMessage(prompt);
+
+    // Avatar mode: re-create the local player's body, keep current body on failure.
+    if (avatarMode && backendCommandsRef.current?.canHandle()) {
+      try {
+        await backendCommandsRef.current.editAvatar(prompt);
+        setAvatarMode(false);
+      } catch (err: unknown) {
+        if (isMissingBrowserGeminiKeyError(err)) setGeminiKey(null);
+        else setContextMsg(errorMessage(err, "Avatar update failed"));
+        console.error(err);
+        throw err;
+      }
+      return;
+    }
+
     if (backendCommandsRef.current?.canHandle()) {
       const editingNow = selectedObjectIdRef.current !== null;
       const action = editingNow
@@ -533,6 +574,9 @@ export function App() {
           onMoveObject={handleMoveObject}
           onDeselect={handleDeselect}
           spawnPointRef={spawnPointRef}
+          players={isLive ? backendSnap.players : undefined}
+          avatars={backendSnap.avatars}
+          onAvatarMove={handleAvatarMove}
         />
       </div>
 
@@ -542,7 +586,10 @@ export function App() {
             status={backendSnap.status}
             message={backendSnap.message}
           />
-          <PlayerList players={backendSnap.players} />
+          <PlayerList
+            players={backendSnap.players}
+            onEditAvatar={isLive && !viewerMode ? handleEditAvatar : undefined}
+          />
           {contextMsg && <p className="context-msg">{contextMsg}</p>}
           <ChatPanel
             messages={backendSnap.chatMessages}
@@ -594,6 +641,8 @@ export function App() {
             onSubmit={handlePromptSubmit}
             disabled={inputDisabled}
             editing={editing}
+            avatarMode={avatarMode}
+            onExitAvatarMode={() => setAvatarMode(false)}
             placeholder={
               viewerMode ? "Add a Gemini key to create objects…" : undefined
             }

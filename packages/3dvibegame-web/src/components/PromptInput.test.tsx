@@ -38,4 +38,73 @@ describe("PromptInput", () => {
     expect(onSubmit).toHaveBeenCalledWith("a palm tree");
     expect(textarea).toHaveValue("");
   });
+
+  it("shows the avatar badge, placeholder, and Set avatar label in avatar mode", () => {
+    render(
+      <PromptInput
+        onSubmit={vi.fn().mockResolvedValue(undefined)}
+        disabled={false}
+        avatarMode
+        onExitAvatarMode={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Avatar mode")).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("Describe your avatar, e.g. a red robot with a crown…"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Set avatar" })).toBeInTheDocument();
+  });
+
+  it("submits the avatar prompt to onSubmit while in avatar mode", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(
+      <PromptInput
+        onSubmit={onSubmit}
+        disabled={false}
+        avatarMode
+        onExitAvatarMode={vi.fn()}
+      />,
+    );
+
+    const textarea = screen.getByPlaceholderText(
+      "Describe your avatar, e.g. a red robot with a crown…",
+    );
+    await user.type(textarea, "a red robot with a crown");
+    await user.keyboard("{Enter}");
+    expect(onSubmit).toHaveBeenCalledWith("a red robot with a crown");
+  });
+
+  it("exits avatar mode on Escape", async () => {
+    const onExitAvatarMode = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <PromptInput
+        onSubmit={vi.fn().mockResolvedValue(undefined)}
+        disabled={false}
+        avatarMode
+        onExitAvatarMode={onExitAvatarMode}
+      />,
+    );
+    await user.click(
+      screen.getByPlaceholderText("Describe your avatar, e.g. a red robot with a crown…"),
+    );
+    await user.keyboard("{Escape}");
+    expect(onExitAvatarMode).toHaveBeenCalled();
+  });
+
+  it("exits avatar mode when the badge close button is clicked", async () => {
+    const onExitAvatarMode = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <PromptInput
+        onSubmit={vi.fn().mockResolvedValue(undefined)}
+        disabled={false}
+        avatarMode
+        onExitAvatarMode={onExitAvatarMode}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Exit avatar mode" }));
+    expect(onExitAvatarMode).toHaveBeenCalled();
+  });
 });

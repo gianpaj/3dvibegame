@@ -2,9 +2,11 @@ import type { BackendPlayerPresence } from "../backend/createBackendPresenceBrid
 
 interface Props {
   players: BackendPlayerPresence[];
+  /** Switches the prompt box into avatar mode for the local player. */
+  onEditAvatar?: () => void;
 }
 
-export function PlayerList({ players }: Props) {
+export function PlayerList({ players, onEditAvatar }: Props) {
   const active = players.filter((p) => p.presenceState === "active");
   if (active.length === 0) return null;
 
@@ -16,6 +18,16 @@ export function PlayerList({ players }: Props) {
           <span className="player-name">
             {player.isLocal ? `${player.nickname} (you)` : player.nickname}
           </span>
+          {player.isLocal && onEditAvatar && (
+            <button
+              type="button"
+              className="player-edit-avatar"
+              onClick={onEditAvatar}
+              title="Re-create your avatar from a prompt"
+            >
+              Edit avatar
+            </button>
+          )}
         </div>
       ))}
     </div>
