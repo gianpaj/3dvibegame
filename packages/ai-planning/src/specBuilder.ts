@@ -157,6 +157,8 @@ export function buildVoxelResponse(
     source_spec: grounded,
     builder_spec: builderSpec,
     warnings,
+    quantity: core.quantity,
+    scale: core.scale,
   };
 }
 

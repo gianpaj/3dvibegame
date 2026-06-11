@@ -42,7 +42,8 @@ export function createConfiguredAiWorkerClient({
   // In browser-gemini mode the browser always owns the Gemini call. When a worker
   // URL is set, the resulting plan is compiled on the worker (/compile); otherwise
   // it is compiled locally in the browser. Either way the key stays in the browser.
-  const browserGeminiClient = getBrowserGeminiApiKey
+  // Never create this client in http-worker mode even if a key happens to be present.
+  const browserGeminiClient = browserGeminiRequested && getBrowserGeminiApiKey
     ? workerUrl
       ? createBrowserGeminiHttpCompileClient({
           apiKey: getBrowserGeminiApiKey,

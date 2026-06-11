@@ -93,9 +93,11 @@ export function App() {
   // --- AI session (stable, never recreated) ---
   const sessionRef = useRef<ReturnType<typeof createAiSession> | null>(null);
   if (!sessionRef.current) {
-    const aiClient = createConfiguredAiWorkerClient({
-      getBrowserGeminiApiKey: () => geminiKeyRef.current,
-    });
+    const aiClient = createConfiguredAiWorkerClient(
+      resolveAiClientMode() === "browser-gemini"
+        ? { getBrowserGeminiApiKey: () => geminiKeyRef.current }
+        : {},
+    );
     sessionRef.current = createAiSession(aiClient);
   }
   const snapshot = useSession(sessionRef.current);
@@ -137,9 +139,11 @@ export function App() {
         createBackendGenerationSnapshot: createSnapshotFn,
       }) => {
         if (!alive) return;
-        const aiClient = createConfiguredAiWorkerClient({
-          getBrowserGeminiApiKey: () => geminiKeyRef.current,
-        });
+        const aiClient = createConfiguredAiWorkerClient(
+          resolveAiClientMode() === "browser-gemini"
+            ? { getBrowserGeminiApiKey: () => geminiKeyRef.current }
+            : {},
+        );
         const bridge = createBackendPresenceBridge({
           onSnapshot: setBackendSnap,
           nickname: playerNameRef.current ?? undefined,

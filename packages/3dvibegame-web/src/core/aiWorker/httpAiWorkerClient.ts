@@ -24,19 +24,22 @@ export interface HttpAiWorkerRequest {
   target_object_id: string | null;
   base_object_version: number | null;
   object_context: AiWorkerObjectContext | null;
+  purpose?: "object" | "avatar";
 }
 
-const defaultTimeoutMs = 20_000;
+// Gemini with thinking enabled is slow — use 60s to match the server's author timeout.
+const defaultTimeoutMs = 60_000;
 
 export function createHttpAiWorkerClient({
   url,
   timeoutMs = defaultTimeoutMs,
   fetchImpl = fetch,
 }: HttpAiWorkerClientConfig): AiWorkerClient {
-  const endpoint = normalizeEndpoint(url);
+  const base = normalizeEndpoint(url).replace(/\/+$/, "");
+  const authorEndpoint = `${base}/author`;
 
   return {
-    async createDraft({ prompt }) {
+    async createDraft({ prompt, purpose }) {
       try {
         const body: HttpAiWorkerRequest = {
           operation: "create",
@@ -44,21 +47,23 @@ export function createHttpAiWorkerClient({
           target_object_id: null,
           base_object_version: null,
           object_context: null,
+          purpose,
         };
-        const response = await postWorkerJson(fetchImpl, endpoint, timeoutMs, body);
+        const response = await postWorkerJson(fetchImpl, authorEndpoint, timeoutMs, body);
 
         return {
           jobIdBase: response.job_id_base ?? response.jobIdBase ?? "http_worker_job",
           objectIdBase:
             response.object_id_base ?? response.objectIdBase ?? "http_worker_object",
-          quantity: 1,
+          quantity: response.quantity ?? 1,
           ...workerResponseToArtifact(response, "http-worker"),
+          avatarScale: response.scale,
         };
       } catch (error) {
         throw normalizeAiWorkerError(error);
       }
     },
-    async createEdit({ actionId, baseObjectId, baseVersion, sourcePrompt, objectContext }) {
+    async createEdit({ actionId, baseObjectId, baseVersion, sourcePrompt, objectContext, purpose }) {
       try {
         const body: HttpAiWorkerRequest = {
           operation: "refine",
@@ -67,10 +72,14 @@ export function createHttpAiWorkerClient({
           target_object_id: baseObjectId,
           base_object_version: baseVersion,
           object_context: objectContext ?? null,
+          purpose,
         };
-        const response = await postWorkerJson(fetchImpl, endpoint, timeoutMs, body);
+        const response = await postWorkerJson(fetchImpl, authorEndpoint, timeoutMs, body);
 
-        return workerResponseToArtifact(response, "http-worker");
+        return {
+          ...workerResponseToArtifact(response, "http-worker"),
+          avatarScale: response.scale,
+        };
       } catch (error) {
         throw normalizeAiWorkerError(error);
       }

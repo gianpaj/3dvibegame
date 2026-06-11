@@ -17,9 +17,21 @@ export const aiWorkerFailureCodes = [
   "generation_failed",
   "validation_failed",
   "timeout",
+  "budget_exhausted",
+  "rate_limited",
 ] as const;
 
 export type AiWorkerFailureCode = (typeof aiWorkerFailureCodes)[number];
+
+export class AiWorkerError extends Error {
+  readonly code: AiWorkerFailureCode;
+
+  constructor(code: AiWorkerFailureCode, message: string) {
+    super(message);
+    this.name = "AiWorkerError";
+    this.code = code;
+  }
+}
 
 export const aiWorkerRequestSchema = z.object({
   operation: z.enum(["create", "refine", "remix"]),
@@ -28,6 +40,7 @@ export const aiWorkerRequestSchema = z.object({
   target_object_id: z.string().nullable().optional(),
   base_object_version: z.number().int().positive().nullable().optional(),
   object_context: z.unknown().nullable().optional(),
+  purpose: z.enum(["object", "avatar"]).optional(),
 });
 
 export type AiWorkerRequest = z.infer<typeof aiWorkerRequestSchema>;
@@ -310,6 +323,8 @@ export interface AiWorkerCompletedResponse {
   source_spec: unknown;
   builder_spec: unknown;
   warnings: string[];
+  quantity?: number;
+  scale?: number;
 }
 
 export interface AiWorkerFailedResponse {

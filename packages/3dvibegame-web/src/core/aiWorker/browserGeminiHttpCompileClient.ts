@@ -53,7 +53,7 @@ export function createBrowserGeminiHttpCompileClient({
       const sourcePrompt = prompt.trim();
 
       try {
-        const voxel = await generateVoxelCore({
+        const { voxelCore: voxel } = await generateVoxelCore({
           apiKey: trimmedKey,
           fetchImpl,
           model,
@@ -102,7 +102,7 @@ export function createBrowserGeminiHttpCompileClient({
       }
 
       try {
-        const voxel = await generateVoxelEdit({
+        const { voxelCore: voxel } = await generateVoxelEdit({
           apiKey: trimmedKey,
           fetchImpl,
           model,

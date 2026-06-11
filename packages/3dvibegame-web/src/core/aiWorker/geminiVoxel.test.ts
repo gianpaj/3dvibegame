@@ -24,7 +24,7 @@ describe("generateVoxelCore", () => {
       return geminiResponse(treeCore);
     }) as unknown as typeof fetch;
 
-    const core = await generateVoxelCore({ ...base, fetchImpl, prompt: "a pine tree" });
+    const { voxelCore: core } = await generateVoxelCore({ ...base, fetchImpl, prompt: "a pine tree" });
 
     expect(core.object_category).toBe("pine_tree");
     expect(body!.systemInstruction.parts[0].text).toContain("voxel-builder assistant");
@@ -81,14 +81,14 @@ describe("generateVoxelEdit", () => {
       return geminiResponse(redTreeCore);
     }) as unknown as typeof fetch;
 
-    const core = await generateVoxelEdit({
+    const { voxelCore: core } = await generateVoxelEdit({
       ...base,
       fetchImpl,
       currentCore: treeCore,
       changePrompt: "make it red",
     });
 
-    expect(core.materials.map((m) => m.material_id)).toContain("red");
+    expect(core.materials.map((m: { material_id: string }) => m.material_id)).toContain("red");
     expect(body!.systemInstruction.parts[0].text).toContain("editing an EXISTING object");
     expect(body!.contents[0].parts[0].text).toContain("make it red");
     // The current core is embedded so the LLM edits rather than regenerates.

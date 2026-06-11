@@ -53,7 +53,7 @@ export function createBrowserGeminiAiWorkerClient({
       };
 
       try {
-        const voxel = await generateVoxelCore({
+        const { voxelCore: voxel } = await generateVoxelCore({
           apiKey: trimmedKey,
           fetchImpl,
           model,
@@ -98,7 +98,7 @@ export function createBrowserGeminiAiWorkerClient({
       };
 
       try {
-        const voxel = await generateVoxelEdit({
+        const { voxelCore: voxel } = await generateVoxelEdit({
           apiKey: trimmedKey,
           fetchImpl,
           model,

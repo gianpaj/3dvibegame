@@ -25,6 +25,8 @@ export interface WorkerResponse {
   message?: string;
   model?: string;
   model_id?: string;
+  quantity?: number;
+  scale?: number;
 }
 
 /**
