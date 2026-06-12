@@ -11,7 +11,7 @@ import type {
 } from "../backend/createBackendPresenceBridge";
 import { ReferenceWorld } from "./ReferenceWorld";
 import { SceneObjects } from "./SceneObjects";
-import { SunLight } from "./SunLight";
+import { DayNightCycle } from "./sky/DayNightCycle";
 import { AvatarLayer } from "./avatar";
 import type { MoveSample } from "./avatar";
 
@@ -80,11 +80,10 @@ export function GameCanvas({
         if (moved <= dragThreshold) onDeselect();
       }}
     >
+      {/* Background + fog colors are mutated each frame by DayNightCycle. */}
       <color attach="background" args={["#b8daf5"]} />
       <fog attach="fog" args={["#b8daf5", 60, 180]} />
-      <hemisphereLight args={["#87ceeb", "#4a8a30", 1.1]} />
-      <SunLight followRef={avatarPositionRef} />
-      <directionalLight position={[-5, 6, -8]} color="#d8e6ff" intensity={0.3} />
+      <DayNightCycle followRef={avatarPositionRef} />
       <Clouds material={THREE.MeshLambertMaterial}>
         <Cloud
           seed={1}
