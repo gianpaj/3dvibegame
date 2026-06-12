@@ -4,8 +4,10 @@ This guide deploys the multiplayer backend on a public Ubuntu VPS using
 [Coolify](https://coolify.io). Two services:
 
 1. **SpacetimeDB** — the authoritative server that runs the `world-backend` module.
-2. **AI worker** *(optional)* — compiles LLM-authored voxel geometry server-side
-   (`POST /compile`). The player app falls back to local compilation if you skip it.
+2. **AI worker** *(optional)* — runs Gemini server-side so players need no API key.
+   Exposes `POST /author` (create/refine with a server key, budget-capped) and
+   `POST /compile` (geometry compilation). The player app falls back to
+   browser-side Gemini (BYOK) if you skip it.
 
 > **Reachability.** The player app runs in users' browsers (e.g. on Vercel), so the
 > SpacetimeDB endpoint must be **publicly reachable over `wss://` with a valid TLS
@@ -113,8 +115,8 @@ Re-run `spacetime publish` (without `-c`) whenever you change `world-backend`.
 
 ## 3. AI worker on Coolify *(optional)*
 
-Skip this if you're fine with the browser compiling geometry locally. To run it
-server-side (so `/compile` is shared and the client just needs `VITE_AI_WORKER_URL`):
+Skip this if you're fine with players supplying their own Gemini key in the browser.
+To run Gemini server-side (no player API key needed, spend capped by the server):
 
 File: [`packages/ai-worker/Dockerfile`](../packages/ai-worker/Dockerfile).
 
@@ -137,8 +139,13 @@ Dockerfile):
 - **Env:**
   - `AI_WORKER_ALLOWED_ORIGIN=https://3dvibegame.com` (CORS; lock it to
     your app's origin, not `*`, in production)
-  - `GOOGLE_GENERATIVE_AI_API_KEY` — **not required** for the player app: `/compile`
-    is keyless. Only set it if you also use the prompt-based `POST /generate` path.
+  - `GOOGLE_GENERATIVE_AI_API_KEY` — **required** for the `/author` endpoint (server-side
+    create/refine). Without it, `/author` returns 500 and players fall back to browser Gemini.
+  - `AI_WORKER_DAILY_BUDGET_USD` — **recommended**. Sets a daily USD spend cap on
+    `/author` (e.g. `1.00`). Requests beyond the cap get a 429 until UTC midnight.
+  - `AI_WORKER_RATE_LIMIT_PER_MIN` — **recommended**. Per-IP request cap per minute
+    (e.g. `10`). Protects against a single player hammering the endpoint.
+  - `AI_WORKER_MODEL` — optional; defaults to `gemini-2.5-flash`.
 
 > **Why a Dockerfile (not Coolify's auto-build)?** Coolify's Nixpacks buildpack can
 > build a plain Node app without a Dockerfile, but `ai-worker` is a pnpm workspace
@@ -152,11 +159,12 @@ Dockerfile):
 
 Set these in the player app's host (e.g. Vercel project env), then redeploy:
 
-```
+```sh
 VITE_SPACETIMEDB_URI=https://stdb.3dvibegame.com
 VITE_SPACETIMEDB_DATABASE=3dvibegame
-VITE_AI_CLIENT_MODE=browser-gemini
-# Only if you deployed the AI worker in step 3:
+# Use http-worker if you deployed the AI worker in step 3 (server-side Gemini key).
+# Use browser-gemini to let players supply their own BYOK key instead.
+VITE_AI_CLIENT_MODE=http-worker
 VITE_AI_WORKER_URL=https://ai.3dvibegame.com
 ```
 
