@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import type { BuilderSpec } from "@3dvibegame/scene-authority-ts";
 
+import { shortestAngle } from "./angles";
 import { Avatar, type AvatarMotion } from "./Avatar";
 
 const SMOOTH_TIME = 0.15; // ~150 ms exponential smoothing
@@ -34,13 +35,6 @@ export function RemoteAvatars({ avatars }: Props) {
   );
 }
 
-function shortestYaw(from: number, to: number, t: number): number {
-  let delta = to - from;
-  while (delta > Math.PI) delta -= Math.PI * 2;
-  while (delta < -Math.PI) delta += Math.PI * 2;
-  return from + delta * t;
-}
-
 function RemoteAvatar({ data }: { data: RemoteAvatarData }) {
   const posRef = useRef(
     new THREE.Vector3(data.target.x, data.target.y, data.target.z),
@@ -65,7 +59,7 @@ function RemoteAvatar({ data }: { data: RemoteAvatarData }) {
     pos.x += (data.target.x - pos.x) * alpha;
     pos.y += (data.target.y - pos.y) * alpha;
     pos.z += (data.target.z - pos.z) * alpha;
-    yawRef.current = shortestYaw(yawRef.current, data.target.yaw, alpha);
+    yawRef.current += shortestAngle(yawRef.current, data.target.yaw) * alpha;
 
     const dx = pos.x - prev.x;
     const dz = pos.z - prev.z;

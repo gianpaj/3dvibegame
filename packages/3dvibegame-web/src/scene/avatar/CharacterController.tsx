@@ -5,6 +5,7 @@ import type { BuilderSpec } from "@3dvibegame/scene-authority-ts";
 
 import type { OrbitControlsLike } from "./orbitControls";
 
+import { shortestAngle } from "./angles";
 import { Avatar, type AvatarMotion } from "./Avatar";
 import { avatarNormalization } from "./avatarSpec";
 import {
@@ -16,6 +17,7 @@ import {
 import { createMoveGate, type MoveSample } from "./throttle";
 
 const WALK_SPEED = 4; // u/s
+const TURN_RATE = 10; // 1/s exponential ease of yaw toward the input heading
 const GRAVITY = -22; // u/s^2
 const JUMP_HEIGHT = 1.2; // u
 const JUMP_VELOCITY = Math.sqrt(2 * -GRAVITY * JUMP_HEIGHT);
@@ -142,9 +144,16 @@ export function CharacterController({
 
     let horizontalSpeed = 0;
     if (move.lengthSq() > 1e-6) {
-      move.normalize().multiplyScalar(WALK_SPEED);
+      // Ease yaw toward the camera-relative input heading at a finite rate and
+      // walk along the *current* facing, so direction changes carve a curve
+      // while the body rotates instead of both snapping instantly.
+      const targetYaw = Math.atan2(move.x, move.z);
+      const ease = 1 - Math.exp(-dt * TURN_RATE);
+      yawRef.current += shortestAngle(yawRef.current, targetYaw) * ease;
+      move
+        .set(Math.sin(yawRef.current), 0, Math.cos(yawRef.current))
+        .multiplyScalar(WALK_SPEED);
       horizontalSpeed = WALK_SPEED;
-      yawRef.current = Math.atan2(move.x, move.z);
     }
 
     // Jump only when grounded.
