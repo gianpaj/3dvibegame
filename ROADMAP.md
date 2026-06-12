@@ -423,6 +423,13 @@ Sub-phases:
 - Avatar prompts route through `avatarSystemPrompt` (a `purpose: "avatar"` flag threads from `editAvatar` through `AiWorkerClient` into both browser Gemini clients) so "make the body red" edits the avatar instead of being rejected as a vague object request
 - Remaining: publish the updated world-backend module and run the two-browser manual smoke
 
+### Phase 4.13 — Movement Feel & UTC Day/Night Cycle ✅
+- Studied `world-of-claudecraft` (Three.js MMO prototype) and ported its movement/lighting practices — plan: `docs/plans/2026-06-12-claudecraft-movement-lighting-learnings.md`
+- Sun shadow frustum follows the player: the directional light and its target re-anchor on the local avatar every frame (live position ref threaded `GameCanvas → AvatarLayer → CharacterController`), so avatar shadows stay sharp anywhere in the world instead of only near the origin; tighter ±15 u ortho box + bias/normalBias tuning
+- Smooth turning: avatar yaw eases toward the camera-relative input heading at a finite rate (`TURN_RATE`) and walks along its *current* facing, so direction changes carve a curve instead of snapping; wrap-safe `shortestAngle` helper shared with remote-avatar yaw interpolation
+- UTC-driven day/night cycle (`scene/sky/`): the sun sweeps a stylized east→west orbit matching real UTC time (sunrise 06:00, sunset 18:00, orbit tilted off the zenith so noon shadows never degenerate); after sunset a dim blue moon becomes the **single** shadow caster — never two shadow maps at once
+- Background, fog and hemisphere light blend across day/twilight/night palettes; starfield fades in at night; camera-riding sun/moon disc sprites; pure `skyStateAtUtc` math is unit-tested; pin the clock with `?timeOfDay=18.5` for testing
+
 ### Phase 5 — V1 Hardening & Launch 🔄 *(current)*
 - Rate limiting and abuse guardrails (the private shared room currently skips per-player create/object caps)
 - World settings UI for hosts (presets, reset schedules, permission toggles)

@@ -23,6 +23,8 @@ https://github.com/user-attachments/assets/17322171-449d-4279-a8c7-0218190edb77
 - Third-person voxel avatars: every player spawns with a default hue-tinted body and a nameplate; WASD walks, Space jumps, capsule-vs-AABB collision lets you stand on objects; other players are non-solid
 - "Edit avatar" (PlayerList) puts the prompt box in avatar mode — prompt a new body through the same pipeline, stored in `player_avatar` via `set_avatar_spec` (size-clamped, rate-limited)
 - Movement syncs through the `move_player` reducer at ≤10 Hz; remote avatars interpolate and animate a procedural distance-driven gait (walk, not glide)
+- Movement feel: avatar yaw eases toward the input heading and walks along its current facing, so direction changes carve a curve instead of snapping; the sun's shadow frustum follows the player so avatar shadows stay sharp anywhere in the world
+- Day/night cycle driven by real UTC time: sun rises 06:00 UTC in the east and sets 18:00 in the west; after sunset a dim blue moon takes over as the shadow caster, stars fade in, and background/fog/lighting blend through dusk palettes — pin the clock for testing with `?timeOfDay=18.5`
 
 **`packages/scene-runtime-demo`** — original plain Three.js dev harness for fixtures and HUD testing (not the deployed app).
 

@@ -86,11 +86,23 @@ pending job → grace (creator can reposition) → public → edit_locked → co
 Players are embodied as third-person voxel avatars (design spec: `docs/superpowers/specs/2026-06-10-voxel-avatars-design.md`).
 
 - Movement: client-side character controller (WASD + Space jump) in `3dvibegame-web/src/scene/avatar/`; capsule-vs-AABB collision against world-object bounds via a module-level `CollisionRegistry`; other players are non-solid.
+- Turning: yaw eases toward the camera-relative input heading at a finite rate (`TURN_RATE` in `CharacterController.tsx`) and the avatar walks along its *current* facing, so direction changes carve a curve instead of snapping. Angle wrapping goes through the shared `shortestAngle` helper (`avatar/angles.ts`) — use it for any yaw lerp (remote interpolation already does) so bodies never spin the long way around.
 - Sync: existing `move_player` reducer, throttled ≤10 Hz and only-on-change; remote avatars interpolate (~150 ms) and derive their procedural gait from interpolated velocity.
 - Body: `player_avatar` table (keyed by identity, persists across sessions) + `set_avatar_spec` reducer (JSON validation, ≤8×12×8 geometry clamp, scale 0.25–4, 10 s rate limit). Default hue-tinted body when no row exists or the stored spec fails to parse — never bodiless.
 - Size: rendered size comes ONLY from the explicit `player_avatar.scale` (1 = human height 1.8 u, up to 4×) — never from geometry, which is always normalized. The AI sets `scale` only when the player explicitly asks ("make me 4 times larger"); omitting it preserves the current scale. The physics capsule stays 1.8 u regardless — oversized bodies are cosmetic.
 - Editing: "Edit avatar" in PlayerList → prompt box avatar mode → same Gemini/compile pipeline → `set_avatar_spec`. Avatars do **not** use locks, grace periods, cooldowns, or any object-lifecycle state.
 - Gait is procedural and distance-driven (`phase += speed * dt`) so it works on any generated shape — do not add rigging/part-tagging without discussion.
+
+---
+
+## World Environment (lighting & time of day)
+
+`3dvibegame-web/src/scene/sky/` owns the UTC-driven day/night cycle (plan: `docs/plans/2026-06-12-claudecraft-movement-lighting-learnings.md`).
+
+- `sunPosition.ts` — **pure, unit-tested** celestial math: UTC hour → sun/moon directions on a stylized east→west orbit (sunrise 06:00 UTC, sunset 18:00, orbit tilted off the zenith so noon shadows never degenerate). Not a real ephemeris; keep it that way.
+- `DayNightCycle.tsx` — owns the sun, moon, hemisphere and fill lights plus background/fog palette blending, the starfield, and camera-riding sun/moon disc sprites. Exactly **one** shadow caster at a time: the sun by day, the moon after sunset — never add a second simultaneous shadow map.
+- The shadow frustum follows the local avatar: a live position ref threads `GameCanvas → AvatarLayer → CharacterController`, and the light + target re-anchor on it every frame. Keep the ortho shadow box tight (±15 u) — a bigger box trades shadow sharpness for nothing since it follows the player.
+- Dev override: `?timeOfDay=18.5` pins the cycle to a fixed UTC hour (parsed once on load). Use it to test dawn/dusk/night states.
 
 ---
 
