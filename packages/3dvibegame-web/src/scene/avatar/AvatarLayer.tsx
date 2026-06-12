@@ -1,4 +1,5 @@
 import { useMemo, type RefObject } from "react";
+import type * as THREE from "three";
 import type { OrbitControlsLike } from "./orbitControls";
 import type { BuilderSpec } from "@3dvibegame/scene-authority-ts";
 
@@ -23,6 +24,8 @@ export interface AvatarLayerProps {
   players: BackendPlayerPresence[];
   avatars: BackendAvatarPresence[];
   onMove?: (sample: MoveSample) => void;
+  /** Copied to the local avatar's world position each frame (sun shadow follow). */
+  localPositionRef?: RefObject<THREE.Vector3>;
 }
 
 interface ResolvedBody {
@@ -67,6 +70,7 @@ export function AvatarLayer({
   players,
   avatars,
   onMove,
+  localPositionRef,
 }: AvatarLayerProps) {
   const local = players.find((player) => player.isLocal);
   const avatarById = useMemo(() => {
@@ -112,6 +116,7 @@ export function AvatarLayer({
           nickname={local.nickname}
           spawnPop={localBody.version > 0}
           onMove={onMove}
+          positionRef={localPositionRef}
         />
       )}
       <RemoteAvatars avatars={remotes} />

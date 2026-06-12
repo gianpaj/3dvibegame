@@ -11,6 +11,7 @@ import type {
 } from "../backend/createBackendPresenceBridge";
 import { ReferenceWorld } from "./ReferenceWorld";
 import { SceneObjects } from "./SceneObjects";
+import { SunLight } from "./SunLight";
 import { AvatarLayer } from "./avatar";
 import type { MoveSample } from "./avatar";
 
@@ -53,6 +54,9 @@ export function GameCanvas({
 }: Props) {
   const controlsRef = useRef<OrbitControlsRef>(null);
   const pointerDownRef = useRef<{ x: number; y: number } | null>(null);
+  // Live local-avatar position the sun's shadow frustum follows. Stays at the
+  // origin in viewer-only sessions (no local avatar writes to it).
+  const avatarPositionRef = useRef(new THREE.Vector3());
 
   return (
     <Canvas
@@ -79,19 +83,7 @@ export function GameCanvas({
       <color attach="background" args={["#b8daf5"]} />
       <fog attach="fog" args={["#b8daf5", 60, 180]} />
       <hemisphereLight args={["#87ceeb", "#4a8a30", 1.1]} />
-      <directionalLight
-        position={[10, 15, 5]}
-        color="#fffaf0"
-        intensity={2.5}
-        castShadow
-        shadow-mapSize={[2048, 2048]}
-        shadow-camera-near={0.5}
-        shadow-camera-far={60}
-        shadow-camera-left={-20}
-        shadow-camera-right={20}
-        shadow-camera-top={20}
-        shadow-camera-bottom={-20}
-      />
+      <SunLight followRef={avatarPositionRef} />
       <directionalLight position={[-5, 6, -8]} color="#d8e6ff" intensity={0.3} />
       <Clouds material={THREE.MeshLambertMaterial}>
         <Cloud
@@ -140,6 +132,7 @@ export function GameCanvas({
           players={players}
           avatars={avatars ?? []}
           onMove={onAvatarMove}
+          localPositionRef={avatarPositionRef}
         />
       )}
     </Canvas>

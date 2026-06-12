@@ -37,6 +37,8 @@ export interface CharacterControllerProps {
   spawnPop?: boolean;
   /** Called (throttled) with the avatar transform to sync via move_player. */
   onMove?: (sample: MoveSample) => void;
+  /** Receives the avatar's world position each frame (sun shadow follow). */
+  positionRef?: RefObject<THREE.Vector3>;
 }
 
 /**
@@ -54,6 +56,7 @@ export function CharacterController({
   nickname,
   spawnPop,
   onMove,
+  positionRef,
 }: CharacterControllerProps) {
   const camera = useThree((state) => state.camera);
 
@@ -188,6 +191,8 @@ export function CharacterController({
       camera.position.add(camDelta);
       controls.update();
     }
+
+    if (positionRef?.current) positionRef.current.copy(pos);
 
     motionRef.current.position = pos;
     motionRef.current.yaw = yawRef.current;
