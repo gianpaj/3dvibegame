@@ -15,7 +15,6 @@ import {
 // ours moves with real UTC time.
 
 const LIGHT_DISTANCE = 24; // light offset along the celestial direction
-const DISC_DISTANCE = 380; // visual discs ride the camera near the far plane
 const SHADOW_EXTENT = 15; // tight ortho box around the player keeps maps crisp
 const COLOR_RATE = 1.5; // 1/s exponential ease for palette transitions
 const STAR_COUNT = 700;
@@ -130,11 +129,15 @@ export function DayNightCycle({ followRef }: DayNightCycleProps) {
     [],
   );
 
+  // Tight core with a modest halo: a wide glow gets razor-cut by the floor
+  // silhouette near the horizon (the cut line sits above the visual horizon
+  // when the camera is high), so most of the energy stays in the disc.
   const sunDiscMap = useMemo(
     () =>
       discTexture([
         [0, "rgba(255, 245, 225, 1)"],
-        [0.25, "rgba(255, 220, 160, 0.9)"],
+        [0.2, "rgba(255, 228, 180, 0.95)"],
+        [0.38, "rgba(255, 210, 140, 0.3)"],
         [1, "rgba(255, 200, 120, 0)"],
       ]),
     [],
@@ -180,6 +183,14 @@ export function DayNightCycle({ followRef }: DayNightCycleProps) {
   const scratchColor = useMemo(() => new THREE.Color(), []);
 
   useFrame((state, rawDt) => {
+    // TEMP debug hook — remove before commit
+    (globalThis as unknown as Record<string, unknown>).__skyDebug = {
+      scene,
+      camera,
+      sun: sunRef.current,
+      moon: moonRef.current,
+      sky: skyRef.current,
+    };
     const dt = Math.min(rawDt, 0.25);
     if (state.clock.elapsedTime >= nextComputeRef.current) {
       nextComputeRef.current = state.clock.elapsedTime + 1;
@@ -209,8 +220,7 @@ export function DayNightCycle({ followRef }: DayNightCycleProps) {
           .add(anchor);
         sun.target.position.copy(anchor);
       }
-      sun.intensity +=
-        (2.5 * day + 1.1 * dusk - sun.intensity) * ease;
+      sun.intensity += (2.5 * day + 1.1 * dusk - sun.intensity) * ease;
       sun.color.lerp(blend(scratchColor, PALETTE.sun, day, dusk, night), ease);
       // Exactly one shadow caster at a time: the sun by day, the moon by night.
       sun.castShadow = sky.sunElevation > 0;
@@ -228,19 +238,28 @@ export function DayNightCycle({ followRef }: DayNightCycleProps) {
     }
     const fill = fillRef.current;
     if (fill) {
-      fill.intensity += (0.3 * day + 0.15 * dusk + 0.06 * night - fill.intensity) * ease;
+      fill.intensity +=
+        (0.3 * day + 0.15 * dusk + 0.06 * night - fill.intensity) * ease;
     }
     const hemi = hemiRef.current;
     if (hemi) {
-      hemi.intensity += (1.1 * day + 0.65 * dusk + 0.3 * night - hemi.intensity) * ease;
-      hemi.color.lerp(blend(scratchColor, PALETTE.hemiSky, day, dusk, night), ease);
+      hemi.intensity +=
+        (1.1 * day + 0.65 * dusk + 0.3 * night - hemi.intensity) * ease;
+      hemi.color.lerp(
+        blend(scratchColor, PALETTE.hemiSky, day, dusk, night),
+        ease,
+      );
       hemi.groundColor.lerp(
         blend(scratchColor, PALETTE.hemiGround, day, dusk, night),
         ease,
       );
     }
 
-    // Background and fog share one palette so the horizon stays seamless.
+    // Background and fog must share one color and BOTH stay raw: three.js
+    // applies fog after tone mapping, so a fully fogged surface outputs the
+    // raw fog color — exactly matching the (also raw) background clear. Do
+    // not swap the background for a tone-mapped sky mesh; it re-introduces a
+    // horizon seam against the fogged floor.
     blend(scratchColor, PALETTE.background, day, dusk, night);
     if (scene.background instanceof THREE.Color) {
       scene.background.lerp(scratchColor, ease);
@@ -248,22 +267,38 @@ export function DayNightCycle({ followRef }: DayNightCycleProps) {
     if (scene.fog) scene.fog.color.lerp(scratchColor, ease);
 
     // Discs and stars ride the camera, like claudecraft's sun sprites.
+    //
+    // The discs sit just INSIDE the fog wall (fogFar), not near the far
+    // plane. The floor depth-cuts a disc at depression atan(camY/discDist),
+    // while the visible horizon (where fogged ground turns distinguishable
+    // from sky) is at atan(camY/fogFar). Any gap between those two angles
+    // shows as sky-colored dead space between a setting body and the ground —
+    // and it grows as the camera rises. Putting the discs at the fog wall
+    // makes the cut line coincide with the visible horizon at any camera
+    // height, so the sun/moon set exactly INTO the ground line.
+    const fogFar = scene.fog instanceof THREE.Fog ? scene.fog.far : 180;
+    const discDistance = fogFar - 5;
+    const placeDisc = (
+      disc: THREE.Sprite,
+      dir: { x: number; y: number; z: number },
+      elevation: number,
+      angularSize: number,
+    ) => {
+      disc.position
+        .set(dir.x, dir.y, dir.z)
+        .multiplyScalar(discDistance)
+        .add(camera.position);
+      // keep apparent size constant regardless of fog distance
+      const size = angularSize * discDistance;
+      disc.scale.set(size, size, 1);
+      const fade = smoothstep(-0.06, 0.02, elevation);
+      disc.material.opacity = fade;
+      disc.visible = fade > 0.01;
+    };
     const sunDisc = sunDiscRef.current;
-    if (sunDisc) {
-      sunDisc.position
-        .set(sky.sunDirection.x, sky.sunDirection.y, sky.sunDirection.z)
-        .multiplyScalar(DISC_DISTANCE)
-        .add(camera.position);
-      sunDisc.visible = sky.sunElevation > -0.12;
-    }
+    if (sunDisc) placeDisc(sunDisc, sky.sunDirection, sky.sunElevation, 0.068);
     const moonDisc = moonDiscRef.current;
-    if (moonDisc) {
-      moonDisc.position
-        .set(sky.moonDirection.x, sky.moonDirection.y, sky.moonDirection.z)
-        .multiplyScalar(DISC_DISTANCE)
-        .add(camera.position);
-      moonDisc.visible = sky.moonElevation > -0.12;
-    }
+    if (moonDisc) placeDisc(moonDisc, sky.moonDirection, sky.moonElevation, 0.042);
     const stars = starsRef.current;
     if (stars) stars.position.copy(camera.position);
     const starsMat = starsMatRef.current;
@@ -314,7 +349,8 @@ export function DayNightCycle({ followRef }: DayNightCycleProps) {
         color="#d8e6ff"
         intensity={0.3}
       />
-      <sprite ref={sunDiscRef} scale={[34, 34, 1]} renderOrder={-9}>
+      {/* scale + position are driven per-frame by placeDisc */}
+      <sprite ref={sunDiscRef} renderOrder={-9}>
         <spriteMaterial
           map={sunDiscMap}
           blending={THREE.AdditiveBlending}
@@ -323,7 +359,7 @@ export function DayNightCycle({ followRef }: DayNightCycleProps) {
           transparent
         />
       </sprite>
-      <sprite ref={moonDiscRef} scale={[16, 16, 1]} renderOrder={-9}>
+      <sprite ref={moonDiscRef} renderOrder={-9}>
         <spriteMaterial
           map={moonDiscMap}
           depthWrite={false}
