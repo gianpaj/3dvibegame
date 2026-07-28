@@ -15,6 +15,7 @@ export const treeCore: VoxelCore = {
     { op_id: "trunk", kind: "add_box", position: [0, 1, 0], size: [0.5, 2, 0.5], material_id: "wood" },
     { op_id: "canopy", kind: "add_sphere", center: [0, 2.5, 0], radius: 1, material_id: "moss_stone" },
   ],
+  quantity: 1,
 };
 
 /** The same tree, recolored red — what an LLM edit of "make it red" would return. */
@@ -25,6 +26,7 @@ export const redTreeCore: VoxelCore = {
     { op_id: "trunk", kind: "add_box", position: [0, 1, 0], size: [0.5, 2, 0.5], material_id: "red" },
     { op_id: "canopy", kind: "add_sphere", center: [0, 2.5, 0], radius: 1, material_id: "red" },
   ],
+  quantity: 1,
 };
 
 /** A Gemini `generateContent` response carrying a voxel core (or raw text). */

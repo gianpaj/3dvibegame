@@ -1,6 +1,16 @@
-import { SenderError, t, type InferSchema, type ReducerCtx } from "spacetimedb/server";
+import {
+  SenderError,
+  t,
+  type InferSchema,
+  type ReducerCtx,
+} from "spacetimedb/server";
+import { checkProfanity } from "glin-profanity";
 
 import spacetimedb from "./schema";
+import {
+  bootstrapModeratorIdentities,
+  ownerAdminIdentities,
+} from "./moderation-config";
 
 const defaultWorldName = "Vibe Test Room";
 // The shared test room is private + destructive so players can delete objects.
@@ -24,12 +34,40 @@ const maxNicknameLength = 24;
 const maxIdLength = 80;
 const maxSnapshotObjectIdLength = 180;
 const maxPromptLength = 500;
+const maxChatBodyLength = 280;
+// Cap persisted chat per world; oldest messages beyond this are pruned on send.
+const maxChatHistoryPerWorld = 200;
+// Moderator/owner trust-roots live in ./moderation-config (resolved at build time from
+// env vars; empty by default so no personal identity is committed).
+// Roles that set_player_role may assign. "host"/"platform_admin" are reserved.
+const assignableRoles = new Set(["player", "moderator"]);
 const maxSourceSpecJsonLength = 300_000;
 const maxBuilderSpecJsonLength = 200_000;
+// Feedback snapshots are small (the prompt + both spec JSONs); cap them so a single
+// row can't be used to bloat the submit-only table.
+const maxFeedbackPromptLength = 1_000;
+const maxFeedbackJsonLength = 16_000;
+const feedbackOperations = new Set(["create", "edit"]);
+const feedbackRatings = new Set(["up", "down"]);
 const maxHorizontalDistance = 256;
 const minPlayerY = -8;
 const maxPlayerY = 128;
 const maxPitchRadians = Math.PI / 2;
+// Avatar bodies are standing characters; cap the JSON like other specs and
+// reject anything whose compiled builder parts exceed the avatar clamp. The
+// clamp guards against extreme geometry only — rendered size comes from the
+// explicit `scale` field (the client normalizes geometry to human height and
+// multiplies by scale), so a roomy clamp is safe.
+const maxAvatarVoxelCoreJsonLength = 200_000;
+const maxAvatarBuilderSpecJsonLength = 200_000;
+const avatarClampWidth = 8;
+const avatarClampHeight = 12;
+const avatarClampDepth = 8;
+// Rendered size multiplier: 1 = human height; "make me 4 times larger" → 4.
+const avatarMinScale = 0.25;
+const avatarMaxScale = 4;
+// Avatar editing must not become a spam channel: reject updates < 10 s apart.
+const avatarUpdateCooldownMicros = 10n * 1_000_000n;
 const maxObjectPosition = 512;
 const maxObjectRotation = Math.PI * 2;
 const minObjectScale = 0.05;
@@ -141,6 +179,148 @@ export const move_player = spacetimedb.reducer(
   },
 );
 
+export const set_avatar_spec = spacetimedb.reducer(
+  {
+    voxelCoreJson: t.string(),
+    builderSpecJson: t.string(),
+    scale: t.f64(),
+  },
+  (ctx, { voxelCoreJson, builderSpecJson, scale }) => {
+    const player = requireActivePlayer(ctx);
+
+    const voxelCore = parseAvatarVoxelCoreJson(voxelCoreJson);
+    const builderSpec = parseAvatarBuilderSpecJson(builderSpecJson);
+    if (
+      !Number.isFinite(scale) ||
+      scale < avatarMinScale ||
+      scale > avatarMaxScale
+    ) {
+      throw new SenderError(
+        `avatar scale must be between ${avatarMinScale} and ${avatarMaxScale}`,
+      );
+    }
+
+    const existing = ctx.db.playerAvatar.identity.find(ctx.sender);
+    if (existing) {
+      const elapsedMicros =
+        ctx.timestamp.microsSinceUnixEpoch -
+        existing.updatedAt.microsSinceUnixEpoch;
+      if (elapsedMicros < avatarUpdateCooldownMicros) {
+        throw new SenderError("avatar was updated too recently");
+      }
+    }
+
+    if (existing) {
+      ctx.db.playerAvatar.identity.update({
+        ...existing,
+        voxelCoreJson: voxelCore.normalizedJson,
+        builderSpecJson: builderSpec.normalizedJson,
+        scale,
+        version: existing.version + 1,
+        updatedAt: ctx.timestamp,
+      });
+    } else {
+      ctx.db.playerAvatar.insert({
+        identity: ctx.sender,
+        voxelCoreJson: voxelCore.normalizedJson,
+        builderSpecJson: builderSpec.normalizedJson,
+        scale,
+        version: 1,
+        updatedAt: ctx.timestamp,
+      });
+    }
+
+    // Touch the session so presence stays warm after an avatar swap.
+    ctx.db.playerSession.identity.update({
+      ...player,
+      lastSeenAt: ctx.timestamp,
+    });
+  },
+);
+
+export const send_chat_message = spacetimedb.reducer(
+  { body: t.string() },
+  (ctx, { body }) => {
+    const player = requireActivePlayer(ctx);
+
+    const trimmed = body.trim();
+    if (!trimmed) {
+      throw new SenderError("chat message is empty");
+    }
+    if (trimmed.length > maxChatBodyLength) {
+      throw new SenderError("chat message is too long");
+    }
+    if (
+      checkProfanity(trimmed, { languages: ["english"], detectLeetspeak: true })
+        .containsProfanity
+    ) {
+      throw new SenderError("chat message contains blocked language");
+    }
+
+    ctx.db.chatMessage.insert({
+      messageId: 0n, // autoInc assigns the real id
+      worldId: player.worldId,
+      senderIdentity: ctx.sender,
+      senderNickname: player.nickname,
+      body: trimmed,
+      createdAt: ctx.timestamp,
+    });
+
+    pruneChatHistory(ctx, player.worldId);
+  },
+);
+
+export const delete_chat_message = spacetimedb.reducer(
+  { messageId: t.u64() },
+  (ctx, { messageId }) => {
+    const player = requireActivePlayer(ctx);
+    const message = ctx.db.chatMessage.messageId.find(messageId);
+    if (!message) {
+      throw new SenderError("chat message not found");
+    }
+    if (message.worldId !== player.worldId) {
+      throw new SenderError("chat message is not in the active player world");
+    }
+
+    const isAuthor = sameIdentity(message.senderIdentity, ctx.sender);
+    if (!isAuthor && !canManageWorldLifecycle(player)) {
+      throw new SenderError(
+        "only the author or a moderator can delete this message",
+      );
+    }
+
+    ctx.db.chatMessage.messageId.delete(messageId);
+  },
+);
+
+export const set_player_role = spacetimedb.reducer(
+  { targetIdentityHex: t.string(), role: t.string() },
+  (ctx, { targetIdentityHex, role }) => {
+    // Owner/admin only — identity-gated, not role-gated, so moderators cannot mint more
+    // moderators. The caller does not need to have joined the world.
+    if (!isOwnerAdmin(ctx)) {
+      throw new SenderError("only an owner/admin can set player roles");
+    }
+    if (!assignableRoles.has(role)) {
+      throw new SenderError("unsupported role");
+    }
+
+    const wanted = normalizeHex(targetIdentityHex);
+    const target = Array.from(ctx.db.playerSession.iter()).find(
+      (player) => normalizeHex(player.identity.toHexString()) === wanted,
+    );
+    if (!target) {
+      throw new SenderError("target player not found");
+    }
+
+    ctx.db.playerSession.identity.update({
+      ...target,
+      role,
+      lastSeenAt: ctx.timestamp,
+    });
+  },
+);
+
 export const update_world_settings = spacetimedb.reducer(
   {
     visibility: t.string(),
@@ -162,7 +342,12 @@ export const update_world_settings = spacetimedb.reducer(
       throw new SenderError("public worlds cannot enable destructive edits");
     }
     assertU32Range("maxPlayers", input.maxPlayers, 1, maxAllowedPlayers);
-    assertU32Range("maxLiveObjects", input.maxLiveObjects, 1, maxAllowedLiveObjects);
+    assertU32Range(
+      "maxLiveObjects",
+      input.maxLiveObjects,
+      1,
+      maxAllowedLiveObjects,
+    );
     assertU32Range(
       "maxObjectsPerPlayer",
       input.maxObjectsPerPlayer,
@@ -191,7 +376,9 @@ export const update_world_settings = spacetimedb.reducer(
       throw new SenderError("maxObjectsPerPlayer cannot exceed maxLiveObjects");
     }
     if (input.maxPlayers < activePlayersInWorld(ctx, world.worldId)) {
-      throw new SenderError("maxPlayers cannot be lower than current active players");
+      throw new SenderError(
+        "maxPlayers cannot be lower than current active players",
+      );
     }
 
     ctx.db.world.worldId.update({
@@ -248,8 +435,11 @@ export const submit_ai_draft = spacetimedb.reducer(
     objectId: t.string(),
     sourceSpecJson: t.string(),
     builderSpecJson: t.string(),
+    positionX: t.f64(),
+    positionY: t.f64(),
+    positionZ: t.f64(),
   },
-  (ctx, { jobId, objectId, sourceSpecJson, builderSpecJson }) => {
+  (ctx, { jobId, objectId, sourceSpecJson, builderSpecJson, positionX, positionY, positionZ }) => {
     const player = requireActivePlayer(ctx);
     const normalizedJobId = normalizeId("jobId", jobId);
     const normalizedObjectId = normalizeId("objectId", objectId);
@@ -289,9 +479,9 @@ export const submit_ai_draft = spacetimedb.reducer(
       sizeTier: sourceSpec.sizeTier,
       sourceSpecJson: sourceSpec.normalizedJson,
       builderSpecJson: builderSpec.normalizedJson,
-      positionX: 0,
-      positionY: 0,
-      positionZ: 0,
+      positionX,
+      positionY,
+      positionZ,
       rotationX: 0,
       rotationY: 0,
       rotationZ: 0,
@@ -376,7 +566,10 @@ export const update_draft_transform = spacetimedb.reducer(
   },
   (ctx, input) => {
     const player = requireActivePlayer(ctx);
-    const object = requireWorldObject(ctx, normalizeId("objectId", input.objectId));
+    const object = requireWorldObject(
+      ctx,
+      normalizeId("objectId", input.objectId),
+    );
     assertSameWorld(player.worldId, object.worldId);
     assertObjectState(object.state, "grace");
     if (!sameIdentity(object.graceOwner, ctx.sender)) {
@@ -470,7 +663,10 @@ export const update_locked_transform = spacetimedb.reducer(
   },
   (ctx, input) => {
     const player = requireActivePlayer(ctx);
-    const object = requireWorldObject(ctx, normalizeId("objectId", input.objectId));
+    const object = requireWorldObject(
+      ctx,
+      normalizeId("objectId", input.objectId),
+    );
     assertSameWorld(player.worldId, object.worldId);
     assertObjectState(object.state, "edit_locked");
     if (!sameIdentity(object.lockOwner, ctx.sender)) {
@@ -572,7 +768,8 @@ export const delete_object = spacetimedb.reducer(
     // Within the protection window, only the creator may delete a freshly created
     // object so other players can't immediately wipe someone's new creation.
     const ageMicros =
-      ctx.timestamp.microsSinceUnixEpoch - object.createdAt.microsSinceUnixEpoch;
+      ctx.timestamp.microsSinceUnixEpoch -
+      object.createdAt.microsSinceUnixEpoch;
     if (
       !sameIdentity(object.createdBy, ctx.sender) &&
       ageMicros < deletionProtectionMicros
@@ -641,6 +838,81 @@ export const expire_cooldown = spacetimedb.reducer(
   },
 );
 
+export const submit_object_feedback = spacetimedb.reducer(
+  {
+    operationId: t.string(),
+    objectId: t.string(),
+    objectVersion: t.u32(),
+    operation: t.string(),
+    rating: t.string(),
+    sourcePrompt: t.string(),
+    sourceSpecJson: t.string(),
+    builderSpecJson: t.string(),
+    modelId: t.string(),
+    promptVersion: t.string(),
+  },
+  (ctx, input) => {
+    const player = requireActivePlayer(ctx);
+
+    const operationId = normalizeId("operationId", input.operationId);
+    const objectId = normalizeId("objectId", input.objectId);
+    if (!feedbackOperations.has(input.operation)) {
+      throw new SenderError("feedback operation must be create or edit");
+    }
+    if (!feedbackRatings.has(input.rating)) {
+      throw new SenderError("feedback rating must be up or down");
+    }
+    const sourcePrompt = normalizeFeedbackText(
+      "source prompt",
+      input.sourcePrompt,
+      maxFeedbackPromptLength,
+    );
+    const sourceSpecJson = normalizeFeedbackText(
+      "source spec JSON",
+      input.sourceSpecJson,
+      maxFeedbackJsonLength,
+    );
+    const builderSpecJson = normalizeFeedbackText(
+      "builder spec JSON",
+      input.builderSpecJson,
+      maxFeedbackJsonLength,
+    );
+    const modelId = normalizeFeedbackText("model id", input.modelId, maxIdLength);
+    const promptVersion = normalizeFeedbackText(
+      "prompt version",
+      input.promptVersion,
+      maxIdLength,
+    );
+
+    // Submit-once: one rating per operation. No composite unique index in the SQL
+    // subset, so scan for an existing row with this operationId and reject if found
+    // (no upsert — the client also hides the card locally, so this is the safety net).
+    for (const existing of ctx.db.objectFeedback.iter()) {
+      if (existing.operationId === operationId) {
+        throw new SenderError("feedback already submitted for this operation");
+      }
+    }
+
+    ctx.db.objectFeedback.insert({
+      feedbackId: 0n, // autoInc assigns the real id
+      worldId: player.worldId,
+      objectId,
+      objectVersion: input.objectVersion,
+      operationId,
+      operation: input.operation,
+      rating: input.rating,
+      sourcePrompt,
+      sourceSpecJson,
+      builderSpecJson,
+      modelId,
+      promptVersion,
+      playerIdentity: ctx.sender,
+      playerNickname: player.nickname,
+      createdAt: ctx.timestamp,
+    });
+  },
+);
+
 export const create_snapshot = spacetimedb.reducer(
   {
     snapshotId: t.string(),
@@ -703,7 +975,10 @@ function ensureDefaultWorld(ctx: BackendCtx) {
 
 function findDefaultWorld(ctx: BackendCtx) {
   for (const world of ctx.db.world.iter()) {
-    if (world.name === defaultWorldName && world.visibility === defaultWorldVisibility) {
+    if (
+      world.name === defaultWorldName &&
+      world.visibility === defaultWorldVisibility
+    ) {
       return world;
     }
   }
@@ -730,9 +1005,14 @@ function joinWorld(
   const existing = ctx.db.playerSession.identity.find(ctx.sender);
   const movingWorlds = existing ? existing.worldId !== world.worldId : true;
 
-  if (movingWorlds && activePlayersInWorld(ctx, world.worldId) >= world.maxPlayers) {
+  if (
+    movingWorlds &&
+    activePlayersInWorld(ctx, world.worldId) >= world.maxPlayers
+  ) {
     throw new SenderError("world is full");
   }
+
+  const bootstrapRole = bootstrapModeratorRole(ctx);
 
   if (existing) {
     ctx.db.playerSession.identity.update({
@@ -740,7 +1020,9 @@ function joinWorld(
       connectionId: currentConnectionId(ctx),
       worldId: world.worldId,
       nickname: normalizedNickname,
-      role: existing.worldId === world.worldId ? existing.role : role,
+      role:
+        bootstrapRole ??
+        (existing.worldId === world.worldId ? existing.role : role),
       presenceState: "active",
       lastSeenAt: ctx.timestamp,
     });
@@ -752,7 +1034,7 @@ function joinWorld(
     worldId: world.worldId,
     connectionId: currentConnectionId(ctx),
     nickname: normalizedNickname,
-    role,
+    role: bootstrapRole ?? role,
     presenceState: "active",
     positionX: 0,
     positionY: 0,
@@ -865,13 +1147,19 @@ function isLiveObjectState(state: string) {
   );
 }
 
-function assertCanManageWorldLifecycle(player: ReturnType<typeof requireActivePlayer>) {
+function assertCanManageWorldLifecycle(
+  player: ReturnType<typeof requireActivePlayer>,
+) {
   if (!canManageWorldLifecycle(player)) {
-    throw new SenderError("only a host or moderator can snapshot or reset this world");
+    throw new SenderError(
+      "only a host or moderator can snapshot or reset this world",
+    );
   }
 }
 
-function canManageWorldLifecycle(player: ReturnType<typeof requireActivePlayer>) {
+function canManageWorldLifecycle(
+  player: ReturnType<typeof requireActivePlayer>,
+) {
   return (
     player.role === "host" ||
     player.role === "moderator" ||
@@ -887,8 +1175,13 @@ function assertCanFailAiJob(
   if (job.worldId !== player.worldId) {
     throw new SenderError("AI job is not in the active player world");
   }
-  if (!sameIdentity(job.playerIdentity, sender) && !canManageWorldLifecycle(player)) {
-    throw new SenderError("only the job owner or world staff can fail this AI job");
+  if (
+    !sameIdentity(job.playerIdentity, sender) &&
+    !canManageWorldLifecycle(player)
+  ) {
+    throw new SenderError(
+      "only the job owner or world staff can fail this AI job",
+    );
   }
 }
 
@@ -927,7 +1220,8 @@ function createWorldSnapshot(
   });
 
   const liveObjects = Array.from(ctx.db.worldObject.iter()).filter(
-    (object) => object.worldId === world.worldId && isLiveObjectState(object.state),
+    (object) =>
+      object.worldId === world.worldId && isLiveObjectState(object.state),
   );
   liveObjects.forEach((object, index) => {
     const snapshotObjectId = normalizeSnapshotObjectId(
@@ -1005,6 +1299,38 @@ function failPendingWorldJobs(ctx: BackendCtx, worldId: bigint) {
   });
 }
 
+function normalizeHex(value: string): string {
+  return value.trim().toLowerCase().replace(/^0x/, "");
+}
+
+function isOwnerAdmin(ctx: BackendCtx): boolean {
+  const sender = normalizeHex(ctx.sender.toHexString());
+  return ownerAdminIdentities.some(
+    (identity) => normalizeHex(identity) === sender,
+  );
+}
+
+function bootstrapModeratorRole(ctx: BackendCtx): string | null {
+  const sender = normalizeHex(ctx.sender.toHexString());
+  return bootstrapModeratorIdentities.some(
+    (identity) => normalizeHex(identity) === sender,
+  )
+    ? "moderator"
+    : null;
+}
+
+function pruneChatHistory(ctx: BackendCtx, worldId: bigint) {
+  const messages = Array.from(ctx.db.chatMessage.iter())
+    .filter((message) => message.worldId === worldId)
+    .sort((a, b) =>
+      a.messageId < b.messageId ? -1 : a.messageId > b.messageId ? 1 : 0,
+    );
+  const excess = messages.length - maxChatHistoryPerWorld;
+  for (let i = 0; i < excess; i += 1) {
+    ctx.db.chatMessage.messageId.delete(messages[i].messageId);
+  }
+}
+
 function requireActivePlayer(ctx: BackendCtx) {
   const existing = ctx.db.playerSession.identity.find(ctx.sender);
   if (!existing) {
@@ -1048,7 +1374,9 @@ function assertSameWorld(playerWorldId: bigint, objectWorldId: bigint) {
 
 function assertObjectState(actual: string, expected: string) {
   if (actual !== expected) {
-    throw new SenderError(`invalid object state, expected ${expected} but got ${actual}`);
+    throw new SenderError(
+      `invalid object state, expected ${expected} but got ${actual}`,
+    );
   }
 }
 
@@ -1192,7 +1520,9 @@ function normalizeId(label: string, value: string) {
     throw new SenderError(`${label} is required`);
   }
   if (normalized.length > maxIdLength) {
-    throw new SenderError(`${label} must be ${maxIdLength} characters or fewer`);
+    throw new SenderError(
+      `${label} must be ${maxIdLength} characters or fewer`,
+    );
   }
   return normalized;
 }
@@ -1213,7 +1543,9 @@ function normalizeSnapshotObjectId(value: string) {
 function normalizeSnapshotReason(reason: string) {
   const normalized = reason.trim();
   if (normalized !== "manual_reset" && normalized !== "scheduled_reset") {
-    throw new SenderError("snapshot reason must be manual_reset or scheduled_reset");
+    throw new SenderError(
+      "snapshot reason must be manual_reset or scheduled_reset",
+    );
   }
   return normalized;
 }
@@ -1232,12 +1564,19 @@ function normalizeWorldName(name: string) {
     throw new SenderError("world name is required");
   }
   if (normalized.length > maxWorldNameLength) {
-    throw new SenderError(`world name must be ${maxWorldNameLength} characters or fewer`);
+    throw new SenderError(
+      `world name must be ${maxWorldNameLength} characters or fewer`,
+    );
   }
   return normalized;
 }
 
-function assertU32Range(label: string, value: number, min: number, max: number) {
+function assertU32Range(
+  label: string,
+  value: number,
+  min: number,
+  max: number,
+) {
   if (!Number.isInteger(value) || value < min || value > max) {
     throw new SenderError(`${label} must be between ${min} and ${max}`);
   }
@@ -1266,7 +1605,20 @@ function normalizeNickname(nickname: string) {
     throw new SenderError("nickname is required");
   }
   if (normalized.length > maxNicknameLength) {
-    throw new SenderError(`nickname must be ${maxNicknameLength} characters or fewer`);
+    throw new SenderError(
+      `nickname must be ${maxNicknameLength} characters or fewer`,
+    );
+  }
+  return normalized;
+}
+
+function normalizeFeedbackText(label: string, value: string, maxLength: number) {
+  const normalized = value.trim();
+  if (!normalized) {
+    throw new SenderError(`${label} is required`);
+  }
+  if (normalized.length > maxLength) {
+    throw new SenderError(`${label} must be ${maxLength} characters or fewer`);
   }
   return normalized;
 }
@@ -1277,7 +1629,9 @@ function normalizePrompt(prompt: string) {
     throw new SenderError("source prompt is required");
   }
   if (normalized.length > maxPromptLength) {
-    throw new SenderError(`source prompt must be ${maxPromptLength} characters or fewer`);
+    throw new SenderError(
+      `source prompt must be ${maxPromptLength} characters or fewer`,
+    );
   }
   return normalized;
 }
@@ -1368,7 +1722,9 @@ function parseBuilderSpecJson(builderSpecJson: string) {
     throw new SenderError("builder spec part count does not match parts");
   }
   if (instanceCount !== instances.length) {
-    throw new SenderError("builder spec instance count does not match instances");
+    throw new SenderError(
+      "builder spec instance count does not match instances",
+    );
   }
 
   parts.forEach((part, index) => {
@@ -1405,6 +1761,110 @@ function parseBuilderSpecJson(builderSpecJson: string) {
   };
 }
 
+function parseAvatarVoxelCoreJson(voxelCoreJson: string) {
+  const normalizedJson = voxelCoreJson.trim();
+  if (!normalizedJson) {
+    throw new SenderError("avatar voxel core JSON is required");
+  }
+  if (normalizedJson.length > maxAvatarVoxelCoreJsonLength) {
+    throw new SenderError(
+      `avatar voxel core JSON must be ${maxAvatarVoxelCoreJsonLength} characters or fewer`,
+    );
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(normalizedJson);
+  } catch {
+    throw new SenderError("avatar voxel core JSON is malformed");
+  }
+  if (!isRecord(parsed)) {
+    throw new SenderError("avatar voxel core must be an object");
+  }
+
+  return { normalizedJson };
+}
+
+function parseAvatarBuilderSpecJson(builderSpecJson: string) {
+  const normalizedJson = builderSpecJson.trim();
+  if (!normalizedJson) {
+    throw new SenderError("avatar builder spec JSON is required");
+  }
+  if (normalizedJson.length > maxAvatarBuilderSpecJsonLength) {
+    throw new SenderError(
+      `avatar builder spec JSON must be ${maxAvatarBuilderSpecJsonLength} characters or fewer`,
+    );
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(normalizedJson);
+  } catch {
+    throw new SenderError("avatar builder spec JSON is malformed");
+  }
+  if (!isRecord(parsed)) {
+    throw new SenderError("avatar builder spec must be an object");
+  }
+
+  const parts = readArrayField(parsed, "parts");
+  if (!parts.length) {
+    throw new SenderError("avatar builder spec parts must not be empty");
+  }
+
+  // Compiled bounds must fit the avatar clamp (≤ 2 × 3 × 2 units pre-normalization).
+  // Each part contributes an AABB centered on its local_position (default origin)
+  // and sized by its dimensions.
+  let minX = Infinity;
+  let minY = Infinity;
+  let minZ = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let maxZ = -Infinity;
+
+  parts.forEach((part, index) => {
+    if (!isRecord(part)) {
+      throw new SenderError(`avatar builder spec part ${index} must be an object`);
+    }
+    const dimensions = readNumberArrayField(part, "dimensions");
+    const [dx, dy, dz] = dimensions as number[];
+    const center = isVector3(part.local_position)
+      ? (part.local_position as number[])
+      : [0, 0, 0];
+    minX = Math.min(minX, center[0] - dx / 2);
+    maxX = Math.max(maxX, center[0] + dx / 2);
+    minY = Math.min(minY, center[1] - dy / 2);
+    maxY = Math.max(maxY, center[1] + dy / 2);
+    minZ = Math.min(minZ, center[2] - dz / 2);
+    maxZ = Math.max(maxZ, center[2] + dz / 2);
+  });
+
+  const width = maxX - minX;
+  const height = maxY - minY;
+  const depth = maxZ - minZ;
+  if (
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    !Number.isFinite(depth) ||
+    width > avatarClampWidth ||
+    height > avatarClampHeight ||
+    depth > avatarClampDepth
+  ) {
+    throw new SenderError(
+      `avatar exceeds the ${avatarClampWidth}x${avatarClampHeight}x${avatarClampDepth} size clamp`,
+    );
+  }
+
+  return { normalizedJson };
+}
+
+function isVector3(value: unknown): value is [number, number, number] {
+  return (
+    Array.isArray(value) &&
+    value.length === 3 &&
+    value.every((entry) => typeof entry === "number" && Number.isFinite(entry))
+  );
+}
+
 function assertArtifactMatchesSource(
   sourceSpec: {
     operation: string;
@@ -1418,13 +1878,19 @@ function assertArtifactMatchesSource(
   },
 ) {
   if (sourceSpec.operation !== builderSpec.operation) {
-    throw new SenderError("builder artifact operation does not match source spec");
+    throw new SenderError(
+      "builder artifact operation does not match source spec",
+    );
   }
   if (sourceSpec.category !== builderSpec.category) {
-    throw new SenderError("builder artifact category does not match source spec");
+    throw new SenderError(
+      "builder artifact category does not match source spec",
+    );
   }
   if (sourceSpec.sizeTier !== builderSpec.sizeTier) {
-    throw new SenderError("builder artifact size tier does not match source spec");
+    throw new SenderError(
+      "builder artifact size tier does not match source spec",
+    );
   }
 }
 
@@ -1496,7 +1962,10 @@ function readNumberArrayField(value: Record<string, unknown>, field: string) {
   return fieldValue;
 }
 
-function readSourceNumberArrayField(value: Record<string, unknown>, field: string) {
+function readSourceNumberArrayField(
+  value: Record<string, unknown>,
+  field: string,
+) {
   const fieldValue = value[field];
   if (!Array.isArray(fieldValue) || fieldValue.length !== 3) {
     throw new SenderError(`source spec ${field} must be a vector3`);
@@ -1513,7 +1982,9 @@ function assertBoundedNumberVector(
 ) {
   const isValid = values.every((value) => {
     if (typeof value !== "number" || !Number.isFinite(value)) return false;
-    return allowMin ? value >= min && value <= max : value > min && value <= max;
+    return allowMin
+      ? value >= min && value <= max
+      : value > min && value <= max;
   });
 
   if (!isValid) {

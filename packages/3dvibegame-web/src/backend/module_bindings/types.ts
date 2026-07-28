@@ -24,6 +24,35 @@ export const AiJob = __t.object("AiJob", {
 });
 export type AiJob = __Infer<typeof AiJob>;
 
+export const ChatMessage = __t.object("ChatMessage", {
+  messageId: __t.u64(),
+  worldId: __t.u64(),
+  senderIdentity: __t.identity(),
+  senderNickname: __t.string(),
+  body: __t.string(),
+  createdAt: __t.timestamp(),
+});
+export type ChatMessage = __Infer<typeof ChatMessage>;
+
+export const ObjectFeedback = __t.object("ObjectFeedback", {
+  feedbackId: __t.u64(),
+  worldId: __t.u64(),
+  objectId: __t.string(),
+  objectVersion: __t.u32(),
+  operationId: __t.string(),
+  operation: __t.string(),
+  rating: __t.string(),
+  sourcePrompt: __t.string(),
+  sourceSpecJson: __t.string(),
+  builderSpecJson: __t.string(),
+  modelId: __t.string(),
+  promptVersion: __t.string(),
+  playerIdentity: __t.identity(),
+  playerNickname: __t.string(),
+  createdAt: __t.timestamp(),
+});
+export type ObjectFeedback = __Infer<typeof ObjectFeedback>;
+
 export const ObjectLock = __t.object("ObjectLock", {
   objectId: __t.string(),
   worldId: __t.u64(),
@@ -33,6 +62,16 @@ export const ObjectLock = __t.object("ObjectLock", {
   expiresAtMicros: __t.option(__t.i64()),
 });
 export type ObjectLock = __Infer<typeof ObjectLock>;
+
+export const PlayerAvatar = __t.object("PlayerAvatar", {
+  identity: __t.identity(),
+  voxelCoreJson: __t.string(),
+  builderSpecJson: __t.string(),
+  scale: __t.f64(),
+  version: __t.u32(),
+  updatedAt: __t.timestamp(),
+});
+export type PlayerAvatar = __Infer<typeof PlayerAvatar>;
 
 export const PlayerSession = __t.object("PlayerSession", {
   identity: __t.identity(),
@@ -131,3 +170,4 @@ export const WorldSnapshot = __t.object("WorldSnapshot", {
   createdAt: __t.timestamp(),
 });
 export type WorldSnapshot = __Infer<typeof WorldSnapshot>;
+

@@ -6,7 +6,15 @@ This document provides orientation for AI agents (and human contributors) workin
 
 ## Project Status
 
-The game is in **design and early implementation**. The primary implementation artifact is `prototype/scene-planning-bench/` — a benchmark for evaluating LLM scene-planning capabilities. All remaining work is in design documents; no authoritative game backend or client exists yet.
+The game is **in active development**. The core multiplayer stack is implemented and deployed:
+
+- `packages/world-backend` — SpacetimeDB module (TypeScript); runs at `stdb.3dvibegame.com`
+- `packages/3dvibegame-web` — React + R3F player app; deployed on Cloudflare Pages
+- `packages/ai-worker` — Cloudflare Worker that compiles Gemini voxel plans into geometry
+- `packages/scene-authority-ts` — shared authority logic (pure reducers, compiler, contracts)
+- `packages/ai-planning` — AI prompt contracts, voxel schema, system prompts
+
+See `packages/3dvibegame-web/AGENTS.md` for package-specific dev/test/deploy instructions.
 
 ---
 
@@ -14,13 +22,15 @@ The game is in **design and early implementation**. The primary implementation a
 
 | Decision | Choice |
 |---|---|
-| Backend | SpacetimeDB |
+| Backend | SpacetimeDB (TypeScript module) |
 | AI generation | External worker service (not embedded in backend) |
 | Editing scope | Spawned objects only (no terrain carving) |
 | Room types | Public (non-destructive remix) and private (destructive edits) |
 | Player identity | Temporary anonymous nicknames, no account required |
 | Target scale | ~20 concurrent players per room |
-| AI pipeline | `prompt → IR → validated builder spec → reducer` |
+| AI pipeline | `prompt → voxel core (Gemini) → builder spec → SpacetimeDB reducer` |
+| Voxel material colors | Resolved by `color_hint` in source spec; renderer maps to hex via `resolveMaterialColor` |
+| Avatars | Third-person voxel avatars; non-solid players; client-side capsule-vs-AABB collision (no physics engine); body stored in `player_avatar`, outside the object lifecycle |
 
 ---
 
@@ -28,126 +38,98 @@ The game is in **design and early implementation**. The primary implementation a
 
 ```
 /
-├── AGENTS.md               ← you are here
-├── ROADMAP.md              ← phased development plan
-├── README.md               ← project overview
-├── docs/
-│   ├── plans/              ← implementation plan documents
-│   └── research/           ← research and landscape notes
-├── packages/               ← monorepo packages (TypeScript)
-└── prototype/              ← prototype code (do NOT treat as authoritative architecture)
-    └── scene-planning-bench/
+├── AGENTS.md                     ← you are here
+├── docs/deploy-backend.md        ← Coolify deploy guide (SpacetimeDB + AI worker)
+├── packages/
+│   ├── 3dvibegame-web/           ← player app (React + R3F + SpacetimeDB SDK)
+│   │   └── AGENTS.md             ← dev / test / deploy for this package
+│   ├── world-backend/            ← SpacetimeDB module
+│   ├── ai-worker/                ← Cloudflare Worker (/compile endpoint)
+│   ├── scene-authority-ts/       ← shared pure reducers + voxel compiler
+│   └── ai-planning/              ← Gemini prompt contracts + voxel schema
+└── prototype/                    ← old bench, NOT authoritative architecture
 ```
-
-Design documentation from `gianpaj/ideas/vibe-world` is the authoritative source for game rules and architecture decisions. When this codebase and the idea docs contradict each other, the idea docs win unless implementation specs say otherwise.
-
----
-
-## Documentation Reading Order
-
-For rapid orientation, read in this sequence:
-
-1. `01-product-vision.md` — what this is and why
-2. `02-core-game-rules.md` — public/private rules, editing, resets
-3. `04-object-and-creation-system.md` — object lifecycle, grace periods
-4. `05-technical-architecture.md` — SpacetimeDB, AI worker, delta sync
-5. `prototype-v1-scope.md` — V1 scope, success criteria, build order
-6. `spacetimedb-v1-schema.md` — DB schema and reducer boundaries
-7. `object-state-machine.md` — object lifecycle state transitions
-8. `prompt-ir-spec.md` — constrained prompt intermediate representation
-9. `reducer-api-spec.md` — authoritative backend surface
-10. `ai-worker-contract.md` — AI worker request/response contract
-
-Implementation-focused specs take precedence over conceptual vision documents when they conflict.
 
 ---
 
 ## AI Pipeline
 
-The AI generation system must stay **outside** the authoritative backend. The flow is:
-
 ```
 player prompt
-  → AI worker (external HTTP service)
-  → constrained prompt IR (validated JSON)
-  → builder spec (deterministic voxel instructions)
-  → SpacetimeDB reducer (object create / edit)
+  → Gemini (browser or server) → VoxelCore (validated JSON, includes quantity)
+  → /compile or buildVoxelResponse → VoxelBuilderSpec + BuilderSpec
+  → submit_ai_draft reducer → world object (grace state)
 ```
 
-The AI worker outputs world-native instructions (category, size, materials, behaviors) — never raw geometry. The engine builds voxel objects deterministically from these instructions. This ensures consistency, moderation, and replayability.
+- The AI worker stays **outside** SpacetimeDB — it returns validated specs, reducers apply them.
+- `VoxelCore.quantity` (1–4) tells the client how many independent objects to create. The client calls the AI once and submits N jobs, releasing all but the first immediately.
+- `color_hint` on a material entry overrides the material name when the voxel compiler builds parts — use it to produce colored objects (e.g. `material_id: "jelly", color_hint: "yellow"` → yellow blob).
 
 ---
 
 ## Object Lifecycle
 
-Objects move through these states:
+```
+pending job → grace (creator can reposition) → public → edit_locked → cooldown → public
+                                                       → archived (after world reset)
+                                                       → deleted
+```
 
-1. **Draft** — creator grace period; only creator can edit or delete
-2. **Released (public)** — one editor at a time; 30s cooldown after accepted edit; non-destructive remixing by anyone
-3. **Locked** — actively being edited by another player; lock expires on inactivity
-4. **Archived** — world has been reset; object is read-only historical record
-
-In private rooms, destructive edits (overwrite, delete by non-creator) are permitted on released objects.
+- Grace period: only the creator can move/delete. Released via `release_object` reducer or automatic release (e.g. batch creation of extra copies).
+- Edit lock: one player at a time; 30 s auto-expiry; `release_edit_lock` or `submit_object_edit` clears it.
+- Private rooms: destructive edits (overwrite, delete by non-creator) are permitted on public objects.
 
 ---
 
-## Permissions Model
+## Avatars
 
-Roles in descending trust: `platform_admin → host → moderator → trusted_builder → player → visitor`
+Players are embodied as third-person voxel avatars (design spec: `docs/superpowers/specs/2026-06-10-voxel-avatars-design.md`).
 
-Public world defaults:
-- **Player**: can create objects, remix released objects, move/scale own objects
-- **Host**: all player actions + configure world settings, trigger resets, invite moderators
+- Movement: client-side character controller (WASD + Space jump) in `3dvibegame-web/src/scene/avatar/`; capsule-vs-AABB collision against world-object bounds via a module-level `CollisionRegistry`; other players are non-solid.
+- Turning: yaw eases toward the camera-relative input heading at a finite rate (`TURN_RATE` in `CharacterController.tsx`) and the avatar walks along its *current* facing, so direction changes carve a curve instead of snapping. Angle wrapping goes through the shared `shortestAngle` helper (`avatar/angles.ts`) — use it for any yaw lerp (remote interpolation already does) so bodies never spin the long way around.
+- Sync: existing `move_player` reducer, throttled ≤10 Hz and only-on-change; remote avatars interpolate (~150 ms) and derive their procedural gait from interpolated velocity.
+- Body: `player_avatar` table (keyed by identity, persists across sessions) + `set_avatar_spec` reducer (JSON validation, ≤8×12×8 geometry clamp, scale 0.25–4, 10 s rate limit). Default hue-tinted body when no row exists or the stored spec fails to parse — never bodiless.
+- Size: rendered size comes ONLY from the explicit `player_avatar.scale` (1 = human height 1.8 u, up to 4×) — never from geometry, which is always normalized. The AI sets `scale` only when the player explicitly asks ("make me 4 times larger"); omitting it preserves the current scale. The physics capsule stays 1.8 u regardless — oversized bodies are cosmetic.
+- Editing: "Edit avatar" in PlayerList → prompt box avatar mode → same Gemini/compile pipeline → `set_avatar_spec`. Avatars do **not** use locks, grace periods, cooldowns, or any object-lifecycle state.
+- Gait is procedural and distance-driven (`phase += speed * dt`) so it works on any generated shape — do not add rigging/part-tagging without discussion.
+
+---
+
+## World Environment (lighting & time of day)
+
+`3dvibegame-web/src/scene/sky/` owns the UTC-driven day/night cycle (plan: `docs/plans/2026-06-12-claudecraft-movement-lighting-learnings.md`).
+
+- `sunPosition.ts` — **pure, unit-tested** celestial math: UTC hour → sun/moon directions on a stylized east→west orbit (sunrise 06:00 UTC, sunset 18:00, orbit tilted off the zenith so noon shadows never degenerate). Not a real ephemeris; keep it that way.
+- `DayNightCycle.tsx` — owns the sun, moon, hemisphere and fill lights plus background/fog palette blending, the starfield, and camera-riding sun/moon disc sprites. Exactly **one** shadow caster at a time: the sun by day, the moon after sunset — never add a second simultaneous shadow map.
+- The shadow frustum follows the local avatar: a live position ref threads `GameCanvas → AvatarLayer → CharacterController`, and the light + target re-anchor on it every frame. Keep the ortho shadow box tight (±15 u) — a bigger box trades shadow sharpness for nothing since it follows the player.
+- Dev override: `?timeOfDay=18.5` pins the cycle to a fixed UTC hour (parsed once on load). Use it to test dawn/dusk/night states.
+
+---
+
+## Permissions
+
+Roles (descending trust): `platform_admin → host → moderator → trusted_builder → player → visitor`
+
+- **Player**: create objects, move/scale own objects, remix released objects
+- **Host**: all player actions + world settings, resets, invite moderators
 - **Moderator**: all player actions + remove objects, kick players
-
-See `public-world-permission-matrix.md` for the full action-by-role table.
-
----
-
-## World Settings
-
-Hosts configure per-world settings including: reset schedule, creation rate limits, max concurrent players, object size caps, trusted builder list, curation zone assignments. See `world-settings-schema.md`.
 
 ---
 
 ## What Agents Should NOT Do
 
-- **Do not** introduce terrain editing, voxel sculpting, or custom world templates — these are explicitly out of V1 scope.
-- **Do not** add persistent player accounts, progression systems, or economies.
-- **Do not** embed AI generation logic inside SpacetimeDB reducers — it must stay in the external worker service.
-- **Do not** allow AI workers to write directly to the DB — they return validated specs, which reducers then apply.
-- **Do not** change the core object state machine transitions without updating `object-state-machine.md`.
-- **Do not** add behavior scripting for players — deferred post-V1.
-- **Do not** treat `prototype/` or `json-render/` as authoritative architecture — they are experimental references.
+- Do not introduce terrain editing, voxel sculpting, or custom world templates.
+- Do not add persistent player accounts, progression systems, or economies.
+- Do not embed AI generation logic inside SpacetimeDB reducers.
+- Do not let AI workers write directly to the DB — they return specs, reducers apply them.
+- Do not treat `prototype/` as authoritative architecture.
 
 ---
 
 ## What Agents Should Do
 
-- **Follow the build order** from `prototype-v1-scope.md`: backend connection → anonymous join → presence → object lifecycle → AI integration → client controls → snapshots → guardrails.
-- **Keep reducers thin** — validation and permission checks in reducers, business logic as small pure functions.
-- **Validate AI worker output** before passing it to any reducer. Reject malformed or out-of-bounds specs.
-- **Use delta sync** — broadcast only object create/edit/delete events, never full world snapshots.
-- **Respect grace periods** — new objects are owned exclusively by their creator until released.
-- **Update docs** when making significant design changes — spec docs in `gianpaj/ideas/vibe-world` are the source of truth.
-
----
-
-## Prototype Notes
-
-The `prototype/scene-planning-bench/` folder evaluates whether an LLM can plan a coherent scene from a natural language prompt. It is **not** the game runtime. Do not import from it into game packages.
-
-The `json-render/` folder (if present) is a reference resource only — it does not represent Vibe World architecture.
-
----
-
-## Open Questions
-
-See `07-open-questions-and-next-steps.md` for the full list. Key unresolved items before Phase 3 begins:
-
-- Exact per-player creation rate limits for public worlds
-- Trusted builder role launch timing
-- World discovery ranking formula
-- Archive visual treatment details
-
-If you encounter a design gap not covered by existing docs, add it to the open questions document and flag it rather than inventing a solution unilaterally.
+- Keep reducers thin — validation + permission checks in reducers, business logic in pure functions.
+- Validate AI worker output before passing to any reducer.
+- Respect grace periods — batch creation auto-releases extra copies so only one is active.
+- When changing the voxel compiler or renderer color logic, verify `color_hint` flows end-to-end.
+- Backend schema changes (SpacetimeDB reducers) require updating the auto-generated module bindings in `3dvibegame-web/src/backend/module_bindings/` manually until `spacetime generate` is re-run.

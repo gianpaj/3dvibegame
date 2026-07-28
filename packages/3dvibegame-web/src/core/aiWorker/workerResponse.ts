@@ -23,6 +23,10 @@ export interface WorkerResponse {
   error_code?: string;
   errorCode?: string;
   message?: string;
+  model?: string;
+  model_id?: string;
+  quantity?: number;
+  scale?: number;
 }
 
 /**
@@ -68,7 +72,10 @@ export async function postWorkerJson(
   }
 }
 
-export function workerResponseToArtifact(response: WorkerResponse): AiWorkerArtifact {
+export function workerResponseToArtifact(
+  response: WorkerResponse,
+  fallbackModelId: string,
+): AiWorkerArtifact {
   try {
     const sourceSpec = parseVoxelBuilderSpec(response.source_spec ?? response.sourceSpec);
     const builderSpec = parseBuilderSpec(response.builder_spec ?? response.builderSpec);
@@ -78,6 +85,7 @@ export function workerResponseToArtifact(response: WorkerResponse): AiWorkerArti
       builderSpec,
       sourceSpecJson: JSON.stringify(sourceSpec),
       builderSpecJson: JSON.stringify(builderSpec),
+      modelId: response.model ?? response.model_id ?? fallbackModelId,
     };
   } catch (error) {
     throw normalizeAiWorkerError(error, "validation_failed");

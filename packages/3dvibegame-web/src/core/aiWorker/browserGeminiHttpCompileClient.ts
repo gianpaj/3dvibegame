@@ -44,7 +44,7 @@ export function createBrowserGeminiHttpCompileClient({
   const compileEndpoint = `${normalizeEndpoint(workerUrl).replace(/\/+$/, "")}/compile`;
 
   return {
-    async createDraft({ prompt }) {
+    async createDraft({ prompt, purpose }) {
       const trimmedKey = apiKey()?.trim();
       if (!trimmedKey) {
         throw new AiWorkerError("generation_failed", "Browser Gemini key is not configured.");
@@ -53,11 +53,12 @@ export function createBrowserGeminiHttpCompileClient({
       const sourcePrompt = prompt.trim();
 
       try {
-        const voxel = await generateVoxelCore({
+        const { voxelCore: voxel } = await generateVoxelCore({
           apiKey: trimmedKey,
           fetchImpl,
           model,
           prompt: sourcePrompt,
+          purpose,
           temperature,
           timeoutMs: geminiTimeoutMs,
         });
@@ -78,13 +79,15 @@ export function createBrowserGeminiHttpCompileClient({
         return {
           jobIdBase: response.job_id_base ?? response.jobIdBase ?? "compile_job",
           objectIdBase: response.object_id_base ?? response.objectIdBase ?? "compile_object",
-          ...workerResponseToArtifact(response),
+          quantity: voxel.quantity ?? 1,
+          ...workerResponseToArtifact(response, model),
+          avatarScale: voxel.scale,
         };
       } catch (error) {
         throw normalizeAiWorkerError(error);
       }
     },
-    async createEdit({ sourcePrompt, objectContext }) {
+    async createEdit({ sourcePrompt, objectContext, purpose }) {
       const trimmedKey = apiKey()?.trim();
       if (!trimmedKey) {
         throw new AiWorkerError("generation_failed", "Browser Gemini key is not configured.");
@@ -99,7 +102,7 @@ export function createBrowserGeminiHttpCompileClient({
       }
 
       try {
-        const voxel = await generateVoxelEdit({
+        const { voxelCore: voxel } = await generateVoxelEdit({
           apiKey: trimmedKey,
           fetchImpl,
           model,
@@ -107,6 +110,7 @@ export function createBrowserGeminiHttpCompileClient({
           timeoutMs: geminiTimeoutMs,
           currentCore,
           changePrompt,
+          purpose,
         });
 
         const body: CompileVoxelRequest = {
@@ -121,7 +125,10 @@ export function createBrowserGeminiHttpCompileClient({
           workerTimeoutMs,
           body,
         );
-        return workerResponseToArtifact(response);
+        return {
+          ...workerResponseToArtifact(response, model),
+          avatarScale: voxel.scale,
+        };
       } catch (error) {
         throw normalizeAiWorkerError(error);
       }

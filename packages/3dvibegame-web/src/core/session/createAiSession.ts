@@ -12,9 +12,17 @@ import {
   updateLockedTransform,
   type AuthorityWorld,
   type GenerationStage,
+  type GenerationStageEvent,
 } from "@3dvibegame/scene-authority-ts";
 
 import type { AiWorkerClient, AiWorkerDraftResult } from "../aiWorker/fixtureAiWorkerClient";
+import {
+  canCopyObject,
+  cloneBuilderSpec,
+  createObjectCopyTemplate,
+  type ObjectCopyTemplate,
+  type ObjectPastePoint,
+} from "../objectClipboard";
 import type { GenerationActionId } from "./generationSession";
 import type { SceneDocument, SceneObjectRecord, PlayerSessionState } from "../state/contracts";
 
@@ -23,6 +31,7 @@ export interface AiSessionSnapshot {
   world: AuthorityWorld;
   stage: GenerationStage;
   lastMessage: string;
+  stageEvents: GenerationStageEvent[];
   object: AuthorityWorld["objects"][number] | null;
   availableActions: GenerationActionId[];
 }
@@ -34,9 +43,32 @@ export function createAiSession(aiClient: AiWorkerClient) {
   let lastMessage = "Type a prompt to generate an object with Gemini.";
   let activeObjectId: string | null = null;
   let requestCounter = 0;
+  let stageEvents: GenerationStageEvent[] = [];
+  let eventSequence = 0;
+  let lastRecordedMessage = "";
   const listeners = new Set<() => void>();
 
+  // Capture each distinct status message as a stage event so the chat panel can
+  // replay the session's progress. Hooked into notify() so every state change is seen.
+  function recordEvent() {
+    if (lastMessage === lastRecordedMessage) return;
+    lastRecordedMessage = lastMessage;
+    eventSequence += 1;
+    const status: GenerationStageEvent["status"] = stage === "failed" ? "error" : "complete";
+    stageEvents = [
+      ...stageEvents,
+      {
+        id: `ai_event_${eventSequence}`,
+        stage,
+        message: lastMessage,
+        status,
+        timestamp: new Date().toISOString(),
+      },
+    ].slice(-32);
+  }
+
   function notify() {
+    recordEvent();
     listeners.forEach((fn) => fn());
   }
 
@@ -131,6 +163,7 @@ export function createAiSession(aiClient: AiWorkerClient) {
         world,
         stage,
         lastMessage,
+        stageEvents,
         object,
         availableActions: resolveAvailableActions(object),
       };
@@ -254,14 +287,26 @@ export function createAiSession(aiClient: AiWorkerClient) {
           }
           case "scale_draft": {
             const [sx, sy, sz] = object.transform.scale;
-            const patch = { scale: { x: sx * 1.12, y: sy * 1.12, z: sz * 1.12 } };
+            const [, py] = object.transform.position;
+            const factor = 1.12;
+            const bottomLocal = computeBottomLocal(object.builder_spec.parts);
+            const patch = {
+              scale: { x: sx * factor, y: sy * factor, z: sz * factor },
+              position: { y: py + bottomLocal * sy * (1 - factor) },
+            };
             world = applyTransform(world, object, playerId, patch);
             lastMessage = "Object scaled up.";
             break;
           }
           case "scale_down_draft": {
             const [sx, sy, sz] = object.transform.scale;
-            const patch = { scale: { x: sx / 1.12, y: sy / 1.12, z: sz / 1.12 } };
+            const [, py] = object.transform.position;
+            const factor = 1 / 1.12;
+            const bottomLocal = computeBottomLocal(object.builder_spec.parts);
+            const patch = {
+              scale: { x: sx * factor, y: sy * factor, z: sz * factor },
+              position: { y: py + bottomLocal * sy * (1 - factor) },
+            };
             world = applyTransform(world, object, playerId, patch);
             lastMessage = "Object scaled down.";
             break;
@@ -275,12 +320,13 @@ export function createAiSession(aiClient: AiWorkerClient) {
       notify();
     },
 
-    moveSelected(dx: number, dz: number) {
+    moveSelected(dx: number, dy: number, dz: number) {
       const object = currentObject();
       if (!object) return;
       try {
-        const [px, , pz] = object.transform.position;
-        const patch = { position: { x: px + dx, z: pz + dz } };
+        const [px, py, pz] = object.transform.position;
+        const newY = Math.min(4.0, Math.max(-1.0, py + dy));
+        const patch = { position: { x: px + dx, y: newY, z: pz + dz } };
         world = applyTransform(world, object, playerId, patch);
         lastMessage = "Object moved.";
       } catch (error) {
@@ -309,6 +355,83 @@ export function createAiSession(aiClient: AiWorkerClient) {
         lastMessage = error instanceof Error ? error.message : "Delete failed.";
       }
       notify();
+    },
+
+    canCopySelectedObject() {
+      return canCopyObject(currentObject(), playerId);
+    },
+
+    copySelectedObject(): ObjectCopyTemplate {
+      const object = currentObject();
+      if (!object) {
+        throw new Error("Select an object before copying it.");
+      }
+      return createObjectCopyTemplate({ object, localPlayerId: playerId });
+    },
+
+    releaseSelectedObjectForPaste() {
+      const object = currentObject();
+      if (!object) return;
+      try {
+        if (object.state === "grace") {
+          world = releaseObject(world, { objectId: object.object_id, playerId }).world;
+        } else if (object.state === "edit_locked") {
+          world = releaseEditLock(world, { objectId: object.object_id, playerId }).world;
+        }
+        activeObjectId = null;
+      } catch (error) {
+        lastMessage =
+          error instanceof Error ? error.message : "Failed to release selected object.";
+        notify();
+        throw error;
+      }
+      notify();
+    },
+
+    async pasteCopiedObject(
+      template: ObjectCopyTemplate,
+      pastePoint: ObjectPastePoint,
+    ) {
+      const n = ++requestCounter;
+      const jobId = `local_duplicate_${n}`;
+      const objectId = `${slug(template.category)}_copy_${n}`;
+
+      try {
+        world = requestCreateObject(world, {
+          jobId,
+          playerId,
+          sourcePrompt: `duplicate ${template.category}`,
+        }).world;
+        world = submitAIDraft(world, {
+          jobId,
+          objectId,
+          creatorId: playerId,
+          builderSpec: cloneBuilderSpec(template.builderSpec),
+          graceSeconds: 30,
+        }).world;
+        const [rotationX, rotationY, rotationZ] = template.transform.rotation;
+        const [scaleX, scaleY, scaleZ] = template.transform.scale;
+        world = updateDraftTransform(world, {
+          objectId,
+          playerId,
+          patch: {
+            position: { x: pastePoint.x, y: pastePoint.y, z: pastePoint.z },
+            rotation: { x: rotationX, y: rotationY, z: rotationZ },
+            scale: { x: scaleX, y: scaleY, z: scaleZ },
+          },
+        }).world;
+        activeObjectId = objectId;
+        stage = "grace";
+        lastMessage = `Duplicated ${template.category}. Move, rotate, scale, then release.`;
+      } catch (error) {
+        stage = "failed";
+        lastMessage = error instanceof Error ? error.message : "Duplicate failed.";
+        notify();
+        throw error;
+      }
+
+      notify();
+      return objectId;
     },
 
     selectObject(objectId: string | null) {
@@ -342,6 +465,17 @@ export function createAiSession(aiClient: AiWorkerClient) {
       listeners.clear();
     },
   };
+}
+
+function computeBottomLocal(
+  parts: { local_position?: [number, number, number]; dimensions: [number, number, number] }[],
+): number {
+  let bottom = 0;
+  for (const part of parts) {
+    const localY = part.local_position ? part.local_position[1] : part.dimensions[1] / 2;
+    bottom = Math.min(bottom, localY - part.dimensions[1] / 2);
+  }
+  return bottom;
 }
 
 function applyTransform(
@@ -393,4 +527,14 @@ function createInitialWorld(): AuthorityWorld {
       protected_spawn_enabled: false,
     },
   });
+}
+
+function slug(value: string) {
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 36) || "object"
+  );
 }

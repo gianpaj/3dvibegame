@@ -37,7 +37,7 @@ export function createBrowserGeminiAiWorkerClient({
   timeoutMs = defaultGeminiTimeoutMs,
 }: BrowserGeminiAiWorkerClientConfig): AiWorkerClient {
   return {
-    async createDraft({ prompt }) {
+    async createDraft({ prompt, purpose }) {
       const trimmedKey = apiKey()?.trim();
       if (!trimmedKey) {
         throw new AiWorkerError("generation_failed", "Browser Gemini key is not configured.");
@@ -53,11 +53,12 @@ export function createBrowserGeminiAiWorkerClient({
       };
 
       try {
-        const voxel = await generateVoxelCore({
+        const { voxelCore: voxel } = await generateVoxelCore({
           apiKey: trimmedKey,
           fetchImpl,
           model,
           prompt: sourcePrompt,
+          purpose,
           temperature,
           timeoutMs,
         });
@@ -66,13 +67,15 @@ export function createBrowserGeminiAiWorkerClient({
         return {
           jobIdBase: response.job_id_base,
           objectIdBase: response.object_id_base,
-          ...toArtifact(response.source_spec, response.builder_spec),
+          quantity: voxel.quantity ?? 1,
+          ...toArtifact(response.source_spec, response.builder_spec, model),
+          avatarScale: voxel.scale,
         };
       } catch (error) {
         throw normalizeAiWorkerError(error);
       }
     },
-    async createEdit({ sourcePrompt, objectContext }) {
+    async createEdit({ sourcePrompt, objectContext, purpose }) {
       const trimmedKey = apiKey()?.trim();
       if (!trimmedKey) {
         throw new AiWorkerError("generation_failed", "Browser Gemini key is not configured.");
@@ -95,7 +98,7 @@ export function createBrowserGeminiAiWorkerClient({
       };
 
       try {
-        const voxel = await generateVoxelEdit({
+        const { voxelCore: voxel } = await generateVoxelEdit({
           apiKey: trimmedKey,
           fetchImpl,
           model,
@@ -103,9 +106,13 @@ export function createBrowserGeminiAiWorkerClient({
           timeoutMs,
           currentCore,
           changePrompt,
+          purpose,
         });
         const response = buildVoxelResponse(request, voxel, ["browser Gemini BYOK edit"]);
-        return toArtifact(response.source_spec, response.builder_spec);
+        return {
+          ...toArtifact(response.source_spec, response.builder_spec, model),
+          avatarScale: voxel.scale,
+        };
       } catch (error) {
         throw normalizeAiWorkerError(error);
       }
@@ -113,7 +120,11 @@ export function createBrowserGeminiAiWorkerClient({
   };
 }
 
-function toArtifact(sourceSpec: unknown, builderSpec: unknown): AiWorkerArtifact {
+function toArtifact(
+  sourceSpec: unknown,
+  builderSpec: unknown,
+  modelId: string,
+): AiWorkerArtifact {
   try {
     const parsedSourceSpec = parseVoxelBuilderSpec(sourceSpec);
     const parsedBuilderSpec = builderSpec as BuilderSpec;
@@ -123,6 +134,7 @@ function toArtifact(sourceSpec: unknown, builderSpec: unknown): AiWorkerArtifact
       builderSpec: parsedBuilderSpec,
       sourceSpecJson: JSON.stringify(parsedSourceSpec),
       builderSpecJson: JSON.stringify(parsedBuilderSpec),
+      modelId,
     };
   } catch (error) {
     throw normalizeAiWorkerError(error, "validation_failed");

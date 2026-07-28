@@ -1,31 +1,12 @@
-export type AiWorkerFailureCode =
-  | "invalid_prompt"
-  | "unsupported_request"
-  | "unsafe_request"
-  | "context_stale"
-  | "generation_failed"
-  | "validation_failed"
-  | "timeout";
+import {
+  AiWorkerError,
+  aiWorkerFailureCodes,
+  type AiWorkerFailureCode,
+} from "@3dvibegame/ai-planning";
 
-const supportedFailureCodes = new Set<AiWorkerFailureCode>([
-  "invalid_prompt",
-  "unsupported_request",
-  "unsafe_request",
-  "context_stale",
-  "generation_failed",
-  "validation_failed",
-  "timeout",
-]);
+export { AiWorkerError, type AiWorkerFailureCode };
 
-export class AiWorkerError extends Error {
-  readonly code: AiWorkerFailureCode;
-
-  constructor(code: AiWorkerFailureCode, message: string) {
-    super(message);
-    this.name = "AiWorkerError";
-    this.code = code;
-  }
-}
+const supportedFailureCodes = new Set<AiWorkerFailureCode>(aiWorkerFailureCodes);
 
 export function normalizeAiWorkerError(
   error: unknown,
@@ -65,6 +46,10 @@ export function aiWorkerFailureLabel(code: AiWorkerFailureCode) {
       return "AI worker returned an invalid build artifact.";
     case "timeout":
       return "AI worker timed out.";
+    case "budget_exhausted":
+      return "Daily AI limit reached — try again tomorrow.";
+    case "rate_limited":
+      return "Too many requests — please wait a moment.";
     default:
       code satisfies never;
       return "AI worker failed.";

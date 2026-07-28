@@ -1,0 +1,25 @@
+# Allow all standard crawlers
+User-agent: *
+Allow: /
+
+# AI search / answer engines (explicitly allowed so the site can be cited)
+User-agent: Googlebot
+Allow: /
+User-agent: Bingbot
+Allow: /
+User-agent: GPTBot
+Allow: /
+User-agent: ChatGPT-User
+Allow: /
+User-agent: OAI-SearchBot
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: anthropic-ai
+Allow: /
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://3dvibegame.com/sitemap.xml

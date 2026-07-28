@@ -20,9 +20,10 @@ function saveGeminiKey(key: string) {
 
 interface Props {
   onSave: (key: string) => void;
+  onDismiss?: () => void;
 }
 
-export function GeminiKeyModal({ onSave }: Props) {
+export function GeminiKeyModal({ onSave, onDismiss }: Props) {
   const [value, setValue] = useState("");
   const [error, setError] = useState("");
 
@@ -65,6 +66,11 @@ export function GeminiKeyModal({ onSave }: Props) {
             aistudio.google.com
           </a>
         </p>
+        {onDismiss && (
+          <button className="modal-dismiss" type="button" onClick={onDismiss}>
+            Continue as viewer
+          </button>
+        )}
       </div>
     </div>
   );

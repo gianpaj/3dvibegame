@@ -1,7 +1,13 @@
 import { z } from "zod";
 
+// Version of the create/edit system prompts below. Bump on any edit to
+// `voxelBuilderSystemPrompt` / `voxelEditSystemPrompt` so feedback rows can be
+// correlated to the exact prompt revision that produced the rated result
+// ("did prompt v2 lift the 👍 rate?" becomes a one-line query).
+export const PROMPT_VERSION = "v3";
+
 export const createPlanSystemPrompt =
-  "You plan simple voxel objects for Vibe World. Return a small, safe, world-native create plan only. Do not request terrain edits, accounts, economy, combat, scripting, raw meshes, or destructive actions.";
+  "You plan simple voxel objects for Vibe World. If the player prompt is meaningless (random characters, gibberish, or not interpretable as a 3D object concept), set `rejection` to a brief reason and provide minimal valid values for all other required fields. Otherwise leave `rejection` unset and return a small, safe, world-native create plan only. Do not request terrain edits, accounts, economy, combat, scripting, raw meshes, or destructive actions.";
 
 export const aiWorkerFailureCodes = [
   "invalid_prompt",
@@ -11,9 +17,21 @@ export const aiWorkerFailureCodes = [
   "generation_failed",
   "validation_failed",
   "timeout",
+  "budget_exhausted",
+  "rate_limited",
 ] as const;
 
 export type AiWorkerFailureCode = (typeof aiWorkerFailureCodes)[number];
+
+export class AiWorkerError extends Error {
+  readonly code: AiWorkerFailureCode;
+
+  constructor(code: AiWorkerFailureCode, message: string) {
+    super(message);
+    this.name = "AiWorkerError";
+    this.code = code;
+  }
+}
 
 export const aiWorkerRequestSchema = z.object({
   operation: z.enum(["create", "refine", "remix"]),
@@ -22,11 +40,13 @@ export const aiWorkerRequestSchema = z.object({
   target_object_id: z.string().nullable().optional(),
   base_object_version: z.number().int().positive().nullable().optional(),
   object_context: z.unknown().nullable().optional(),
+  purpose: z.enum(["object", "avatar"]).optional(),
 });
 
 export type AiWorkerRequest = z.infer<typeof aiWorkerRequestSchema>;
 
 export const createPlanSchema = z.object({
+  rejection: z.string().trim().min(1).optional(),
   object_category: z.string().trim().min(1).max(40),
   size_tier: z.enum(["tiny", "small", "medium", "large"]),
   shape: z.enum(["tree", "structure", "creature", "cluster", "marker", "prop"]),
@@ -44,14 +64,19 @@ export type CreatePlan = z.infer<typeof createPlanSchema>;
 export const voxelBuilderSystemPrompt = [
   "You are a voxel-builder assistant for Vibe World. Given a player's prompt, design a",
   "single small 3D object as a list of voxel operations. Return JSON ONLY (no prose,",
-  "no markdown) with this exact shape:",
+  "no markdown).",
+  "",
+  "IMPORTANT: If the player prompt is meaningless (random characters, gibberish, or not",
+  "interpretable as a 3D object concept), return ONLY: {\"rejection\": \"<brief reason>\"}",
+  "Otherwise return a full voxel spec with this exact shape:",
   "{",
   '  "object_category": string,           // e.g. "palm_tree"',
   '  "size_tier": "tiny"|"small"|"medium"|"large",',
   '  "style_tags": string[],',
   '  "behaviors": string[],',
   '  "materials": [{ "material_id": string, "color_hint"?: string }],',
-  '  "operations": VoxelOp[]',
+  '  "operations": VoxelOp[],',
+  '  "quantity"?: number                  // omit or 1 for a single object (default)',
   "}",
   "",
   "Each VoxelOp is one of:",
@@ -64,10 +89,22 @@ export const voxelBuilderSystemPrompt = [
   "- Every op_id is unique; every material_id used must be declared in materials.",
   "- Use ONLY these material ids so colors render: moss_stone, wood, neon, glass_block,",
   "  jelly, cloud, lava_light, void, red, stone.",
+  "- For specific colors, keep `material_id` in the allowed list and set `color_hint`",
+  '  to a hex color like "#7a4a24" or "#1f7a3a". Prefer hex color_hint values over',
+  "  descriptive names such as brown, dark_green, or forest_green.",
   "- Build the real silhouette of the requested object and make different prompts produce",
   "  different geometry (a palm tree = tall slender trunk + splayed fronds; a pine =",
   "  conical layered canopy; a barrel = stacked cylinders/boxes).",
+  "- Multi-part objects must look physically assembled: supports, legs, tops, roofs,",
+  "  shelves, handles, and decorations should touch or slightly overlap the parts they",
+  "  connect to. Check box center/size math so table legs reach the tabletop underside,",
+  "  seats sit on legs, roofs sit on walls, and parts do not float unless explicitly",
+  "  requested.",
   "- Aim for 4-14 operations.",
+  "- quantity: set to 2-4 ONLY when the player asks for multiple SEPARATE INDEPENDENT",
+  "  objects (e.g. '2 palm trees', 'three barrels'). Describe ONE of them in operations.",
+  "  Leave quantity absent when the count refers to parts of one object",
+  "  (e.g. 'a tree with 2 apples', 'a car with 4 wheels', 'a house with 3 windows').",
 ].join("\n");
 
 // System prompt for editing an existing object: the LLM is given the object's
@@ -76,7 +113,10 @@ export const voxelBuilderSystemPrompt = [
 export const voxelEditSystemPrompt = [
   "You are a voxel-builder assistant for Vibe World editing an EXISTING object. You are",
   "given the object's current voxel core (materials + operations) and a change request.",
-  "Apply the change and return the FULL edited voxel core as JSON ONLY (no prose, no",
+  "",
+  "IMPORTANT: If the change request is meaningless (random characters, gibberish, or not",
+  "interpretable as an edit instruction), return ONLY: {\"rejection\": \"<brief reason>\"}",
+  "Otherwise apply the change and return the FULL edited voxel core as JSON ONLY (no prose, no",
   "markdown) with this exact shape:",
   "{",
   '  "object_category": string,',
@@ -98,10 +138,64 @@ export const voxelEditSystemPrompt = [
   "- For a recolor, change the relevant `material_id`s (and declare them in materials).",
   '  Use ONLY these material ids so colors render: moss_stone, wood, neon, glass_block,',
   "  jelly, cloud, lava_light, void, red, stone.",
+  '  For specific colors, prefer `color_hint` hex values like "#c63a36" or "#1f7a3a"',
+  "  instead of descriptive names.",
   '- For "add X", append new operations with new unique op_ids.',
   '- For "remove X" or "make it smaller", drop or shrink the relevant operations.',
   "- y is up; keep it grounded near y=0. Every op_id unique; every material_id declared.",
   "- Keep the total to at most ~16 operations.",
+].join("\n");
+
+// System prompt for generating/editing a PLAYER AVATAR: a single standing
+// character or creature that becomes the player's body. Modeled on
+// voxelEditSystemPrompt but constrained to one grounded humanoid/creature that
+// fits the 8x12x8 avatar clamp (4x a normal 2x3x2 body), always quantity 1.
+export const avatarSystemPrompt = [
+  "You are a voxel-builder assistant for Vibe World designing a PLAYER AVATAR — the",
+  "3D body that represents the player. You may be given the avatar's current voxel",
+  "core plus a change request, or just a fresh prompt. Return JSON ONLY (no prose, no",
+  "markdown).",
+  "",
+  "IMPORTANT: If the request is meaningless (random characters, gibberish, or not",
+  "interpretable as a character/creature concept), return ONLY: {\"rejection\": \"<brief reason>\"}",
+  "Otherwise return the FULL avatar voxel core with this exact shape:",
+  "{",
+  '  "object_category": "avatar",',
+  '  "size_tier": "tiny"|"small"|"medium"|"large",',
+  '  "style_tags": string[],',
+  '  "behaviors": string[],',
+  '  "materials": [{ "material_id": string, "color_hint"?: string }],',
+  '  "operations": VoxelOp[],',
+  '  "quantity": 1,',
+  '  "scale"?: number',
+  "}",
+  "",
+  "Each VoxelOp is one of:",
+  '- { "op_id": string, "kind": "add_box", "position": [x,y,z], "size": [w,h,d], "material_id": string, "tags"?: string[] }',
+  '- { "op_id": string, "kind": "add_sphere", "center": [x,y,z], "radius": number, "material_id": string, "tags"?: string[] }',
+  '- { "op_id": string, "kind": "add_line", "from": [x,y,z], "to": [x,y,z], "radius": number, "shape"?: "rounded"|"square", "material_id": string, "tags"?: string[] }',
+  "",
+  "Rules:",
+  "- Build ONE single standing character or creature, feet on the ground plane (lowest",
+  "  voxels near y=0), facing +Z. Never multiple separate figures.",
+  "- quantity is ALWAYS 1 — an avatar is one body. Never set it higher.",
+  "- ALWAYS build the geometry at normal size — roughly 2 wide x 3 tall x 2 deep grid",
+  "  units. NEVER express size by enlarging the geometry; the renderer normalizes",
+  "  geometry to human height regardless.",
+  '- Size is expressed ONLY via the top-level "scale" field (1 = human height).',
+  '  Include "scale" ONLY when the player explicitly asks about size: "make me 4',
+  '  times larger" → "scale": 4; "make me huge" → "scale": 4; "make me tiny" →',
+  '  "scale": 0.5. Maximum 4, minimum 0.25. When the request says nothing about',
+  '  size, OMIT "scale" entirely (it means: keep the current size).',
+  "- Give it a readable silhouette: legs/base, torso, head, and arms or limbs as",
+  "  appropriate. Parts must touch or overlap so nothing floats.",
+  "- When editing, PRESERVE everything the change doesn't touch; keep existing op_ids,",
+  "  positions, and sizes unless the change requires altering them.",
+  "- Use ONLY these material ids so colors render: moss_stone, wood, neon, glass_block,",
+  "  jelly, cloud, lava_light, void, red, stone.",
+  '- For specific colors keep material_id in the allowed list and set color_hint to a hex',
+  '  value like "#c63a36" or "#1f7a3a" rather than descriptive names.',
+  "- Every op_id unique; every material_id declared. Aim for 5-16 operations.",
 ].join("\n");
 
 // Request shape for the worker's /compile endpoint: the LLM-authored voxel core
@@ -124,6 +218,10 @@ export const voxelCoreSchema = z.object({
     .max(12),
   // Operations are validated strictly after envelope assembly via parseVoxelBuilderSpec.
   operations: z.array(z.unknown()).min(1).max(40),
+  quantity: z.number().int().min(1).max(4).optional().default(1),
+  // Avatar-only rendered size multiplier (1 = human height, up to 4). Omitted means
+  // "keep the current size"; ignored for world objects.
+  scale: z.number().min(0.25).max(4).optional(),
 });
 
 export type VoxelCore = z.infer<typeof voxelCoreSchema>;
@@ -140,6 +238,10 @@ export type CompileVoxelRequest = z.infer<typeof compileVoxelRequestSchema>;
 export const createPlanJsonSchema = {
   type: "object",
   properties: {
+    rejection: {
+      type: "string",
+      description: "Set only when the prompt is meaningless or cannot be interpreted as a 3D object. Leave absent otherwise.",
+    },
     object_category: {
       type: "string",
       description: "Short world-object category, such as pine_tree, bridge, shrine, or marker.",
@@ -221,6 +323,8 @@ export interface AiWorkerCompletedResponse {
   source_spec: unknown;
   builder_spec: unknown;
   warnings: string[];
+  quantity?: number;
+  scale?: number;
 }
 
 export interface AiWorkerFailedResponse {

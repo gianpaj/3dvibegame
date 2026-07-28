@@ -7,15 +7,28 @@ export interface AiWorkerArtifact {
   builderSpec: BuilderSpec;
   sourceSpecJson: string;
   builderSpecJson: string;
+  /** The model that authored this result (e.g. "gemini-2.5-flash"); stamped onto feedback. */
+  modelId: string;
+  /**
+   * Avatar-only rendered size multiplier the AI requested (1 = human height, up
+   * to 4). Undefined means the AI said nothing about size — keep the current one.
+   */
+  avatarScale?: number;
 }
 
 export interface AiWorkerDraftResult extends AiWorkerArtifact {
   jobIdBase: string;
   objectIdBase: string;
+  /** Number of independent objects the player asked for (1 = default). */
+  quantity: number;
 }
 
 export interface AiWorkerClient {
-  createDraft(input: { prompt: string }): Promise<AiWorkerDraftResult>;
+  createDraft(input: {
+    prompt: string;
+    /** "avatar" selects the avatar system prompt (single grounded body); default "object". */
+    purpose?: "object" | "avatar";
+  }): Promise<AiWorkerDraftResult>;
   createEdit(input: {
     // Optional: scenario refine recipes use it; free-form chat edits omit it and rely
     // on `sourcePrompt` + `objectContext`.
@@ -24,6 +37,8 @@ export interface AiWorkerClient {
     baseVersion: number;
     sourcePrompt?: string;
     objectContext?: AiWorkerObjectContext | null;
+    /** "avatar" selects the avatar system prompt (single grounded body); default "object". */
+    purpose?: "object" | "avatar";
   }): Promise<AiWorkerArtifact>;
 }
 
@@ -41,6 +56,7 @@ export function createFixtureAiWorkerClient(): AiWorkerClient {
       return {
         jobIdBase: scenario.jobId,
         objectIdBase: scenario.objectId,
+        quantity: 1,
         ...toArtifact(scenario.voxelSource, scenario.draftBuilder),
       };
     },
@@ -63,5 +79,6 @@ function toArtifact(sourceSpec: VoxelBuilderSpec, builderSpec: BuilderSpec): AiW
     builderSpec,
     sourceSpecJson: JSON.stringify(sourceSpec),
     builderSpecJson: JSON.stringify(builderSpec),
+    modelId: "fixture",
   };
 }

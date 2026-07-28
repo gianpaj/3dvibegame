@@ -3,6 +3,8 @@ import type { AuthorityWorld } from "@3dvibegame/scene-authority-ts";
 import { DbConnection, type SubscriptionHandle } from "./module_bindings";
 import type {
   AiJob,
+  ChatMessage,
+  PlayerAvatar,
   PlayerSession,
   SnapshotObject,
   World,
@@ -28,6 +30,19 @@ export interface BackendPlayerPresence {
   presenceState: string;
   transform: BackendPlayerTransform;
   isLocal: boolean;
+}
+
+// The voxel body a player prompt-created, synced from the player_avatar table.
+// Carried separately from BackendPlayerPresence so 10 Hz position updates don't
+// re-send the heavy spec JSON.
+export interface BackendAvatarPresence {
+  /** Identity hex of the avatar owner. */
+  id: string;
+  voxelCoreJson: string;
+  builderSpecJson: string;
+  /** Rendered size multiplier (1 = human height, up to 4). */
+  scale: number;
+  version: number;
 }
 
 export interface BackendPlayerTransform {
@@ -80,6 +95,15 @@ export interface BackendSnapshotObjectDebug {
   capturedAt: string;
 }
 
+export interface BackendChatMessage {
+  id: string;
+  senderId: string;
+  senderNickname: string;
+  body: string;
+  createdAt: string;
+  isLocal: boolean;
+}
+
 export interface BackendAiJobDebug {
   jobId: string;
   worldId: string;
@@ -101,23 +125,34 @@ export interface BackendPresenceSnapshot {
   onlineCount: number;
   world: BackendWorldPresence | null;
   players: BackendPlayerPresence[];
+  avatars: BackendAvatarPresence[];
   authorityWorld: AuthorityWorld | null;
   archiveAuthorityWorld: AuthorityWorld | null;
   objectArtifacts: BackendObjectArtifactDebug[];
   aiJobs: BackendAiJobDebug[];
   worldSnapshots: BackendWorldSnapshotDebug[];
   snapshotObjects: BackendSnapshotObjectDebug[];
+  chatMessages: BackendChatMessage[];
 }
 
 interface BackendPresenceBridgeConfig {
   onSnapshot(snapshot: BackendPresenceSnapshot): void;
   /** Player-chosen display name; falls back to env / "You" when omitted. */
   nickname?: string;
+  /**
+   * Spectator mode: connect and subscribe (so the world renders) but never call
+   * join_world. A viewer has no player_session, so no avatar, no presence chip, and
+   * the write reducers (chat/avatar/movement) are rejected client-side. They just watch.
+   */
+  viewer?: boolean;
 }
 
 export interface BackendPresenceBridge {
   getSnapshot(): BackendPresenceSnapshot;
   updateLocalTransform(transform: BackendPlayerTransform): void;
+  setAvatarSpec(input: BackendSetAvatarSpecInput): Promise<void>;
+  sendChat(body: string): Promise<void>;
+  deleteChatMessage(messageId: string): Promise<void>;
   requestCreateObject(input: BackendRequestCreateObjectInput): Promise<void>;
   submitAiDraft(input: BackendSubmitAiDraftInput): Promise<void>;
   updateDraftTransform(input: BackendObjectTransformInput): Promise<void>;
@@ -128,12 +163,20 @@ export interface BackendPresenceBridge {
   cancelEdit(input: BackendObjectIdInput): Promise<void>;
   deleteObject(input: BackendObjectIdInput): Promise<void>;
   expireCooldown(input: BackendObjectIdInput): Promise<void>;
+  submitObjectFeedback(input: BackendSubmitObjectFeedbackInput): Promise<void>;
   failAiJob(input: BackendFailAiJobInput): Promise<void>;
   expireAiJob(input: BackendAiJobIdInput): Promise<void>;
   updateWorldSettings(input: BackendUpdateWorldSettingsInput): Promise<void>;
   createSnapshot(input: BackendWorldSnapshotInput): Promise<void>;
   resetWorld(input: BackendWorldSnapshotInput): Promise<void>;
   dispose(): void;
+}
+
+export interface BackendSetAvatarSpecInput {
+  voxelCoreJson: string;
+  builderSpecJson: string;
+  /** Rendered size multiplier (1 = human height, up to 4). */
+  scale: number;
 }
 
 export interface BackendRequestCreateObjectInput {
@@ -146,10 +189,26 @@ export interface BackendSubmitAiDraftInput {
   objectId: string;
   sourceSpecJson: string;
   builderSpecJson: string;
+  positionX: number;
+  positionY: number;
+  positionZ: number;
 }
 
 export interface BackendObjectIdInput {
   objectId: string;
+}
+
+export interface BackendSubmitObjectFeedbackInput {
+  operationId: string;
+  objectId: string;
+  objectVersion: number;
+  operation: string;
+  rating: string;
+  sourcePrompt: string;
+  sourceSpecJson: string;
+  builderSpecJson: string;
+  modelId: string;
+  promptVersion: string;
 }
 
 export interface BackendAiJobIdInput {
@@ -200,11 +259,15 @@ export interface BackendObjectTransformInput extends BackendObjectIdInput {
 const tokenStorageKey = "vibe-world:spacetimedb-token";
 const heartbeatMs = 15_000;
 const movementThrottleMs = 180;
+const reconnectBaseMs = 2_000;
+const reconnectMaxMs = 30_000;
+const reconnectMaxRetries = 6;
 const movementEpsilon = 0.025;
 
 export function createBackendPresenceBridge({
   onSnapshot,
   nickname: nicknameOverride,
+  viewer = false,
 }: BackendPresenceBridgeConfig): BackendPresenceBridge {
   const config = readBackendConfig(nicknameOverride);
 
@@ -219,6 +282,9 @@ export function createBackendPresenceBridge({
     return {
       getSnapshot: () => snapshot,
       updateLocalTransform() {},
+      setAvatarSpec: rejectDisabledBackend,
+      sendChat: rejectDisabledBackend,
+      deleteChatMessage: rejectDisabledBackend,
       requestCreateObject: rejectDisabledBackend,
       submitAiDraft: rejectDisabledBackend,
       updateDraftTransform: rejectDisabledBackend,
@@ -229,6 +295,7 @@ export function createBackendPresenceBridge({
       cancelEdit: rejectDisabledBackend,
       deleteObject: rejectDisabledBackend,
       expireCooldown: rejectDisabledBackend,
+      submitObjectFeedback: rejectDisabledBackend,
       failAiJob: rejectDisabledBackend,
       expireAiJob: rejectDisabledBackend,
       updateWorldSettings: rejectDisabledBackend,
@@ -245,6 +312,8 @@ export function createBackendPresenceBridge({
   let localIdentityHex: string | null = null;
   let connection: DbConnection | null = null;
   let subscription: SubscriptionHandle | null = null;
+  let chatSubscription: SubscriptionHandle | null = null;
+  let chatSubscriptionWorldId: bigint | null = null;
   let removeTableListeners: (() => void) | null = null;
   let heartbeatId: number | null = null;
   let movementTimeoutId: number | null = null;
@@ -252,6 +321,8 @@ export function createBackendPresenceBridge({
   let lastQueuedTransform: BackendPlayerTransform | null = null;
   let pendingTransform: BackendPlayerTransform | null = null;
   let joined = false;
+  let retryCount = 0;
+  let retryTimeoutId: number | null = null;
 
   let snapshot = createBaseSnapshot({
     enabled: true,
@@ -261,117 +332,162 @@ export function createBackendPresenceBridge({
   });
   onSnapshot(snapshot);
 
-  try {
+  function teardownConnection() {
+    if (heartbeatId !== null) {
+      window.clearInterval(heartbeatId);
+      heartbeatId = null;
+    }
+    try { subscription?.unsubscribe(); } catch { /* double-unsubscribe is harmless */ }
+    try { chatSubscription?.unsubscribe(); } catch { /* double-unsubscribe is harmless */ }
+    subscription = null;
+    chatSubscription = null;
+    chatSubscriptionWorldId = null;
+    removeTableListeners?.();
+    removeTableListeners = null;
+    joined = false;
+  }
+
+  function scheduleReconnect() {
+    if (disposed) return;
+    if (retryCount >= reconnectMaxRetries) {
+      status = "error";
+      message = "Connection lost. Reload the page to reconnect.";
+      emitCurrent();
+      return;
+    }
+    const delay = Math.min(reconnectBaseMs * 2 ** retryCount, reconnectMaxMs);
+    retryCount++;
+    status = "connecting";
+    message = `Reconnecting… (attempt ${retryCount} of ${reconnectMaxRetries})`;
+    emitCurrent();
+    console.log("[backend] reconnect scheduled in %dms (attempt %d)", delay, retryCount);
+    retryTimeoutId = window.setTimeout(() => {
+      retryTimeoutId = null;
+      if (!disposed) connect();
+    }, delay);
+  }
+
+  function connect() {
+    teardownConnection();
     console.log(
-      "[backend] building DbConnection uri=%o database=%o hasToken=%o",
+      "[backend] building DbConnection uri=%o database=%o hasToken=%o retry=%d",
       backendConfig.uri,
       backendConfig.database,
       Boolean(readToken()),
+      retryCount,
     );
-    connection = DbConnection.builder()
-      .withUri(backendConfig.uri)
-      .withDatabaseName(backendConfig.database)
-      .withToken(readToken())
-      .onConnect((conn, identity, token) => {
-        console.log("[backend] onConnect identity=%s disposed=%o", identity.toHexString(), disposed);
-        if (disposed) return;
+    try {
+      connection = DbConnection.builder()
+        .withUri(backendConfig.uri)
+        .withDatabaseName(backendConfig.database)
+        .withToken(readToken())
+        .onConnect((conn, identity, token) => {
+          console.log("[backend] onConnect identity=%s disposed=%o", identity.toHexString(), disposed);
+          if (disposed) return;
 
-        localIdentityHex = identity.toHexString();
-        writeToken(token);
-        status = "connected";
-        message = "Connected. Loading room.";
-        removeTableListeners = installTableListeners(conn, emitCurrent);
+          retryCount = 0;
+          localIdentityHex = identity.toHexString();
+          writeToken(token);
+          status = "connected";
+          message = "Connected. Loading room.";
+          removeTableListeners = installTableListeners(conn, emitCurrent);
 
-        subscription = conn
-          .subscriptionBuilder()
-          .onApplied(() => {
-            console.log("[backend] subscription applied disposed=%o", disposed);
-            if (disposed) return;
-            status = "connected";
-            message = "Live room joined.";
-            emitCurrent();
-            void conn.reducers
-              .joinWorld({ nickname: backendConfig.nickname })
-              .then(() => {
-                if (disposed) return;
-                joined = true;
-                emitCurrent();
-                flushPendingTransform();
-              })
-              .catch((error: unknown) => {
-                if (!disposed) {
-                  status = "error";
-                  message = errorMessage(error, "Failed to join room");
+          subscription = conn
+            .subscriptionBuilder()
+            .onApplied(() => {
+              console.log("[backend] subscription applied disposed=%o", disposed);
+              if (disposed) return;
+              status = "connected";
+              message = viewer ? "Viewing room." : "Live room joined.";
+              emitCurrent();
+              // Viewers only watch: subscribe to the room's chat (read-only) but never
+              // join, never heartbeat — they hold no player_session.
+              if (viewer) {
+                ensureChatSubscription(conn);
+                return;
+              }
+              void conn.reducers
+                .joinWorld({ nickname: backendConfig.nickname })
+                .then(() => {
+                  if (disposed) return;
+                  joined = true;
+                  ensureChatSubscription(conn);
                   emitCurrent();
-                }
-              });
-            heartbeatId = window.setInterval(() => {
-              void conn.reducers.heartbeatPlayer({}).catch(() => {
-                if (!disposed) {
-                  status = "disconnected";
-                  message = "Heartbeat failed.";
-                  emitCurrent();
-                }
-              });
-            }, heartbeatMs);
-          })
-          .onError((ctx) => {
-            console.error("[backend] subscription onError", ctx.event);
-            if (disposed) return;
-            status = "error";
-            message = errorMessage(ctx.event, "Room subscription failed");
-            emitCurrent();
-          })
-          .subscribe([
-            "SELECT * FROM world",
-            "SELECT * FROM ai_job",
-            "SELECT * FROM player_session",
-            "SELECT * FROM world_object",
-            "SELECT * FROM world_snapshot",
-            "SELECT * FROM snapshot_object",
-          ]);
-      })
-      .onConnectError((_ctx, error) => {
-        console.error("[backend] onConnectError", error);
-        if (disposed) return;
-        status = "error";
-        message = errorMessage(error, "Backend connection failed");
-        emitCurrent();
-      })
-      .onDisconnect((_ctx, error) => {
-        console.warn("[backend] onDisconnect", error);
-        if (disposed) return;
-        status = "disconnected";
-        message = errorMessage(error, "Backend disconnected");
-        emitCurrent();
-      })
-      .build();
-    console.log("[backend] DbConnection.build() returned (async connect in progress)");
-  } catch (error) {
-    console.error("[backend] DbConnection.build() threw synchronously:", error);
-    status = "error";
-    message = errorMessage(error, "Backend connection failed");
-    emitCurrent();
+                  flushPendingTransform();
+                })
+                .catch((error: unknown) => {
+                  if (!disposed) {
+                    status = "error";
+                    message = errorMessage(error, "Failed to join room");
+                    emitCurrent();
+                  }
+                });
+              heartbeatId = window.setInterval(() => {
+                void conn.reducers.heartbeatPlayer({}).catch(() => {
+                  if (!disposed) {
+                    status = "disconnected";
+                    message = "Heartbeat failed.";
+                    emitCurrent();
+                  }
+                });
+              }, heartbeatMs);
+            })
+            .onError((ctx) => {
+              console.error("[backend] subscription onError", ctx.event);
+              if (disposed) return;
+              status = "error";
+              message = errorMessage(ctx.event, "Room subscription failed");
+              emitCurrent();
+            })
+            .subscribe([
+              "SELECT * FROM world",
+              "SELECT * FROM ai_job",
+              "SELECT * FROM player_session",
+              "SELECT * FROM player_avatar",
+              "SELECT * FROM world_object",
+              "SELECT * FROM world_snapshot",
+              "SELECT * FROM snapshot_object",
+            ]);
+        })
+        .onConnectError((_ctx, error) => {
+          console.error("[backend] onConnectError", error);
+          if (disposed) return;
+          // Stale token from a server reset — clear it and reload for a fresh identity.
+          if (String(error).includes("Failed to verify token")) {
+            clearToken();
+            window.location.reload();
+            return;
+          }
+          scheduleReconnect();
+        })
+        .onDisconnect((_ctx, error) => {
+          console.warn("[backend] onDisconnect", error);
+          if (disposed) return;
+          scheduleReconnect();
+        })
+        .build();
+      console.log("[backend] DbConnection.build() returned (async connect in progress)");
+    } catch (error) {
+      console.error("[backend] DbConnection.build() threw synchronously:", error);
+      scheduleReconnect();
+    }
   }
+
+  connect();
 
   return {
     getSnapshot: () => snapshot,
     dispose() {
       disposed = true;
-      if (heartbeatId !== null) {
-        window.clearInterval(heartbeatId);
-        heartbeatId = null;
+      if (retryTimeoutId !== null) {
+        window.clearTimeout(retryTimeoutId);
+        retryTimeoutId = null;
       }
       if (movementTimeoutId !== null) {
         window.clearTimeout(movementTimeoutId);
         movementTimeoutId = null;
       }
-      try {
-        subscription?.unsubscribe();
-      } catch {
-        // The SDK rejects double/unapplied unsubscribe calls; disposal should continue.
-      }
-      removeTableListeners?.();
+      teardownConnection();
       if (connection?.isActive) {
         void connection.reducers.leaveWorld({}).finally(() => connection?.disconnect());
       } else {
@@ -379,7 +495,9 @@ export function createBackendPresenceBridge({
       }
     },
     updateLocalTransform(transform: BackendPlayerTransform) {
-      if (disposed || !shouldQueueTransform(transform, lastQueuedTransform)) return;
+      // Viewers have no body to move; drop transforms rather than queue them.
+      if (disposed || viewer) return;
+      if (!shouldQueueTransform(transform, lastQueuedTransform)) return;
       lastQueuedTransform = cloneTransform(transform);
       pendingTransform = cloneTransform(transform);
 
@@ -395,6 +513,21 @@ export function createBackendPresenceBridge({
           flushPendingTransform();
         }, movementThrottleMs - elapsed);
       }
+    },
+    setAvatarSpec(input) {
+      return callLiveReducer("Avatar update rejected", (conn) =>
+        conn.reducers.setAvatarSpec(input),
+      );
+    },
+    sendChat(body) {
+      return callLiveReducer("Chat message rejected", (conn) =>
+        conn.reducers.sendChatMessage({ body }),
+      );
+    },
+    deleteChatMessage(messageId) {
+      return callLiveReducer("Chat delete rejected", (conn) =>
+        conn.reducers.deleteChatMessage({ messageId: BigInt(messageId) }),
+      );
     },
     requestCreateObject(input) {
       return callLiveReducer("Create request rejected", (conn) =>
@@ -446,6 +579,11 @@ export function createBackendPresenceBridge({
         conn.reducers.expireCooldown(input),
       );
     },
+    submitObjectFeedback(input) {
+      return callLiveReducer("Feedback submit rejected", (conn) =>
+        conn.reducers.submitObjectFeedback(input),
+      );
+    },
     failAiJob(input) {
       return callLiveReducer("AI job failure rejected", (conn) =>
         conn.reducers.failAiJob(input),
@@ -486,8 +624,42 @@ export function createBackendPresenceBridge({
     if (snapshot.players.some((player) => player.isLocal && player.presenceState === "active")) {
       joined = true;
     }
+    if (connection?.isActive && (joined || viewer)) {
+      ensureChatSubscription(connection);
+    }
     onSnapshot(snapshot);
     flushPendingTransform();
+  }
+
+  function ensureChatSubscription(conn: DbConnection) {
+    // Viewers have no player_session to derive a world from, so fall back to the
+    // default (first) world's chat — they read it but can't post.
+    const worldId =
+      findLocalPlayerWorldId(conn, localIdentityHex) ??
+      (viewer ? (first(conn.db.world.iter())?.worldId ?? null) : null);
+    if (worldId === null || chatSubscriptionWorldId === worldId) return;
+
+    try {
+      chatSubscription?.unsubscribe();
+    } catch {
+      // The SDK rejects double/unapplied unsubscribe calls; resubscribe should continue.
+    }
+
+    chatSubscriptionWorldId = worldId;
+    chatSubscription = conn
+      .subscriptionBuilder()
+      .onApplied(() => {
+        if (disposed) return;
+        emitCurrent();
+      })
+      .onError((ctx) => {
+        console.error("[backend] chat subscription onError", ctx.event);
+        if (disposed) return;
+        status = "error";
+        message = errorMessage(ctx.event, "Chat subscription failed");
+        emitCurrent();
+      })
+      .subscribe([`SELECT * FROM chat_message WHERE world_id = ${worldId.toString()}`]);
   }
 
   function flushPendingTransform() {
@@ -507,6 +679,9 @@ export function createBackendPresenceBridge({
     fallback: string,
     reducer: (conn: DbConnection) => Promise<unknown>,
   ) {
+    if (viewer) {
+      throw new Error("You're viewing only — add a Gemini key to take part.");
+    }
     if (disposed || !joined || !connection?.isActive) {
       throw new Error("Backend room is not ready yet.");
     }
@@ -536,6 +711,14 @@ function installTableListeners(connection: DbConnection, onChange: () => void) {
     () => onChange();
   const onPlayerUpdate: NonNullable<
     Parameters<NonNullable<typeof connection.db.playerSession.onUpdate>>[0]
+  > = () => onChange();
+
+  const onAvatarInsert: Parameters<typeof connection.db.playerAvatar.onInsert>[0] =
+    () => onChange();
+  const onAvatarDelete: Parameters<typeof connection.db.playerAvatar.onDelete>[0] =
+    () => onChange();
+  const onAvatarUpdate: NonNullable<
+    Parameters<NonNullable<typeof connection.db.playerAvatar.onUpdate>>[0]
   > = () => onChange();
 
   const onWorldInsert: Parameters<typeof connection.db.world.onInsert>[0] = () =>
@@ -570,6 +753,10 @@ function installTableListeners(connection: DbConnection, onChange: () => void) {
   const onSnapshotObjectUpdate: NonNullable<
     Parameters<NonNullable<typeof connection.db.snapshotObject.onUpdate>>[0]
   > = () => onChange();
+  const onChatMessageInsert: Parameters<typeof connection.db.chatMessage.onInsert>[0] =
+    () => onChange();
+  const onChatMessageDelete: Parameters<typeof connection.db.chatMessage.onDelete>[0] =
+    () => onChange();
 
   connection.db.aiJob.onInsert(onAiJobInsert);
   connection.db.aiJob.onDelete(onAiJobDelete);
@@ -577,6 +764,9 @@ function installTableListeners(connection: DbConnection, onChange: () => void) {
   connection.db.playerSession.onInsert(onPlayerInsert);
   connection.db.playerSession.onDelete(onPlayerDelete);
   connection.db.playerSession.onUpdate(onPlayerUpdate);
+  connection.db.playerAvatar.onInsert(onAvatarInsert);
+  connection.db.playerAvatar.onDelete(onAvatarDelete);
+  connection.db.playerAvatar.onUpdate(onAvatarUpdate);
   connection.db.world.onInsert(onWorldInsert);
   connection.db.world.onDelete(onWorldDelete);
   connection.db.world.onUpdate(onWorldUpdate);
@@ -589,6 +779,8 @@ function installTableListeners(connection: DbConnection, onChange: () => void) {
   connection.db.snapshotObject.onInsert(onSnapshotObjectInsert);
   connection.db.snapshotObject.onDelete(onSnapshotObjectDelete);
   connection.db.snapshotObject.onUpdate(onSnapshotObjectUpdate);
+  connection.db.chatMessage.onInsert(onChatMessageInsert);
+  connection.db.chatMessage.onDelete(onChatMessageDelete);
 
   return () => {
     connection.db.aiJob.removeOnInsert(onAiJobInsert);
@@ -597,6 +789,9 @@ function installTableListeners(connection: DbConnection, onChange: () => void) {
     connection.db.playerSession.removeOnInsert(onPlayerInsert);
     connection.db.playerSession.removeOnDelete(onPlayerDelete);
     connection.db.playerSession.removeOnUpdate(onPlayerUpdate);
+    connection.db.playerAvatar.removeOnInsert(onAvatarInsert);
+    connection.db.playerAvatar.removeOnDelete(onAvatarDelete);
+    connection.db.playerAvatar.removeOnUpdate(onAvatarUpdate);
     connection.db.world.removeOnInsert(onWorldInsert);
     connection.db.world.removeOnDelete(onWorldDelete);
     connection.db.world.removeOnUpdate(onWorldUpdate);
@@ -609,6 +804,8 @@ function installTableListeners(connection: DbConnection, onChange: () => void) {
     connection.db.snapshotObject.removeOnInsert(onSnapshotObjectInsert);
     connection.db.snapshotObject.removeOnDelete(onSnapshotObjectDelete);
     connection.db.snapshotObject.removeOnUpdate(onSnapshotObjectUpdate);
+    connection.db.chatMessage.removeOnInsert(onChatMessageInsert);
+    connection.db.chatMessage.removeOnDelete(onChatMessageDelete);
   };
 }
 
@@ -652,10 +849,17 @@ function readSnapshotFromConnection({
         .filter((object) => object.worldId === world.worldId)
         .sort(compareSnapshotObjects)
     : [];
+  const chatMessages = world
+    ? Array.from(connection.db.chatMessage.iter())
+        .filter((message) => message.worldId === world.worldId)
+        .sort(compareChatMessages)
+        .map((message) => mapChatMessage(message, localIdentityHex))
+    : [];
   const players = Array.from(connection.db.playerSession.iter())
     .filter((player) => !world || player.worldId === world.worldId)
     .sort(comparePlayers)
     .map((player) => mapPlayer(player, localIdentityHex));
+  const avatars = Array.from(connection.db.playerAvatar.iter()).map(mapAvatar);
   const authorityWorld = world ? mapBackendAuthorityWorld(world, worldObjects) : null;
   const archiveAuthorityWorld = world
     ? mapBackendArchiveAuthorityWorld(world, worldSnapshots[0] ?? null, snapshotObjects)
@@ -669,13 +873,25 @@ function readSnapshotFromConnection({
     onlineCount: players.filter((player) => player.presenceState === "active").length,
     world: world ? mapWorld(world) : null,
     players,
+    avatars,
     authorityWorld,
     archiveAuthorityWorld,
     objectArtifacts: worldObjects.map(mapObjectArtifactDebug),
     aiJobs: aiJobs.map(mapAiJobDebug),
     worldSnapshots: worldSnapshots.map(mapWorldSnapshotDebug),
     snapshotObjects: snapshotObjects.map(mapSnapshotObjectDebug),
+    chatMessages,
   };
+}
+
+function findLocalPlayerWorldId(connection: DbConnection, localIdentityHex: string | null) {
+  if (!localIdentityHex) return null;
+  for (const player of connection.db.playerSession.iter()) {
+    if (player.identity.toHexString() === localIdentityHex) {
+      return player.worldId;
+    }
+  }
+  return null;
 }
 
 function createBaseSnapshot({
@@ -697,12 +913,14 @@ function createBaseSnapshot({
     onlineCount: 0,
     world: null,
     players: [],
+    avatars: [],
     authorityWorld: null,
     archiveAuthorityWorld: null,
     objectArtifacts: [],
     aiJobs: [],
     worldSnapshots: [],
     snapshotObjects: [],
+    chatMessages: [],
   };
 }
 
@@ -752,6 +970,14 @@ function writeToken(token: string) {
   }
 }
 
+function clearToken() {
+  try {
+    window.localStorage.removeItem(tokenStorageKey);
+  } catch {
+    // ignore
+  }
+}
+
 function first<T>(iterator: Iterable<T>) {
   for (const item of iterator) {
     return item;
@@ -795,6 +1021,38 @@ function mapPlayer(
   };
 }
 
+function mapAvatar(avatar: PlayerAvatar): BackendAvatarPresence {
+  return {
+    id: avatar.identity.toHexString(),
+    voxelCoreJson: avatar.voxelCoreJson,
+    builderSpecJson: avatar.builderSpecJson,
+    scale: avatar.scale,
+    version: avatar.version,
+  };
+}
+
+function mapChatMessage(
+  message: ChatMessage,
+  localIdentityHex: string | null,
+): BackendChatMessage {
+  const senderId = message.senderIdentity.toHexString();
+  return {
+    id: message.messageId.toString(),
+    senderId,
+    senderNickname: message.senderNickname,
+    body: message.body,
+    // SpacetimeDB's Timestamp has no toString(); emit ISO 8601 (UTC) so ChatPanel can
+    // render a readable time and messages stay orderable by recency.
+    createdAt: timestampToIso(message.createdAt),
+    isLocal: localIdentityHex === senderId,
+  };
+}
+
+function compareChatMessages(a: ChatMessage, b: ChatMessage) {
+  // messageId is a u64 (bigint) autoInc — strictly increasing with send order.
+  return a.messageId < b.messageId ? -1 : a.messageId > b.messageId ? 1 : 0;
+}
+
 function mapObjectArtifactDebug(object: WorldObject): BackendObjectArtifactDebug {
   return {
     objectId: object.objectId,
@@ -814,10 +1072,22 @@ function mapAiJobDebug(job: AiJob): BackendAiJobDebug {
     jobType: job.jobType,
     status: job.status,
     sourcePrompt: job.sourcePrompt,
-    requestedAt: job.requestedAt.toString(),
-    completedAt: job.completedAt?.toString() ?? null,
+    // SpacetimeDB's Timestamp has no toString(); emit ISO 8601 (UTC) so these are
+    // both human-readable and lexicographically orderable by recency.
+    requestedAt: timestampToIso(job.requestedAt),
+    completedAt: job.completedAt ? timestampToIso(job.completedAt) : null,
     errorCode: job.errorCode ?? null,
   };
+}
+
+function timestampToIso(timestamp: AiJob["requestedAt"]): string {
+  try {
+    return timestamp.toISOString();
+  } catch {
+    // toISOString throws for timestamps outside JS Date's range; fall back to the
+    // raw microsecond count so the value is still present (if not orderable).
+    return timestamp.microsSinceUnixEpoch.toString();
+  }
 }
 
 function mapWorldSnapshotDebug(

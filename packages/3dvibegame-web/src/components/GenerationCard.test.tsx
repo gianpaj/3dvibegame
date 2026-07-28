@@ -30,6 +30,7 @@ function makeSnapshot(
     world: {} as AiSessionSnapshot["world"],
     stage,
     lastMessage: "status message",
+    stageEvents: [],
     object,
     availableActions,
   };
@@ -60,12 +61,15 @@ describe("GenerationCard", () => {
         snapshot={makeSnapshot("grace", allActions, fakeObject)}
         onDispatch={vi.fn()}
         onDelete={vi.fn()}
+        canDuplicate
+        onDuplicate={vi.fn()}
       />,
     );
     expect(screen.getByRole("button", { name: "Move" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rotate" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Scale ↑" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Scale ↓" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Duplicate" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Release to world" })).toBeInTheDocument();
   });
 
@@ -106,6 +110,23 @@ describe("GenerationCard", () => {
     expect(onDispatch).toHaveBeenCalledWith("rotate_draft");
   });
 
+  it("calls onDuplicate when the duplicate button is clicked", async () => {
+    const onDuplicate = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <GenerationCard
+        snapshot={makeSnapshot("released", allActions, fakeObject)}
+        onDispatch={vi.fn()}
+        onDelete={vi.fn()}
+        onDuplicate={onDuplicate}
+        canDuplicate
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Duplicate" }));
+    expect(onDuplicate).toHaveBeenCalledTimes(1);
+  });
+
   it("calls onDelete only after confirming in the modal", async () => {
     const onDelete = vi.fn();
     const user = userEvent.setup();
@@ -131,6 +152,38 @@ describe("GenerationCard", () => {
     await user.click(
       screen.getAllByRole("button", { name: "Delete" }).at(-1) as HTMLElement,
     );
+    expect(onDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens delete confirmation with the Delete key", async () => {
+    const user = userEvent.setup();
+    render(
+      <GenerationCard
+        snapshot={makeSnapshot("released", allActions, fakeObject)}
+        onDispatch={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    await user.keyboard("{Delete}");
+
+    expect(screen.getByText("Delete this object?")).toBeInTheDocument();
+  });
+
+  it("confirms delete with Enter while the modal is open", async () => {
+    const onDelete = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <GenerationCard
+        snapshot={makeSnapshot("released", allActions, fakeObject)}
+        onDispatch={vi.fn()}
+        onDelete={onDelete}
+      />,
+    );
+
+    await user.keyboard("{Delete}");
+    await user.keyboard("{Enter}");
+
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
 });

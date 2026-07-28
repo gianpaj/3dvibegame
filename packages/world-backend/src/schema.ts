@@ -223,14 +223,100 @@ export const SnapshotObject = table(
   },
 );
 
+export const ChatMessage = table(
+  {
+    name: "chat_message",
+    public: true,
+    indexes: [
+      {
+        name: "chat_message_world_id",
+        accessor: "byWorldId",
+        algorithm: "btree",
+        columns: ["worldId"],
+      },
+    ],
+  },
+  {
+    messageId: t.u64().primaryKey().autoInc(),
+    worldId: t.u64(),
+    senderIdentity: t.identity(),
+    // Denormalized so messages keep their author after the sender leaves the world.
+    senderNickname: t.string(),
+    body: t.string(),
+    createdAt: t.timestamp(),
+  },
+);
+
+// Player ratings (👍/👎) on an AI create/edit. Not `public`: submit-only, never
+// broadcast to clients. Each row snapshots the prompt + both spec JSONs + the model
+// and prompt version so a rating stays analysable even after the object is later
+// edited or deleted. Analysed offline via `spacetime sql`.
+export const ObjectFeedback = table(
+  {
+    name: "object_feedback",
+    indexes: [
+      {
+        name: "object_feedback_operation_id",
+        accessor: "byOperationId",
+        algorithm: "btree",
+        columns: ["operationId"],
+      },
+    ],
+  },
+  {
+    feedbackId: t.u64().primaryKey().autoInc(),
+    worldId: t.u64(),
+    objectId: t.string(),
+    objectVersion: t.u32(),
+    operationId: t.string(),
+    operation: t.string(),
+    rating: t.string(),
+    sourcePrompt: t.string(),
+    sourceSpecJson: t.string(),
+    builderSpecJson: t.string(),
+    modelId: t.string(),
+    promptVersion: t.string(),
+    playerIdentity: t.identity(),
+    playerNickname: t.string(),
+    createdAt: t.timestamp(),
+  },
+);
+
+// One row per player identity holding the voxel avatar body they prompt-created.
+// Kept separate from `PlayerSession` so the heavy spec JSON is not re-sent with the
+// 10 Hz `move_player` position updates, and so the body persists across sessions
+// (the anonymous identity persists in the client's localStorage).
+export const PlayerAvatar = table(
+  {
+    name: "player_avatar",
+    public: true,
+  },
+  {
+    identity: t.identity().primaryKey(),
+    voxelCoreJson: t.string(),
+    builderSpecJson: t.string(),
+    version: t.u32(),
+    updatedAt: t.timestamp(),
+    // Rendered size multiplier (1 = human height, up to 4). Added after the table
+    // shipped, so it must live at the END of the column list with a default value —
+    // SpacetimeDB only auto-migrates columns appended last and backfills existing
+    // rows from the default (1 = normal size). Inserting it mid-table would force a
+    // manual migration.
+    scale: t.f64().default(1),
+  },
+);
+
 const spacetimedb = schema({
   world: World,
   playerSession: PlayerSession,
+  playerAvatar: PlayerAvatar,
   aiJob: AiJob,
   worldObject: WorldObject,
   objectLock: ObjectLock,
   worldSnapshot: WorldSnapshot,
   snapshotObject: SnapshotObject,
+  chatMessage: ChatMessage,
+  objectFeedback: ObjectFeedback,
 });
 
 export default spacetimedb;

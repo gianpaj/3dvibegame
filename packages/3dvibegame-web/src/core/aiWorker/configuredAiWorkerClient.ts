@@ -42,7 +42,8 @@ export function createConfiguredAiWorkerClient({
   // In browser-gemini mode the browser always owns the Gemini call. When a worker
   // URL is set, the resulting plan is compiled on the worker (/compile); otherwise
   // it is compiled locally in the browser. Either way the key stays in the browser.
-  const browserGeminiClient = getBrowserGeminiApiKey
+  // Never create this client in http-worker mode even if a key happens to be present.
+  const browserGeminiClient = browserGeminiRequested && getBrowserGeminiApiKey
     ? workerUrl
       ? createBrowserGeminiHttpCompileClient({
           apiKey: getBrowserGeminiApiKey,
@@ -75,7 +76,26 @@ export function createConfiguredAiWorkerClient({
       }
       return fixtureClient.createDraft(input);
     },
-    createEdit: fixtureClient.createEdit,
+    createEdit(input) {
+      // Route edits the same way as creates: prefer the browser-Gemini client when a
+      // BYOK key is present, then the HTTP worker, then the fixture recipes. (The old
+      // fixture-only wiring made every live free-form edit throw "Fixture AI worker
+      // does not have that refine recipe".)
+      const hasBrowserGeminiKey = Boolean(getBrowserGeminiApiKey?.()?.trim());
+      if (browserGeminiClient && hasBrowserGeminiKey) {
+        return browserGeminiClient.createEdit(input);
+      }
+      if (browserGeminiRequested) {
+        throw new AiWorkerError("generation_failed", missingBrowserGeminiKeyMessage);
+      }
+      if (httpWorkerRequested) {
+        if (!httpClient) {
+          throw new Error("VITE_AI_CLIENT_MODE=http-worker requires VITE_AI_WORKER_URL.");
+        }
+        return httpClient.createEdit(input);
+      }
+      return fixtureClient.createEdit(input);
+    },
   };
 }
 
