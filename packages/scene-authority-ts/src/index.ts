@@ -6,3 +6,4 @@ export * from "./spec-template-cache";
 export * from "./voxel-contracts";
 export * from "./voxel-guards";
 export * from "./voxel-compiler";
+export * from "./builder-guards";
