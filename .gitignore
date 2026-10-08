@@ -3,3 +3,6 @@ dist/
 .env
 .tmp/
 .DS_Store
+# Private visual-quality data: feedback exports, curated imports, labels on
+# private prompts. Generated runs and reports live under .tmp/visual-quality/.
+evals/visual-quality/private/

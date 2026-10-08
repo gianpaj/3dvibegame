@@ -189,6 +189,28 @@ importers:
         specifier: ~5.6.2
         version: 5.6.3
 
+  scripts/visual-quality:
+    dependencies:
+      '@3dvibegame/scene-authority-ts':
+        specifier: workspace:*
+        version: link:../../packages/scene-authority-ts
+      zod:
+        specifier: ^4.1.8
+        version: 4.3.6
+    devDependencies:
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      tsx:
+        specifier: ^4.22.4
+        version: 4.22.4
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.6(@types/node@25.9.1)(jsdom@25.0.1)(tsx@4.22.4)
+
 packages:
 
   '@adobe/css-tools@4.5.0':

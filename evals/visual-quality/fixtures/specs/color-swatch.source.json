@@ -1,0 +1,163 @@
+{
+  "spec_version": "0.1",
+  "request_id": "vq_fixture_color_swatch",
+  "intent_id": "vq_fixture_color_swatch::intent_0",
+  "operation": "create",
+  "target_object_id": null,
+  "base_object_version": null,
+  "object_category": "swatch",
+  "size_tier": "medium",
+  "style_tags": [],
+  "behaviors": [],
+  "grid": {
+    "unit_meters": 0.5,
+    "up_axis": "y",
+    "rotation_step_degrees": 90
+  },
+  "placement": {
+    "mode": "absolute",
+    "reference_object": null,
+    "relation": null,
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "materials": [
+    {
+      "material_id": "red"
+    },
+    {
+      "material_id": "blue"
+    },
+    {
+      "material_id": "green"
+    },
+    {
+      "material_id": "yellow"
+    },
+    {
+      "material_id": "white"
+    },
+    {
+      "material_id": "black"
+    },
+    {
+      "material_id": "paint",
+      "color_hint": "#ff8800"
+    }
+  ],
+  "anchors": [],
+  "operations": [
+    {
+      "op_id": "block_red",
+      "kind": "add_box",
+      "position": [
+        0.0,
+        0,
+        0
+      ],
+      "size": [
+        2,
+        2,
+        2
+      ],
+      "material_id": "red"
+    },
+    {
+      "op_id": "block_blue",
+      "kind": "add_box",
+      "position": [
+        2.5,
+        0,
+        0
+      ],
+      "size": [
+        2,
+        2,
+        2
+      ],
+      "material_id": "blue"
+    },
+    {
+      "op_id": "block_green",
+      "kind": "add_box",
+      "position": [
+        5.0,
+        0,
+        0
+      ],
+      "size": [
+        2,
+        2,
+        2
+      ],
+      "material_id": "green"
+    },
+    {
+      "op_id": "block_yellow",
+      "kind": "add_box",
+      "position": [
+        7.5,
+        0,
+        0
+      ],
+      "size": [
+        2,
+        2,
+        2
+      ],
+      "material_id": "yellow"
+    },
+    {
+      "op_id": "block_white",
+      "kind": "add_box",
+      "position": [
+        10.0,
+        0,
+        0
+      ],
+      "size": [
+        2,
+        2,
+        2
+      ],
+      "material_id": "white"
+    },
+    {
+      "op_id": "block_black",
+      "kind": "add_box",
+      "position": [
+        12.5,
+        0,
+        0
+      ],
+      "size": [
+        2,
+        2,
+        2
+      ],
+      "material_id": "black"
+    },
+    {
+      "op_id": "block_paint",
+      "kind": "add_box",
+      "position": [
+        15.0,
+        0,
+        0
+      ],
+      "size": [
+        2,
+        2,
+        2
+      ],
+      "material_id": "paint"
+    }
+  ],
+  "compile_hints": {
+    "preferred_runtime": "primitive_parts"
+  },
+  "diagnostics": []
+}

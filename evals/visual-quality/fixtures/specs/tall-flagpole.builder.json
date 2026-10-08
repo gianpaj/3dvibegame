@@ -1,0 +1,95 @@
+{
+  "builder_version": "0.1",
+  "request_id": "vq_fixture_tall_flagpole",
+  "intent_id": "vq_fixture_tall_flagpole::intent_0",
+  "operation": "create",
+  "target_object_id": null,
+  "base_object_version": null,
+  "object_category": "flagpole",
+  "size_tier": "large",
+  "parts": [
+    {
+      "part_id": "pole",
+      "primitive": "cube",
+      "material": "white",
+      "dimensions": [
+        0.5,
+        10,
+        0.5
+      ],
+      "modifiers": [],
+      "local_position": [
+        0,
+        0,
+        0
+      ],
+      "local_rotation": [
+        0,
+        0,
+        0
+      ],
+      "local_scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "part_id": "flag",
+      "primitive": "cube",
+      "material": "blue",
+      "dimensions": [
+        2,
+        1.5,
+        0.5
+      ],
+      "modifiers": [],
+      "local_position": [
+        0.5,
+        8,
+        0
+      ],
+      "local_rotation": [
+        0,
+        0,
+        0
+      ],
+      "local_scale": [
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "instances": [
+    {
+      "instance_id": "instance_0",
+      "anchor_mode": "absolute",
+      "reference_object": null,
+      "relation": null,
+      "offset": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "attachments": [],
+  "materials": [
+    "white",
+    "blue"
+  ],
+  "behaviors": [],
+  "placement": {
+    "mode": "absolute",
+    "reference_object": null,
+    "relation": null,
+    "offset_meters": null
+  },
+  "complexity": {
+    "part_count": 2,
+    "instance_count": 1,
+    "behavior_count": 0
+  },
+  "diagnostics": []
+}

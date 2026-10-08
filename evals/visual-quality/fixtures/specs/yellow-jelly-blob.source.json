@@ -1,0 +1,64 @@
+{
+  "spec_version": "0.1",
+  "request_id": "vq_fixture_yellow_jelly_blob",
+  "intent_id": "vq_fixture_yellow_jelly_blob::intent_0",
+  "operation": "create",
+  "target_object_id": null,
+  "base_object_version": null,
+  "object_category": "blob",
+  "size_tier": "small",
+  "style_tags": [
+    "jelly"
+  ],
+  "behaviors": [],
+  "grid": {
+    "unit_meters": 0.5,
+    "up_axis": "y",
+    "rotation_step_degrees": 90
+  },
+  "placement": {
+    "mode": "absolute",
+    "reference_object": null,
+    "relation": null,
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "materials": [
+    {
+      "material_id": "jelly",
+      "color_hint": "yellow"
+    }
+  ],
+  "anchors": [],
+  "operations": [
+    {
+      "op_id": "body",
+      "kind": "add_sphere",
+      "center": [
+        0,
+        2,
+        0
+      ],
+      "radius": 2,
+      "material_id": "jelly"
+    },
+    {
+      "op_id": "top",
+      "kind": "add_sphere",
+      "center": [
+        0,
+        3.5,
+        0
+      ],
+      "radius": 1,
+      "material_id": "jelly"
+    }
+  ],
+  "compile_hints": {
+    "preferred_runtime": "primitive_parts"
+  },
+  "diagnostics": []
+}

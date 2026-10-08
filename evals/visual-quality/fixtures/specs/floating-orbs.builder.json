@@ -1,0 +1,173 @@
+{
+  "builder_version": "0.1",
+  "request_id": "vq_fixture_floating_orbs",
+  "intent_id": "vq_fixture_floating_orbs::intent_0",
+  "operation": "create",
+  "target_object_id": null,
+  "base_object_version": null,
+  "object_category": "sculpture",
+  "size_tier": "medium",
+  "parts": [
+    {
+      "part_id": "core",
+      "primitive": "blob",
+      "material": "void",
+      "dimensions": [
+        1.5,
+        1.5,
+        1.5
+      ],
+      "modifiers": [],
+      "local_position": [
+        0,
+        2,
+        0
+      ],
+      "local_rotation": [
+        0,
+        0,
+        0
+      ],
+      "local_scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "part_id": "orb_0",
+      "primitive": "blob",
+      "material": "neon",
+      "dimensions": [
+        0.6,
+        0.6,
+        0.6
+      ],
+      "modifiers": [],
+      "local_position": [
+        2,
+        2,
+        0
+      ],
+      "local_rotation": [
+        0,
+        0,
+        0
+      ],
+      "local_scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "part_id": "orb_1",
+      "primitive": "blob",
+      "material": "neon",
+      "dimensions": [
+        0.6,
+        0.6,
+        0.6
+      ],
+      "modifiers": [],
+      "local_position": [
+        -2,
+        2,
+        0
+      ],
+      "local_rotation": [
+        0,
+        0,
+        0
+      ],
+      "local_scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "part_id": "orb_2",
+      "primitive": "blob",
+      "material": "neon",
+      "dimensions": [
+        0.6,
+        0.6,
+        0.6
+      ],
+      "modifiers": [],
+      "local_position": [
+        0,
+        2,
+        2
+      ],
+      "local_rotation": [
+        0,
+        0,
+        0
+      ],
+      "local_scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "part_id": "orb_3",
+      "primitive": "blob",
+      "material": "neon",
+      "dimensions": [
+        0.6,
+        0.6,
+        0.6
+      ],
+      "modifiers": [],
+      "local_position": [
+        0,
+        2,
+        -2
+      ],
+      "local_rotation": [
+        0,
+        0,
+        0
+      ],
+      "local_scale": [
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "instances": [
+    {
+      "instance_id": "instance_0",
+      "anchor_mode": "absolute",
+      "reference_object": null,
+      "relation": null,
+      "offset": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "attachments": [],
+  "materials": [
+    "void",
+    "neon"
+  ],
+  "behaviors": [],
+  "placement": {
+    "mode": "absolute",
+    "reference_object": null,
+    "relation": null,
+    "offset_meters": null
+  },
+  "complexity": {
+    "part_count": 5,
+    "instance_count": 1,
+    "behavior_count": 0
+  },
+  "diagnostics": []
+}

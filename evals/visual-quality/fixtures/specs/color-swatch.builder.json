@@ -1,0 +1,230 @@
+{
+  "builder_version": "0.1",
+  "request_id": "vq_fixture_color_swatch",
+  "intent_id": "vq_fixture_color_swatch::intent_0",
+  "operation": "create",
+  "target_object_id": null,
+  "base_object_version": null,
+  "object_category": "swatch",
+  "size_tier": "medium",
+  "parts": [
+    {
+      "part_id": "block_red",
+      "primitive": "cube",
+      "material": "red",
+      "dimensions": [
+        1,
+        1,
+        1
+      ],
+      "modifiers": [],
+      "local_position": [
+        0,
+        0,
+        0
+      ],
+      "local_rotation": [
+        0,
+        0,
+        0
+      ],
+      "local_scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "part_id": "block_blue",
+      "primitive": "cube",
+      "material": "blue",
+      "dimensions": [
+        1,
+        1,
+        1
+      ],
+      "modifiers": [],
+      "local_position": [
+        1.25,
+        0,
+        0
+      ],
+      "local_rotation": [
+        0,
+        0,
+        0
+      ],
+      "local_scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "part_id": "block_green",
+      "primitive": "cube",
+      "material": "green",
+      "dimensions": [
+        1,
+        1,
+        1
+      ],
+      "modifiers": [],
+      "local_position": [
+        2.5,
+        0,
+        0
+      ],
+      "local_rotation": [
+        0,
+        0,
+        0
+      ],
+      "local_scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "part_id": "block_yellow",
+      "primitive": "cube",
+      "material": "yellow",
+      "dimensions": [
+        1,
+        1,
+        1
+      ],
+      "modifiers": [],
+      "local_position": [
+        3.75,
+        0,
+        0
+      ],
+      "local_rotation": [
+        0,
+        0,
+        0
+      ],
+      "local_scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "part_id": "block_white",
+      "primitive": "cube",
+      "material": "white",
+      "dimensions": [
+        1,
+        1,
+        1
+      ],
+      "modifiers": [],
+      "local_position": [
+        5,
+        0,
+        0
+      ],
+      "local_rotation": [
+        0,
+        0,
+        0
+      ],
+      "local_scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "part_id": "block_black",
+      "primitive": "cube",
+      "material": "black",
+      "dimensions": [
+        1,
+        1,
+        1
+      ],
+      "modifiers": [],
+      "local_position": [
+        6.25,
+        0,
+        0
+      ],
+      "local_rotation": [
+        0,
+        0,
+        0
+      ],
+      "local_scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "part_id": "block_paint",
+      "primitive": "cube",
+      "material": "#ff8800",
+      "dimensions": [
+        1,
+        1,
+        1
+      ],
+      "modifiers": [],
+      "local_position": [
+        7.5,
+        0,
+        0
+      ],
+      "local_rotation": [
+        0,
+        0,
+        0
+      ],
+      "local_scale": [
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "instances": [
+    {
+      "instance_id": "instance_0",
+      "anchor_mode": "absolute",
+      "reference_object": null,
+      "relation": null,
+      "offset": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "attachments": [],
+  "materials": [
+    "red",
+    "blue",
+    "green",
+    "yellow",
+    "white",
+    "black",
+    "#ff8800"
+  ],
+  "behaviors": [],
+  "placement": {
+    "mode": "absolute",
+    "reference_object": null,
+    "relation": null,
+    "offset_meters": null
+  },
+  "complexity": {
+    "part_count": 7,
+    "instance_count": 1,
+    "behavior_count": 0
+  },
+  "diagnostics": []
+}

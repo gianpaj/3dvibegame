@@ -1,0 +1,99 @@
+{
+  "spec_version": "0.1",
+  "request_id": "vq_fixture_floating_orbs",
+  "intent_id": "vq_fixture_floating_orbs::intent_0",
+  "operation": "create",
+  "target_object_id": null,
+  "base_object_version": null,
+  "object_category": "sculpture",
+  "size_tier": "medium",
+  "style_tags": [
+    "abstract"
+  ],
+  "behaviors": [],
+  "grid": {
+    "unit_meters": 0.5,
+    "up_axis": "y",
+    "rotation_step_degrees": 90
+  },
+  "placement": {
+    "mode": "absolute",
+    "reference_object": null,
+    "relation": null,
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "materials": [
+    {
+      "material_id": "neon"
+    },
+    {
+      "material_id": "void"
+    }
+  ],
+  "anchors": [],
+  "operations": [
+    {
+      "op_id": "core",
+      "kind": "add_sphere",
+      "center": [
+        0,
+        4,
+        0
+      ],
+      "radius": 1.5,
+      "material_id": "void"
+    },
+    {
+      "op_id": "orb_0",
+      "kind": "add_sphere",
+      "center": [
+        4,
+        4,
+        0
+      ],
+      "radius": 0.6,
+      "material_id": "neon"
+    },
+    {
+      "op_id": "orb_1",
+      "kind": "add_sphere",
+      "center": [
+        -4,
+        4,
+        0
+      ],
+      "radius": 0.6,
+      "material_id": "neon"
+    },
+    {
+      "op_id": "orb_2",
+      "kind": "add_sphere",
+      "center": [
+        0,
+        4,
+        4
+      ],
+      "radius": 0.6,
+      "material_id": "neon"
+    },
+    {
+      "op_id": "orb_3",
+      "kind": "add_sphere",
+      "center": [
+        0,
+        4,
+        -4
+      ],
+      "radius": 0.6,
+      "material_id": "neon"
+    }
+  ],
+  "compile_hints": {
+    "preferred_runtime": "primitive_parts"
+  },
+  "diagnostics": []
+}

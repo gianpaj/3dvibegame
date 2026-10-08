@@ -13,6 +13,8 @@
     "web:dev": "pnpm --filter @3dvibegame/3dvibegame-web dev",
     "web:build": "pnpm --filter @3dvibegame/3dvibegame-web build",
     "web:test": "pnpm --filter @3dvibegame/3dvibegame-web test",
-    "typecheck": "pnpm -r --filter @3dvibegame/ai-planning --filter @3dvibegame/ai-worker --filter @3dvibegame/scene-runtime-ts --filter @3dvibegame/scene-authority-ts --filter @3dvibegame/scene-runtime-demo --filter @3dvibegame/3dvibegame-web --filter @3dvibegame/world-backend typecheck"
+    "vq": "pnpm --silent --filter @3dvibegame/visual-quality vq",
+    "vq:test": "pnpm --filter @3dvibegame/visual-quality test",
+    "typecheck": "pnpm -r --filter @3dvibegame/ai-planning --filter @3dvibegame/ai-worker --filter @3dvibegame/scene-runtime-ts --filter @3dvibegame/scene-authority-ts --filter @3dvibegame/scene-runtime-demo --filter @3dvibegame/3dvibegame-web --filter @3dvibegame/world-backend --filter @3dvibegame/visual-quality typecheck"
   }
 }

@@ -1,0 +1,73 @@
+{
+  "spec_version": "0.1",
+  "request_id": "vq_fixture_tall_flagpole",
+  "intent_id": "vq_fixture_tall_flagpole::intent_0",
+  "operation": "create",
+  "target_object_id": null,
+  "base_object_version": null,
+  "object_category": "flagpole",
+  "size_tier": "large",
+  "style_tags": [],
+  "behaviors": [],
+  "grid": {
+    "unit_meters": 0.5,
+    "up_axis": "y",
+    "rotation_step_degrees": 90
+  },
+  "placement": {
+    "mode": "absolute",
+    "reference_object": null,
+    "relation": null,
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "materials": [
+    {
+      "material_id": "white"
+    },
+    {
+      "material_id": "cloth",
+      "color_hint": "blue"
+    }
+  ],
+  "anchors": [],
+  "operations": [
+    {
+      "op_id": "pole",
+      "kind": "add_box",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "size": [
+        1,
+        20,
+        1
+      ],
+      "material_id": "white"
+    },
+    {
+      "op_id": "flag",
+      "kind": "add_box",
+      "position": [
+        1,
+        16,
+        0
+      ],
+      "size": [
+        4,
+        3,
+        1
+      ],
+      "material_id": "cloth"
+    }
+  ],
+  "compile_hints": {
+    "preferred_runtime": "primitive_parts"
+  },
+  "diagnostics": []
+}

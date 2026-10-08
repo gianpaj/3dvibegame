@@ -1,0 +1,94 @@
+{
+  "builder_version": "0.1",
+  "request_id": "vq_fixture_yellow_jelly_blob",
+  "intent_id": "vq_fixture_yellow_jelly_blob::intent_0",
+  "operation": "create",
+  "target_object_id": null,
+  "base_object_version": null,
+  "object_category": "blob",
+  "size_tier": "small",
+  "parts": [
+    {
+      "part_id": "body",
+      "primitive": "blob",
+      "material": "yellow",
+      "dimensions": [
+        2,
+        2,
+        2
+      ],
+      "modifiers": [],
+      "local_position": [
+        0,
+        1,
+        0
+      ],
+      "local_rotation": [
+        0,
+        0,
+        0
+      ],
+      "local_scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "part_id": "top",
+      "primitive": "blob",
+      "material": "yellow",
+      "dimensions": [
+        1,
+        1,
+        1
+      ],
+      "modifiers": [],
+      "local_position": [
+        0,
+        1.75,
+        0
+      ],
+      "local_rotation": [
+        0,
+        0,
+        0
+      ],
+      "local_scale": [
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "instances": [
+    {
+      "instance_id": "instance_0",
+      "anchor_mode": "absolute",
+      "reference_object": null,
+      "relation": null,
+      "offset": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "attachments": [],
+  "materials": [
+    "yellow"
+  ],
+  "behaviors": [],
+  "placement": {
+    "mode": "absolute",
+    "reference_object": null,
+    "relation": null,
+    "offset_meters": null
+  },
+  "complexity": {
+    "part_count": 2,
+    "instance_count": 1,
+    "behavior_count": 0
+  },
+  "diagnostics": []
+}

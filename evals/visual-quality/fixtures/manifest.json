@@ -1,0 +1,411 @@
+{
+  "format": "vq-dataset/v1",
+  "dataset_id": "synthetic-fixtures",
+  "description": "Synthetic artifacts that exercise validation, capture and reporting. Scores on these say nothing about judge accuracy.",
+  "samples": [
+    {
+      "sample_id": "pine-tree",
+      "prompt_family_id": "tree",
+      "split": "development",
+      "sample_type": "single_object_create",
+      "prompt": "a pine tree",
+      "builder_spec_path": "specs/pine-tree.builder.json",
+      "source_spec_path": "specs/pine-tree.source.json",
+      "quantity": 1,
+      "generator": {
+        "model_id": "synthetic-fixture",
+        "prompt_version": "fixture-v1"
+      },
+      "provenance": {
+        "kind": "curated_fixture",
+        "note": "Synthetic harness fixture; not calibration evidence."
+      },
+      "visual_attributes_applicable": false,
+      "fixture_expectation": "valid"
+    },
+    {
+      "sample_id": "yellow-jelly-blob",
+      "prompt_family_id": "jelly-blob",
+      "split": "development",
+      "sample_type": "single_object_create",
+      "prompt": "a yellow jelly blob",
+      "builder_spec_path": "specs/yellow-jelly-blob.builder.json",
+      "source_spec_path": "specs/yellow-jelly-blob.source.json",
+      "quantity": 1,
+      "generator": {
+        "model_id": "synthetic-fixture",
+        "prompt_version": "fixture-v1"
+      },
+      "provenance": {
+        "kind": "curated_fixture",
+        "note": "Synthetic harness fixture; not calibration evidence."
+      },
+      "visual_attributes_applicable": true,
+      "fixture_expectation": "valid"
+    },
+    {
+      "sample_id": "color-swatch",
+      "prompt_family_id": "color-swatch",
+      "split": "development",
+      "sample_type": "single_object_create",
+      "prompt": "a row of seven blocks colored red, blue, green, yellow, white, black and orange",
+      "builder_spec_path": "specs/color-swatch.builder.json",
+      "source_spec_path": "specs/color-swatch.source.json",
+      "quantity": 1,
+      "generator": {
+        "model_id": "synthetic-fixture",
+        "prompt_version": "fixture-v1"
+      },
+      "provenance": {
+        "kind": "curated_fixture",
+        "note": "Synthetic harness fixture; not calibration evidence."
+      },
+      "visual_attributes_applicable": true,
+      "fixture_expectation": "valid"
+    },
+    {
+      "sample_id": "barrel-triangle",
+      "prompt_family_id": "barrel",
+      "split": "development",
+      "sample_type": "single_object_create",
+      "prompt": "red barrels stacked in a triangle",
+      "builder_spec_path": "specs/barrel-triangle.builder.json",
+      "source_spec_path": "specs/barrel-triangle.source.json",
+      "quantity": 1,
+      "generator": {
+        "model_id": "synthetic-fixture",
+        "prompt_version": "fixture-v1"
+      },
+      "provenance": {
+        "kind": "curated_fixture",
+        "note": "Synthetic harness fixture; not calibration evidence."
+      },
+      "visual_attributes_applicable": true,
+      "fixture_expectation": "valid"
+    },
+    {
+      "sample_id": "tall-flagpole",
+      "prompt_family_id": "flagpole",
+      "split": "holdout",
+      "sample_type": "single_object_create",
+      "prompt": "a very tall white flagpole with a blue flag",
+      "builder_spec_path": "specs/tall-flagpole.builder.json",
+      "source_spec_path": "specs/tall-flagpole.source.json",
+      "quantity": 1,
+      "generator": {
+        "model_id": "synthetic-fixture",
+        "prompt_version": "fixture-v1"
+      },
+      "provenance": {
+        "kind": "curated_fixture",
+        "note": "Synthetic harness fixture; not calibration evidence."
+      },
+      "visual_attributes_applicable": true,
+      "fixture_expectation": "valid"
+    },
+    {
+      "sample_id": "flat-rug",
+      "prompt_family_id": "rug",
+      "split": "holdout",
+      "sample_type": "single_object_create",
+      "prompt": "a wide flat red rug with a yellow stripe",
+      "builder_spec_path": "specs/flat-rug.builder.json",
+      "source_spec_path": "specs/flat-rug.source.json",
+      "quantity": 1,
+      "generator": {
+        "model_id": "synthetic-fixture",
+        "prompt_version": "fixture-v1"
+      },
+      "provenance": {
+        "kind": "curated_fixture",
+        "note": "Synthetic harness fixture; not calibration evidence."
+      },
+      "visual_attributes_applicable": true,
+      "fixture_expectation": "valid"
+    },
+    {
+      "sample_id": "floating-orbs",
+      "prompt_family_id": "abstract-sculpture",
+      "split": "holdout",
+      "sample_type": "single_object_create",
+      "prompt": "an abstract sculpture: a dark core with four glowing orbs floating around it",
+      "builder_spec_path": "specs/floating-orbs.builder.json",
+      "source_spec_path": "specs/floating-orbs.source.json",
+      "quantity": 1,
+      "generator": {
+        "model_id": "synthetic-fixture",
+        "prompt_version": "fixture-v1"
+      },
+      "provenance": {
+        "kind": "curated_fixture",
+        "note": "Synthetic harness fixture; not calibration evidence."
+      },
+      "visual_attributes_applicable": true,
+      "fixture_expectation": "valid"
+    },
+    {
+      "sample_id": "malformed-dimensions",
+      "prompt_family_id": "tree",
+      "split": "development",
+      "sample_type": "single_object_create",
+      "prompt": "a pine tree",
+      "source_spec_path": "specs/pine-tree.source.json",
+      "quantity": 1,
+      "generator": {
+        "model_id": "synthetic-fixture",
+        "prompt_version": "fixture-v1"
+      },
+      "provenance": {
+        "kind": "curated_fixture",
+        "note": "Synthetic harness fixture; not calibration evidence."
+      },
+      "visual_attributes_applicable": false,
+      "fixture_expectation": "input_invalid:malformed",
+      "builder_spec": {
+        "builder_version": "0.1",
+        "request_id": "add_pine_tree_left_of_cabin_001::prompt_0",
+        "intent_id": "add_pine_tree_left_of_cabin_001::prompt_0::intent_0",
+        "operation": "create",
+        "target_object_id": null,
+        "base_object_version": null,
+        "object_category": "tree",
+        "size_tier": "medium",
+        "parts": [
+          {
+            "part_id": "trunk",
+            "primitive": "column",
+            "material": "wood",
+            "dimensions": [
+              1,
+              "tall"
+            ],
+            "modifiers": [
+              "pine",
+              "trunk"
+            ],
+            "local_position": [
+              0,
+              1,
+              0
+            ],
+            "local_rotation": [
+              0,
+              0,
+              0
+            ],
+            "local_scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          {
+            "part_id": "canopy",
+            "primitive": "blob",
+            "material": "moss_stone",
+            "dimensions": [
+              2,
+              2,
+              2
+            ],
+            "modifiers": [
+              "pine",
+              "canopy"
+            ],
+            "local_position": [
+              0,
+              2.5,
+              0
+            ],
+            "local_rotation": [
+              0,
+              0,
+              0
+            ],
+            "local_scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        ],
+        "instances": [
+          {
+            "instance_id": "instance_0",
+            "anchor_mode": "relative",
+            "reference_object": "cabin_1",
+            "relation": "left_of",
+            "offset": [
+              3,
+              0,
+              0
+            ]
+          }
+        ],
+        "attachments": [],
+        "materials": [
+          "wood",
+          "moss_stone"
+        ],
+        "behaviors": [],
+        "placement": {
+          "mode": "relative",
+          "reference_object": "cabin_1",
+          "relation": "left_of",
+          "offset_meters": 3
+        },
+        "complexity": {
+          "part_count": 2,
+          "instance_count": 1,
+          "behavior_count": 0
+        },
+        "diagnostics": []
+      }
+    },
+    {
+      "sample_id": "empty-geometry",
+      "prompt_family_id": "tree",
+      "split": "development",
+      "sample_type": "single_object_create",
+      "prompt": "a pine tree",
+      "source_spec_path": "specs/pine-tree.source.json",
+      "quantity": 1,
+      "generator": {
+        "model_id": "synthetic-fixture",
+        "prompt_version": "fixture-v1"
+      },
+      "provenance": {
+        "kind": "curated_fixture",
+        "note": "Synthetic harness fixture; not calibration evidence."
+      },
+      "visual_attributes_applicable": false,
+      "fixture_expectation": "input_invalid:artifact_failure",
+      "builder_spec": {
+        "builder_version": "0.1",
+        "request_id": "add_pine_tree_left_of_cabin_001::prompt_0",
+        "intent_id": "add_pine_tree_left_of_cabin_001::prompt_0::intent_0",
+        "operation": "create",
+        "target_object_id": null,
+        "base_object_version": null,
+        "object_category": "tree",
+        "size_tier": "medium",
+        "parts": [],
+        "instances": [
+          {
+            "instance_id": "instance_0",
+            "anchor_mode": "relative",
+            "reference_object": "cabin_1",
+            "relation": "left_of",
+            "offset": [
+              3,
+              0,
+              0
+            ]
+          }
+        ],
+        "attachments": [],
+        "materials": [
+          "wood",
+          "moss_stone"
+        ],
+        "behaviors": [],
+        "placement": {
+          "mode": "relative",
+          "reference_object": "cabin_1",
+          "relation": "left_of",
+          "offset_meters": 3
+        },
+        "complexity": {
+          "part_count": 0,
+          "instance_count": 1,
+          "behavior_count": 0
+        },
+        "diagnostics": []
+      }
+    },
+    {
+      "sample_id": "edit-request",
+      "prompt_family_id": "tree",
+      "split": "development",
+      "sample_type": "object_edit",
+      "prompt": "make the canopy glow",
+      "builder_spec_path": "specs/pine-tree-edit.builder.json",
+      "source_spec_path": "specs/pine-tree-edit.source.json",
+      "quantity": 1,
+      "generator": {
+        "model_id": "synthetic-fixture",
+        "prompt_version": "fixture-v1"
+      },
+      "provenance": {
+        "kind": "curated_fixture",
+        "note": "Synthetic harness fixture; not calibration evidence."
+      },
+      "visual_attributes_applicable": true,
+      "fixture_expectation": "input_invalid:unsupported"
+    },
+    {
+      "sample_id": "multi-object-request",
+      "prompt_family_id": "barrel",
+      "split": "development",
+      "sample_type": "single_object_create",
+      "prompt": "three wooden barrels",
+      "builder_spec_path": "specs/barrel-triangle.builder.json",
+      "generator": {
+        "model_id": "synthetic-fixture",
+        "prompt_version": "fixture-v1"
+      },
+      "provenance": {
+        "kind": "curated_fixture",
+        "note": "Synthetic harness fixture; not calibration evidence."
+      },
+      "visual_attributes_applicable": true,
+      "fixture_expectation": "input_invalid:unsupported",
+      "source_spec": {
+        "object_category": "barrel",
+        "size_tier": "small",
+        "materials": [
+          {
+            "material_id": "wood"
+          }
+        ],
+        "operations": [
+          {
+            "op_id": "body",
+            "kind": "add_box",
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "size": [
+              2,
+              3,
+              2
+            ],
+            "material_id": "wood"
+          }
+        ],
+        "quantity": 3
+      }
+    },
+    {
+      "sample_id": "scope-unknown",
+      "prompt_family_id": "jelly-blob",
+      "split": "development",
+      "sample_type": "single_object_create",
+      "prompt": "a yellow jelly blob",
+      "builder_spec_path": "specs/yellow-jelly-blob.builder.json",
+      "source_spec_path": "specs/yellow-jelly-blob.source.json",
+      "generator": {
+        "model_id": "synthetic-fixture",
+        "prompt_version": "fixture-v1"
+      },
+      "provenance": {
+        "kind": "curated_fixture",
+        "note": "Synthetic harness fixture; not calibration evidence."
+      },
+      "visual_attributes_applicable": true,
+      "fixture_expectation": "input_invalid:needs_curation"
+    }
+  ]
+}

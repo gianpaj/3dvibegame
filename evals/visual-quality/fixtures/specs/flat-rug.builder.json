@@ -1,0 +1,95 @@
+{
+  "builder_version": "0.1",
+  "request_id": "vq_fixture_flat_rug",
+  "intent_id": "vq_fixture_flat_rug::intent_0",
+  "operation": "create",
+  "target_object_id": null,
+  "base_object_version": null,
+  "object_category": "rug",
+  "size_tier": "medium",
+  "parts": [
+    {
+      "part_id": "rug",
+      "primitive": "cube",
+      "material": "red",
+      "dimensions": [
+        6,
+        0.5,
+        4
+      ],
+      "modifiers": [],
+      "local_position": [
+        0,
+        0,
+        0
+      ],
+      "local_rotation": [
+        0,
+        0,
+        0
+      ],
+      "local_scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "part_id": "stripe",
+      "primitive": "cube",
+      "material": "yellow",
+      "dimensions": [
+        6,
+        0.5,
+        0.5
+      ],
+      "modifiers": [],
+      "local_position": [
+        0,
+        0.5,
+        1.5
+      ],
+      "local_rotation": [
+        0,
+        0,
+        0
+      ],
+      "local_scale": [
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "instances": [
+    {
+      "instance_id": "instance_0",
+      "anchor_mode": "absolute",
+      "reference_object": null,
+      "relation": null,
+      "offset": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "attachments": [],
+  "materials": [
+    "red",
+    "yellow"
+  ],
+  "behaviors": [],
+  "placement": {
+    "mode": "absolute",
+    "reference_object": null,
+    "relation": null,
+    "offset_meters": null
+  },
+  "complexity": {
+    "part_count": 2,
+    "instance_count": 1,
+    "behavior_count": 0
+  },
+  "diagnostics": []
+}

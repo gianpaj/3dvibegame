@@ -1,0 +1,73 @@
+{
+  "spec_version": "0.1",
+  "request_id": "vq_fixture_flat_rug",
+  "intent_id": "vq_fixture_flat_rug::intent_0",
+  "operation": "create",
+  "target_object_id": null,
+  "base_object_version": null,
+  "object_category": "rug",
+  "size_tier": "medium",
+  "style_tags": [],
+  "behaviors": [],
+  "grid": {
+    "unit_meters": 0.5,
+    "up_axis": "y",
+    "rotation_step_degrees": 90
+  },
+  "placement": {
+    "mode": "absolute",
+    "reference_object": null,
+    "relation": null,
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "materials": [
+    {
+      "material_id": "red"
+    },
+    {
+      "material_id": "trim",
+      "color_hint": "yellow"
+    }
+  ],
+  "anchors": [],
+  "operations": [
+    {
+      "op_id": "rug",
+      "kind": "add_box",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "size": [
+        12,
+        1,
+        8
+      ],
+      "material_id": "red"
+    },
+    {
+      "op_id": "stripe",
+      "kind": "add_box",
+      "position": [
+        0,
+        1,
+        3
+      ],
+      "size": [
+        12,
+        1,
+        1
+      ],
+      "material_id": "trim"
+    }
+  ],
+  "compile_hints": {
+    "preferred_runtime": "primitive_parts"
+  },
+  "diagnostics": []
+}
