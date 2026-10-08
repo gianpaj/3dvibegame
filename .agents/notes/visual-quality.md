@@ -47,3 +47,27 @@ Working notes for `docs/plans/2026-10-08-visual-quality-evaluation.md`.
   stable on one machine and don't depend on the GPU.
 - The Decisions client uses raw `fetch` (no SDK dependency) so the mock client
   and request hashing see the exact wire format.
+
+## Capture (step 2) learnings
+
+- Two independent fresh captures under SwiftShader (Chromium 156, Playwright
+  1.64, three r180) were byte-identical on this machine (21/21 views). Tests
+  still assert on stats (framing, foreground fraction, hue buckets) rather than
+  bytes, so they hold on other machines.
+- Fitting the camera to bounding-box corners framed sparse objects loosely
+  (orbs filled about 50% of the frame). Fitting to world-space mesh vertices per
+  view gives consistent fill.
+- The compiler centres `add_box` on `position` (no grounding without
+  `groundOperations`). The first flagpole fixture had a floating flag because of
+  this; author fixture sources with centre positions.
+- Background `#aab3bf`: the lighter `#c9ced6` made white parts blend in.
+- A favicon 404 surfaces as a console error, which correctly fails a capture.
+  The page sets `<link rel="icon" href="data:,">`.
+- Capture of one sample takes about 0.4 s (about 1.1 s for the first, which
+  includes shader warm-up).
+
+## Gotchas
+
+- The local pnpm (10.21.0 via corepack) drops `libc: [glibc|musl]` lines from
+  `pnpm-lock.yaml` on install. They were written by a newer pnpm (dependabot).
+  After any install, restore them so the lockfile diff only holds real changes.

@@ -6,7 +6,10 @@ export const repoRoot = path.resolve(
   "../../..",
 );
 
-export const tmpRoot = path.join(repoRoot, ".tmp", "visual-quality");
+// VQ_TMP_ROOT redirects all generated output (tests use a throwaway directory).
+export const tmpRoot = process.env.VQ_TMP_ROOT
+  ? path.resolve(process.env.VQ_TMP_ROOT)
+  : path.join(repoRoot, ".tmp", "visual-quality");
 export const runsRoot = path.join(tmpRoot, "runs");
 export const cacheRoot = path.join(tmpRoot, "cache");
 export const evalsRoot = path.join(repoRoot, "evals", "visual-quality");

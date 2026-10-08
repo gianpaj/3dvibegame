@@ -6,6 +6,7 @@
   "scripts": {
     "vq": "tsx src/cli.ts",
     "test": "vitest run",
+    "test:browser": "VQ_BROWSER_TESTS=1 vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -14,8 +15,10 @@
   },
   "devDependencies": {
     "@types/node": "^25.9.1",
+    "playwright": "^1.64.0",
     "tsx": "^4.22.4",
     "typescript": "^5.9.2",
+    "vite": "^7.3.5",
     "vitest": "^3.0.0"
   }
 }

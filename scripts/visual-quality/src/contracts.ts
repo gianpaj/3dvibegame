@@ -1,6 +1,15 @@
 import type { BuilderSpec } from "@3dvibegame/scene-authority-ts";
 import { z } from "zod";
 
+import type {
+  CameraPose,
+  PageInfo,
+  RenderSettings,
+  Vec3,
+  ViewId,
+  ViewStats,
+} from "../../../packages/3dvibegame-web/visual-quality/contract.ts";
+
 // File formats for the offline visual-quality harness. Inputs that humans
 // author (datasets, labels) get zod schemas; records the harness writes itself
 // are plain types tagged with a format version.
@@ -136,38 +145,23 @@ export type SampleValidation =
 
 export const CAPTURE_FORMAT = "vq-capture/v1";
 
-export const VIEW_IDS = [
-  "front_three_quarter",
-  "opposite_three_quarter",
-  "elevated",
-] as const;
-export type ViewId = (typeof VIEW_IDS)[number];
-
-export type Vec3 = [number, number, number];
-
-export interface ViewStats {
-  // Fraction of pixels that differ from the background colour.
-  foreground_fraction: number;
-  // Normalised [0,1] bounding box of foreground pixels, or null when blank.
-  foreground_bbox: { x0: number; y0: number; x1: number; y1: number } | null;
-  // Foreground pixel counts by hue bucket, for colour regression checks.
-  hue_histogram: Record<string, number>;
-}
+export type { CameraPose, PageInfo, RenderSettings, Vec3, ViewId, ViewStats };
 
 export interface CapturedView {
   view_id: ViewId;
   label: string;
   file: string;
   sha256: string;
-  camera: {
-    position: Vec3;
-    target: Vec3;
-    up: Vec3;
-    fov_degrees: number;
-    near: number;
-    far: number;
-  };
+  camera: CameraPose;
   stats: ViewStats;
+}
+
+export interface CaptureSettings extends RenderSettings {
+  // Fraction of foreground pixels below which a view counts as blank.
+  blank_threshold: number;
+  timeout_ms: number;
+  // Chromium GL backend; software rendering keeps captures GPU-independent.
+  gl_backend: string;
 }
 
 export interface CaptureRecord {
@@ -176,36 +170,19 @@ export interface CaptureRecord {
   status: "captured" | "capture_failed";
   error: string | null;
   cache_key: string;
+  // captured_at of the cached capture this record was copied from.
   reused_from: string | null;
   artifact_sha256: string;
-  renderer: {
-    capture_version: string;
-    capture_app_sha256: string;
-    three_revision: string;
-  };
+  // Content hash of the built capture page: the renderer revision.
+  capture_app_sha256: string;
+  page: PageInfo | null;
+  browser: { name: string; version: string; playwright: string };
   settings: CaptureSettings;
-  browser: { version: string; gl_renderer: string | null } | null;
   bounds: { min: Vec3; max: Vec3; size: Vec3 } | null;
   views: CapturedView[];
   browser_errors: string[];
   capture_latency_ms: number;
   captured_at: string;
-}
-
-export interface CaptureSettings {
-  width: number;
-  height: number;
-  device_pixel_ratio: number;
-  background: string;
-  tone_mapping: string;
-  tone_mapping_exposure: number;
-  output_color_space: string;
-  fov_degrees: number;
-  framing_padding: number;
-  // Fraction of foreground pixels below which a view counts as blank.
-  blank_threshold: number;
-  timeout_ms: number;
-  gl_backend: string;
 }
 
 // ---------------------------------------------------------------------------

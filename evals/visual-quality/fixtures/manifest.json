@@ -68,7 +68,7 @@
       "prompt_family_id": "barrel",
       "split": "development",
       "sample_type": "single_object_create",
-      "prompt": "red barrels stacked in a triangle",
+      "prompt": "red barrels arranged in a triangle",
       "builder_spec_path": "specs/barrel-triangle.builder.json",
       "source_spec_path": "specs/barrel-triangle.source.json",
       "quantity": 1,

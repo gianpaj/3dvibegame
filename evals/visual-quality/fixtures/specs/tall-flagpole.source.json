@@ -40,7 +40,7 @@
       "kind": "add_box",
       "position": [
         0,
-        0,
+        10,
         0
       ],
       "size": [
@@ -54,8 +54,8 @@
       "op_id": "flag",
       "kind": "add_box",
       "position": [
-        1,
-        16,
+        2.5,
+        17.5,
         0
       ],
       "size": [

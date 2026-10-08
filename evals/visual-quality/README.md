@@ -81,3 +81,28 @@ Each imported sample needs curation before capture or judging:
 3. Assign `prompt_family_id` and `split`.
 4. Review the prompt for personal information (see `import-report.json` for
    heuristic flags), then set `provenance.privacy_reviewed: true`.
+
+## Capturing views
+
+```sh
+pnpm vq capture [--dataset <manifest>] [--run <run-id>] [--samples a,b] [--no-reuse]
+```
+
+This validates the dataset, builds the development-only capture page
+(`packages/3dvibegame-web/visual-quality/`), and renders three views per valid
+sample in headless Chromium with software GL. Each sample is rendered through
+the game's own `createAuthorityObject` in public state, under fixed neutral
+lighting, at a fixed resolution and colour pipeline. The camera is fitted to
+the object's vertices from three fixed directions (front three-quarter,
+opposite three-quarter, elevated).
+
+Captures are cached by artifact, renderer build hash, browser version and
+settings. Re-running a command resumes an existing run. First-time setup:
+
+```sh
+pnpm --filter @3dvibegame/visual-quality exec playwright install chromium-headless-shell
+```
+
+Camera fitting normalises apparent size. These images don't establish world
+scale, placement, hidden geometry or collision correctness. They're controlled
+test views, not reconstructions of what the player saw.
