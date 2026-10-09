@@ -40,6 +40,8 @@ See `packages/3dvibegame-web/AGENTS.md` for package-specific dev/test/deploy ins
 /
 ├── AGENTS.md                     ← you are here
 ├── docs/deploy-backend.md        ← Coolify deploy guide (SpacetimeDB + AI worker)
+├── evals/visual-quality/         ← offline visual-eval datasets, rubric, label format, pilot runbook
+├── scripts/visual-quality/       ← offline visual-eval harness (capture, Decisions judge, reports)
 ├── packages/
 │   ├── 3dvibegame-web/           ← player app (React + R3F + SpacetimeDB SDK)
 │   │   └── AGENTS.md             ← dev / test / deploy for this package
@@ -103,6 +105,16 @@ Players are embodied as third-person voxel avatars (design spec: `docs/superpowe
 - `DayNightCycle.tsx` — owns the sun, moon, hemisphere and fill lights plus background/fog palette blending, the starfield, and camera-riding sun/moon disc sprites. Exactly **one** shadow caster at a time: the sun by day, the moon after sunset — never add a second simultaneous shadow map.
 - The shadow frustum follows the local avatar: a live position ref threads `GameCanvas → AvatarLayer → CharacterController`, and the light + target re-anchor on it every frame. Keep the ortho shadow box tight (±15 u) — a bigger box trades shadow sharpness for nothing since it follows the player.
 - Dev override: `?timeOfDay=18.5` pins the cycle to a fixed UTC hour (parsed once on load). Use it to test dawn/dusk/night states.
+
+---
+
+## Offline visual-quality evaluation
+
+`pnpm vq <command>` scores saved creation artifacts (prompt + compiled builder spec) offline: controlled three-view captures through the real `createAuthorityObject`, an OpenAI Decisions rubric judge, and static reports (plan: `docs/plans/2026-10-08-visual-quality-evaluation.md`; usage: `evals/visual-quality/README.md`).
+
+- The capture page (`3dvibegame-web/visual-quality/`) is development-only with its own Vite config; never import it from `src/` or add it to the production build.
+- It is not a live quality gate and never touches `ai-worker` or SpacetimeDB. Paid judge calls need `--execute` plus `OPENAI_API_KEY`; tests and `pnpm vq offline` use mocks.
+- Private exports, labels and generated runs stay out of Git (`evals/visual-quality/private/`, `.tmp/visual-quality/`).
 
 ---
 

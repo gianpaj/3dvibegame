@@ -88,3 +88,17 @@ Working notes for `docs/plans/2026-10-08-visual-quality-evaluation.md`.
   meaningless; the mock flag is part of the reuse key and the record.
 - No live call has been made yet. The request shape follows the guide and the
   `openai@7.30.1` types, and still needs an authorised smoke run.
+
+## Status (2026-10-09)
+
+- Steps 1–4 are implemented and tested. Step 5 (calibration pilot) has its
+  tooling and a runbook (`evals/visual-quality/CALIBRATION.md`), but it needs
+  humans: about 40 curated real artifacts, blind labels, and an authorised
+  paid run. None of that exists yet. Don't fabricate labels or results.
+- Never run: a live Decisions call. No `OPENAI_API_KEY` was available, and the
+  plan needs explicit authorisation for paid calls. First live step:
+  `pnpm vq judge --run <run> --split development --execute --max-requests 5`.
+  Check that `usage`, answer shapes and the image `detail` parameter match what
+  `response.ts` expects.
+- Commit with explicit pathspecs (`git commit -- <paths>`). The user had their
+  own staged edit to the plan doc, and a plain commit swept it in once.

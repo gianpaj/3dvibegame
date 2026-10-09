@@ -8,6 +8,7 @@ import {
   type CaptureRecord,
   type JudgeAttempt,
   type JudgmentRecord,
+  type Split,
   type ValidatedSample,
 } from "../contracts.ts";
 import { readJson, writeJson } from "../files.ts";
@@ -51,6 +52,8 @@ export interface JudgeOptions {
   reuse: boolean;
   trials: number;
   sampleIds?: string[];
+  // Only samples in this split (e.g. development while tuning the rubric).
+  split?: Split;
   // Pre-usage token estimate per image; the largest reported usage replaces
   // the estimate once responses arrive.
   estimatedTokensPerImage: number;
@@ -115,6 +118,7 @@ export async function judgeRun(runId: string, options: JudgeOptions): Promise<Ju
     if (validation.status !== "valid") continue;
     const { sample } = validation;
     if (options.sampleIds && !options.sampleIds.includes(sample.sample_id)) continue;
+    if (options.split && sample.split !== options.split) continue;
     const capture = readCapture(runId, sample.sample_id);
     // A failed, missing or altered capture never triggers a paid call.
     if (capture?.status !== "captured" || !viewsIntact(runId, capture)) {

@@ -148,6 +148,9 @@ export function agreement(results: SampleResult[], dimension: Dimension): Dimens
 
 export interface CalibrationSplit {
   labelled: number;
+  // Rubric hashes behind this split's primary judgments. More than one means
+  // the rubric changed mid-split (e.g. edited after it was frozen).
+  rubric_sha256: string[];
   dimensions: Record<Dimension, DimensionAgreement>;
 }
 
@@ -157,6 +160,9 @@ export function calibration(results: SampleResult[]): Record<"development" | "ho
     const subset = results.filter((r) => r.split === split);
     return {
       labelled: subset.filter((r) => r.human.primary).length,
+      rubric_sha256: [
+        ...new Set(subset.flatMap((r) => r.judgments.filter((j) => j.trial === 0).map((j) => j.rubric.sha256))),
+      ].sort(),
       dimensions: Object.fromEntries(DIMENSIONS.map((d) => [d, agreement(subset, d)])) as Record<Dimension, DimensionAgreement>,
     };
   };

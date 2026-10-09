@@ -111,7 +111,11 @@ function calibrationSection(model: ReportModel) {
         <td>${idList(a.false_pass)}</td><td>${idList(a.false_fail)}</td>
         <td>${a.excluded.ai_not_answered.length} not answered, ${a.excluded.applicability_mismatch.length} applicability mismatch</td></tr>`;
     }).join("");
-    return `<h3>${split} (${s.labelled} labelled samples)</h3>
+    const mixed = s.rubric_sha256.length > 1
+      ? `<p class="warn">This split was judged with ${s.rubric_sha256.length} different rubric texts
+          (${s.rubric_sha256.map((h) => escapeHtml(h.slice(0, 8))).join(", ")}); its agreement numbers mix rubric versions.</p>`
+      : "";
+    return `<h3>${split} (${s.labelled} labelled samples)</h3>${mixed}
       <table><tr><th>Dimension</th><th>Pairs</th><th>MAE</th><th>Bias (AI−human)</th><th>Exact</th><th>Within one</th>
       <th>Exact / adjacent / over / under</th><th>Severe failure, high AI score</th><th>Success, low AI score</th><th>Excluded</th></tr>${rows}</table>`;
   });

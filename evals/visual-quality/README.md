@@ -7,6 +7,8 @@ Inputs for the offline visual-quality harness (`scripts/visual-quality`, plan:
 |---|---|
 | `fixtures/` | Synthetic artifacts that exercise validation, capture and reporting. Their scores say nothing about judge accuracy. |
 | `private/` | Git-ignored. Put feedback exports, curated imports and labels on private prompts here. |
+| `rubric/` | Versioned judge rubrics. Freeze before any holdout run. |
+| `CALIBRATION.md` | Runbook for the human-labelled calibration pilot. |
 
 Generated captures, API responses and reports go under `.tmp/visual-quality/`,
 which is also ignored.

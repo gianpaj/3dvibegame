@@ -3,6 +3,7 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 
 import { captureRun } from "./capture/index.ts";
+import { SPLITS, type Split } from "./contracts.ts";
 import { loadDataset } from "./dataset.ts";
 import { writeJson } from "./files.ts";
 import { importFeedbackRows } from "./importFeedback.ts";
@@ -62,6 +63,7 @@ Commands:
                     --tokens-per-image <n> pre-usage estimate (default: 1600)
                     --trials <n>           repeated judging per sample (default: 1)
                     --samples <a,b>        only these sample IDs
+                    --split <name>         only development, holdout or unassigned samples
                     --no-reuse             ignore cached judgments
   report          Regenerate the HTML gallery, blind labelling view and JSON/CSV (offline)
                     --run <run-id>         (required)
@@ -165,11 +167,14 @@ async function judgeCommand(argv: string[]) {
       "tokens-per-image": { type: "string", default: "1600" },
       trials: { type: "string", default: "1" },
       samples: { type: "string" },
+      split: { type: "string" },
       "no-reuse": { type: "boolean", default: false },
     },
   });
   if (!values.run) throw new UsageError("--run is required");
   readRunManifest(values.run);
+  const split = values.split as Split | undefined;
+  if (split !== undefined && !SPLITS.includes(split)) throw new UsageError(`--split must be one of ${SPLITS.join(", ")}`);
   if (values.mock && values.execute) throw new UsageError("use either --mock or --execute, not both");
   const detail = values["image-detail"] as JudgeConfig["image_detail"];
   if (!["auto", "low", "high", "original"].includes(detail)) throw new UsageError("invalid --image-detail");
@@ -189,6 +194,7 @@ async function judgeCommand(argv: string[]) {
     trials: positiveInt(values.trials, "--trials"),
     reuse: !values["no-reuse"],
     sampleIds: sampleSelection(readSamples(values.run).map(sampleIdOf), values.samples),
+    split,
   };
 
   if (!values.mock && !values.execute) {
@@ -196,6 +202,7 @@ async function judgeCommand(argv: string[]) {
       (v) =>
         v.status === "valid" &&
         (!options.sampleIds || options.sampleIds.includes(v.sample.sample_id)) &&
+        (!split || v.sample.split === split) &&
         readCapture(values.run!, v.sample.sample_id)?.status === "captured",
     ).length;
     const tasks = eligible * options.trials;

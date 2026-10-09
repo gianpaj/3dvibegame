@@ -15,6 +15,7 @@ import { blindHtml, escapeHtml } from "../src/report/html.ts";
 import { generateReport } from "../src/report/index.ts";
 import {
   agreement,
+  calibration,
   coverage,
   generatorComparison,
   repeatability,
@@ -184,6 +185,17 @@ describe("metrics", () => {
     const a = agreement(results, "attribute_fidelity");
     expect(a.n).toBe(1);
     expect(a.excluded.applicability_mismatch).toEqual([results[1]!.sample_id, results[2]!.sample_id]);
+  });
+
+  it("reports which rubric texts each calibration split was judged with", () => {
+    const results = [
+      result({ judgments: [judgment({ rubric: { version: "v1", sha256: "aaa" } })] }),
+      result({ judgments: [judgment({ rubric: { version: "v1", sha256: "bbb" } })] }),
+      result({ split: "holdout", judgments: [judgment({ rubric: { version: "v1", sha256: "aaa" } })] }),
+    ];
+    const c = calibration(results);
+    expect(c.development.rubric_sha256).toEqual(["aaa", "bbb"]);
+    expect(c.holdout.rubric_sha256).toEqual(["aaa"]);
   });
 
   it("measures repeatability across completed trials", () => {

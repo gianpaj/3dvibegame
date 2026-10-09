@@ -341,6 +341,14 @@ describe("judgeRun", () => {
     expect(summary.completed).toBe(7);
   });
 
+  it("restricts judging to one split", async () => {
+    fabricateCapturedRun("judge-split");
+    const client = new ScriptedClient((request) => okResponse(request));
+    const summary = await judgeRun("judge-split", options({ client, sampleIds: undefined, split: "development" }));
+    // Development only, so the draft rubric is fine.
+    expect(summary.completed).toBe(4);
+  });
+
   it("never calls the judge for failed captures", async () => {
     fabricateCapturedRun("judge-capture-failed", undefined, ["pine-tree"]);
     const client = new ScriptedClient((request) => okResponse(request));
