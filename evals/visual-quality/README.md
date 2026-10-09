@@ -106,3 +106,43 @@ pnpm --filter @3dvibegame/visual-quality exec playwright install chromium-headle
 Camera fitting normalises apparent size. These images don't establish world
 scale, placement, hidden geometry or collision correctness. They're controlled
 test views, not reconstructions of what the player saw.
+
+## Judging
+
+```sh
+pnpm vq judge --run <run-id>            # dry run: prints the plan and worst-case cost
+pnpm vq judge --run <run-id> --mock     # offline deterministic judge, no API calls
+OPENAI_API_KEY=... pnpm vq judge --run <run-id> --execute --max-requests 20 --max-cost-usd 0.05
+```
+
+Each sample gets one `POST /v1/decisions` request (`gpt-6-luna`). It contains
+the rubric preamble, the prompt as a JSON string marked as untrusted data, and
+the three labelled views. Human labels, generator identity and spec JSON are
+never sent. `rubric/v1.json` defines three independent 0–3 `score` questions.
+Attribute fidelity is only asked when `visual_attributes_applicable` is true;
+otherwise it's recorded as `not_applicable`, never as a score. The exact rubric
+text is copied into each run and referenced by hash.
+
+Results per question are `answered` (score, confidence, per-level
+probabilities), `refused`, `missing`, `invalid` or `not_applicable`. A sample
+is `completed`, `refused`, `incomplete` or `api_error`. A refusal or partial
+answer is never turned into a zero.
+
+Execution controls:
+
+- Paid calls need both `--execute` and `OPENAI_API_KEY`. The key isn't written
+  to records, and error text is redacted before it's saved.
+- Bounded concurrency, a per-request deadline, and retries for transient
+  failures only (timeouts, network errors, 408/409/429/5xx), with backoff that
+  honours `Retry-After`.
+- `--max-requests` counts every attempt, including retries. `--max-cost-usd`
+  stops scheduling once reported usage plus estimates would exceed it. This
+  isn't an exact dollar cap: requests in flight can finish after a limit is
+  reached, and image tokens are estimated (`--tokens-per-image`) until the API
+  reports usage.
+- Completed results are reused only when the prompt, image hashes, applicable
+  questions, exact rubric, model, image detail, request format and mock/live
+  mode all match. Reused records keep their original `evaluated_at`.
+  `--no-reuse` forces fresh calls. `--trials N` repeats judging for
+  repeatability (only trial 0 may reuse).
+- Live judging of `holdout` samples requires a rubric with `"status": "frozen"`.

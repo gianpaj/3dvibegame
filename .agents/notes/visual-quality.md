@@ -71,3 +71,20 @@ Working notes for `docs/plans/2026-10-08-visual-quality-evaluation.md`.
 - The local pnpm (10.21.0 via corepack) drops `libc: [glibc|musl]` lines from
   `pnpm-lock.yaml` on install. They were written by a newer pnpm (dependabot).
   After any install, restore them so the lockfile diff only holds real changes.
+
+## Judge (step 3) notes
+
+- Rubric wording: the plan's level 2 for attribute fidelity says "a material
+  discrepancy". In this game "material" also means a surface type, so the
+  rubric says "a significant discrepancy" to keep the judge from reading it as
+  texture.
+- Prompt injection: the prompt is sent as a JSON string inside a labelled
+  input_text part. It can't break out of its quoting, and the preamble tells the
+  judge to treat it as data.
+- Cost: luna charges $0.10/1M input tokens. With 3 × 768px images the dry-run
+  estimate is about $0.0006 per request, so budget limits matter more as a
+  runaway guard than for spend.
+- The mock client is deterministic from a request hash. Its scores are
+  meaningless; the mock flag is part of the reuse key and the record.
+- No live call has been made yet. The request shape follows the guide and the
+  `openai@7.30.1` types, and still needs an authorised smoke run.

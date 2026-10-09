@@ -230,7 +230,10 @@ export interface JudgmentRecord {
   trial: number;
   status: JudgeStatus;
   error: string | null;
+  // Non-fatal notes, e.g. unexpected extra answers or unreported usage.
+  warnings: string[];
   cache_key: string;
+  // evaluated_at of the cached judgment this record was copied from.
   reused_from: string | null;
   judge: { model: string; request_format: string; image_detail: string; mock: boolean };
   rubric: { version: string; sha256: string };
