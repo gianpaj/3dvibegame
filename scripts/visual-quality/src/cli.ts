@@ -1,8 +1,6 @@
-import { mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
-
-import { existsSync } from "node:fs";
 
 import { captureRun } from "./capture/index.ts";
 import { loadDataset } from "./dataset.ts";
@@ -10,10 +8,20 @@ import { writeJson } from "./files.ts";
 import { importFeedbackRows } from "./importFeedback.ts";
 import { HttpDecisionsClient, MockDecisionsClient, type DecisionsClient } from "./judge/client.ts";
 import { DEFAULT_JUDGE_CONFIG, DEFAULT_USD_PER_INPUT_TOKEN, judgeRun } from "./judge/index.ts";
+import type { JudgeConfig } from "./judge/request.ts";
 import { loadRubric } from "./judge/rubric.ts";
-import { generateReport } from "./report/index.ts";
 import { evalsRoot, repoRelative, repoRoot, resolveUserPath, tmpRoot } from "./paths.ts";
-import { newRunId, openRun, readCapture, readRunManifest, readSamples, recordStep, runDir } from "./run.ts";
+import { generateReport } from "./report/index.ts";
+import {
+  newRunId,
+  openRun,
+  readCapture,
+  readRunManifest,
+  readSamples,
+  recordStep,
+  runDir,
+  sampleIdOf,
+} from "./run.ts";
 
 const DEFAULT_DATASET = path.join(evalsRoot, "fixtures", "manifest.json");
 const DEFAULT_RUBRIC = path.join(evalsRoot, "rubric", "v1.json");
@@ -66,83 +74,80 @@ Commands:
 
 type Handler = (argv: string[]) => Promise<number>;
 
-const commands: Record<string, Handler> = {
-  validate: async (argv) => {
-    const { values } = parseArgs({ args: argv, options: { dataset: { type: "string" } } });
-    const dataset = loadDataset(values.dataset ? resolveUserPath(values.dataset) : DEFAULT_DATASET);
-    let valid = 0;
-    for (const v of dataset.validations) {
-      if (v.status === "valid") {
-        valid += 1;
-        console.log(`ok       ${v.sample.sample_id}${v.warnings.length ? `  (${v.warnings.join("; ")})` : ""}`);
-      } else {
-        console.log(`${v.issue.padEnd(8)} ${v.meta.sample_id}: ${v.reasons.join("; ")}`);
-      }
+async function validateCommand(argv: string[]) {
+  const { values } = parseArgs({ args: argv, options: { dataset: { type: "string" } } });
+  const dataset = loadDataset(values.dataset ? resolveUserPath(values.dataset) : DEFAULT_DATASET);
+  let valid = 0;
+  for (const v of dataset.validations) {
+    if (v.status === "valid") {
+      valid += 1;
+      console.log(`ok       ${v.sample.sample_id}${v.warnings.length ? `  (${v.warnings.join("; ")})` : ""}`);
+    } else {
+      console.log(`${v.issue.padEnd(8)} ${v.meta.sample_id}: ${v.reasons.join("; ")}`);
     }
-    console.log(`\n${valid}/${dataset.validations.length} samples valid (dataset ${dataset.dataset_id})`);
-    return 0;
-  },
+  }
+  console.log(`\n${valid}/${dataset.validations.length} samples valid (dataset ${dataset.dataset_id})`);
+  return 0;
+}
 
-  "import-feedback": async (argv) => {
-    const { values } = parseArgs({
-      args: argv,
-      options: { input: { type: "string" }, name: { type: "string" } },
-    });
-    if (!values.input || !values.name) throw new UsageError("--input and --name are required");
-    if (!/^[a-z0-9][a-z0-9_-]*$/i.test(values.name)) throw new UsageError("--name must be a simple identifier");
-    const rows: unknown = JSON.parse(readFileSync(resolveUserPath(values.input), "utf8"));
-    if (!Array.isArray(rows)) throw new UsageError("--input must contain a JSON array of rows");
+async function importFeedbackCommand(argv: string[]) {
+  const { values } = parseArgs({
+    args: argv,
+    options: { input: { type: "string" }, name: { type: "string" } },
+  });
+  if (!values.input || !values.name) throw new UsageError("--input and --name are required");
+  if (!/^[a-z0-9][a-z0-9_-]*$/i.test(values.name)) throw new UsageError("--name must be a simple identifier");
+  const rows: unknown = JSON.parse(readFileSync(resolveUserPath(values.input), "utf8"));
+  if (!Array.isArray(rows)) throw new UsageError("--input must contain a JSON array of rows");
 
-    const result = importFeedbackRows(rows, values.name);
-    // Imports may contain private prompts; keep them under the ignored .tmp tree.
-    const outDir = path.join(tmpRoot, "imports", values.name);
-    mkdirSync(outDir, { recursive: true });
-    writeJson(path.join(outDir, "manifest.json"), result.manifest);
-    writeJson(path.join(outDir, "import-report.json"), {
-      imported: result.manifest.samples.length,
-      excluded: result.excluded,
-      privacy_flags: result.privacy_flags,
-    });
-    console.log(`imported ${result.manifest.samples.length} create records, excluded ${result.excluded.length}`);
-    for (const flag of result.privacy_flags) {
-      console.log(`  review ${flag.sample_id}: prompt may contain ${flag.matches.join(", ")}`);
-    }
-    console.log(`wrote ${repoRelative(outDir)}/manifest.json — curate it before capture or judging`);
-    return 0;
-  },
+  const result = importFeedbackRows(rows, values.name);
+  // Imports may contain private prompts; keep them under the ignored .tmp tree.
+  const outDir = path.join(tmpRoot, "imports", values.name);
+  mkdirSync(outDir, { recursive: true });
+  writeJson(path.join(outDir, "manifest.json"), result.manifest);
+  writeJson(path.join(outDir, "import-report.json"), {
+    imported: result.manifest.samples.length,
+    excluded: result.excluded,
+    privacy_flags: result.privacy_flags,
+  });
+  console.log(`imported ${result.manifest.samples.length} create records, excluded ${result.excluded.length}`);
+  for (const flag of result.privacy_flags) {
+    console.log(`  review ${flag.sample_id}: prompt may contain ${flag.matches.join(", ")}`);
+  }
+  console.log(`wrote ${repoRelative(outDir)}/manifest.json — curate it before capture or judging`);
+  return 0;
+}
 
-  capture: async (argv) => {
-    const { values } = parseArgs({
-      args: argv,
-      options: {
-        dataset: { type: "string" },
-        run: { type: "string" },
-        samples: { type: "string" },
-        "no-reuse": { type: "boolean", default: false },
-      },
-    });
-    const started = new Date().toISOString();
-    const { runId } = openRunFor(values.run, values.dataset);
-    const sampleIds = values.samples?.split(",").map((id) => id.trim()).filter(Boolean);
-    const summary = await captureRun(runId, { reuse: !values["no-reuse"], sampleIds });
-    recordStep(runId, {
-      command: "capture",
-      started_at: started,
-      finished_at: new Date().toISOString(),
-      options: { reuse: !values["no-reuse"], samples: sampleIds ?? "all" },
-      summary: { ...summary },
-    });
-    console.log(
-      `run ${runId}: ${summary.captured} captured, ${summary.reused} reused from cache, ` +
-        `${summary.resumed} already in run, ${summary.failed} failed, ${summary.not_valid} not valid`,
-    );
-    for (const failure of summary.failures) console.log(`  capture_failed ${failure.sample_id}: ${failure.error}`);
-    console.log(`  ${repoRelative(runDir(runId))}`);
-    return 0;
-  },
-};
+async function captureCommand(argv: string[]) {
+  const { values } = parseArgs({
+    args: argv,
+    options: {
+      dataset: { type: "string" },
+      run: { type: "string" },
+      samples: { type: "string" },
+      "no-reuse": { type: "boolean", default: false },
+    },
+  });
+  const started = new Date().toISOString();
+  const { runId, sampleIds } = openRunFor(values.run, values.dataset, values.samples);
+  const summary = await captureRun(runId, { reuse: !values["no-reuse"], sampleIds });
+  recordStep(runId, {
+    command: "capture",
+    started_at: started,
+    finished_at: new Date().toISOString(),
+    options: { reuse: !values["no-reuse"], samples: sampleIds ?? "all" },
+    summary: { ...summary },
+  });
+  console.log(
+    `run ${runId}: ${summary.captured} captured, ${summary.reused} reused from cache, ` +
+      `${summary.resumed} already in run, ${summary.failed} failed, ${summary.not_valid} not valid`,
+  );
+  for (const failure of summary.failures) console.log(`  capture_failed ${failure.sample_id}: ${failure.error}`);
+  console.log(`  ${repoRelative(runDir(runId))}`);
+  return 0;
+}
 
-const JUDGE_COMMAND: Handler = async (argv) => {
+async function judgeCommand(argv: string[]) {
   const { values } = parseArgs({
     args: argv,
     options: {
@@ -164,13 +169,14 @@ const JUDGE_COMMAND: Handler = async (argv) => {
     },
   });
   if (!values.run) throw new UsageError("--run is required");
+  readRunManifest(values.run);
   if (values.mock && values.execute) throw new UsageError("use either --mock or --execute, not both");
-  const detail = values["image-detail"];
+  const detail = values["image-detail"] as JudgeConfig["image_detail"];
   if (!["auto", "low", "high", "original"].includes(detail)) throw new UsageError("invalid --image-detail");
   const rubricPath = values.rubric ? resolveUserPath(values.rubric) : DEFAULT_RUBRIC;
   const rubric = loadRubric(rubricPath);
   const options = {
-    config: { model: values.model, image_detail: detail as "auto" },
+    config: { model: values.model, image_detail: detail },
     limits: {
       maxRequests: positiveInt(values["max-requests"], "--max-requests"),
       maxCostUsd: positiveNumber(values["max-cost-usd"], "--max-cost-usd"),
@@ -182,9 +188,8 @@ const JUDGE_COMMAND: Handler = async (argv) => {
     estimatedTokensPerImage: positiveInt(values["tokens-per-image"], "--tokens-per-image"),
     trials: positiveInt(values.trials, "--trials"),
     reuse: !values["no-reuse"],
-    sampleIds: values.samples?.split(",").map((id) => id.trim()).filter(Boolean),
+    sampleIds: sampleSelection(readSamples(values.run).map(sampleIdOf), values.samples),
   };
-  readRunManifest(values.run);
 
   if (!values.mock && !values.execute) {
     const eligible = readSamples(values.run).filter(
@@ -248,7 +253,7 @@ const JUDGE_COMMAND: Handler = async (argv) => {
   );
   if (summary.budget_exhausted) console.log(`  stopped scheduling: ${summary.budget_exhausted}`);
   return 0;
-};
+}
 
 function positiveInt(value: string, flag: string) {
   const n = Number(value);
@@ -268,9 +273,7 @@ function positiveNumber(value: string, flag: string) {
   return n;
 }
 
-commands.judge = JUDGE_COMMAND;
-
-commands.report = async (argv) => {
+async function reportCommand(argv: string[]) {
   const { values } = parseArgs({
     args: argv,
     options: { run: { type: "string" }, labels: { type: "string" }, "primary-reviewer": { type: "string" } },
@@ -278,9 +281,9 @@ commands.report = async (argv) => {
   if (!values.run) throw new UsageError("--run is required");
   printReport(values.run, splitList(values.labels).map(resolveUserPath), values["primary-reviewer"]);
   return 0;
-};
+}
 
-commands.offline = async (argv) => {
+async function offlineCommand(argv: string[]) {
   const { values } = parseArgs({ args: argv, options: { dataset: { type: "string" }, labels: { type: "string" } } });
   const labels = values.labels
     ? splitList(values.labels).map(resolveUserPath)
@@ -288,17 +291,26 @@ commands.offline = async (argv) => {
       ? []
       : [DEFAULT_FIXTURE_LABELS];
   const { runId } = openRunFor(undefined, values.dataset);
-  for (const [name, args] of [
-    ["capture", ["--run", runId]],
-    ["judge", ["--run", runId, "--mock"]],
+  for (const [name, handler, args] of [
+    ["capture", captureCommand, ["--run", runId]],
+    ["judge", judgeCommand, ["--run", runId, "--mock"]],
   ] as const) {
     console.log(`\n== ${name}`);
-    const code = await commands[name]!([...args]);
+    const code = await handler([...args]);
     if (code !== 0) return code;
   }
   console.log("\n== report");
   printReport(runId, labels, undefined);
   return 0;
+}
+
+const commands: Record<string, Handler> = {
+  validate: validateCommand,
+  "import-feedback": importFeedbackCommand,
+  capture: captureCommand,
+  judge: judgeCommand,
+  report: reportCommand,
+  offline: offlineCommand,
 };
 
 function printReport(runId: string, labelFiles: string[], primaryReviewer: string | undefined) {
@@ -322,12 +334,24 @@ function printReport(runId: string, labelFiles: string[], primaryReviewer: strin
   console.log(`  ${repoRelative(path.join(report.outDir, "results.json"))}, results.csv`);
 }
 
+// Parses --samples and rejects unknown IDs, so a typo can't silently select
+// nothing.
+function sampleSelection(knownIds: string[], value: string | undefined): string[] | undefined {
+  if (value === undefined) return undefined;
+  const requested = splitList(value);
+  const known = new Set(knownIds);
+  const unknown = requested.filter((id) => !known.has(id));
+  if (unknown.length) throw new UsageError(`unknown sample ID(s): ${unknown.join(", ")}`);
+  return requested;
+}
+
 function splitList(value: string | undefined) {
   return value?.split(",").map((item) => item.trim()).filter(Boolean) ?? [];
 }
 
-// Opens an existing run (defaulting to its own dataset) or creates a new one.
-function openRunFor(runOption: string | undefined, datasetOption: string | undefined) {
+// Opens an existing run (defaulting to its own dataset) or creates a new one,
+// after checking any --samples selection against the dataset.
+function openRunFor(runOption: string | undefined, datasetOption: string | undefined, samplesOption?: string) {
   const existing = runOption && existsSync(path.join(runDir(runOption), "run.json"));
   const datasetPath = datasetOption
     ? resolveUserPath(datasetOption)
@@ -335,9 +359,10 @@ function openRunFor(runOption: string | undefined, datasetOption: string | undef
       ? path.join(repoRoot, readRunManifest(runOption).dataset.path)
       : DEFAULT_DATASET;
   const dataset = loadDataset(datasetPath);
+  const sampleIds = sampleSelection(dataset.validations.map(sampleIdOf), samplesOption);
   const runId = runOption ?? newRunId(dataset.dataset_id);
   openRun(runId, dataset);
-  return { runId, dataset };
+  return { runId, dataset, sampleIds };
 }
 
 class UsageError extends Error {}
