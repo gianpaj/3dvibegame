@@ -95,11 +95,14 @@ Working notes for `docs/plans/2026-10-08-visual-quality-evaluation.md`.
   tooling and a runbook (`evals/visual-quality/CALIBRATION.md`), but it needs
   humans: about 40 curated real artifacts, blind labels, and an authorised
   paid run. None of that exists yet. Don't fabricate labels or results.
-- Never run: a live Decisions call. No `OPENAI_API_KEY` was available, and the
-  plan needs explicit authorisation for paid calls. First live step:
-  `pnpm vq judge --run <run> --split development --execute --max-requests 5`.
-  Check that `usage`, answer shapes and the image `detail` parameter match what
-  `response.ts` expects.
+- First live smoke run (2026-10-09, run `live-smoke`, barrel-triangle): it
+  completed and the response passed validation unchanged. Response top-level
+  keys are `answers`, `model` and `usage`. Usage has
+  `input_tokens_details.{cached_tokens,cache_write_tokens}`. Score answers
+  carry per-level labels. 2,665 input tokens for 3 × 768px images (auto
+  detail) plus text, about 800 per image, so the default
+  `--tokens-per-image 1600` is conservative. Latency was about 2.1 s and the
+  cost $0.00027. The key was read from `.env` and isn't in any saved file.
 - Commit with explicit pathspecs (`git commit -- <paths>`). The user had their
   own staged edit to the plan doc, and a plain commit swept it in once.
 

@@ -132,8 +132,10 @@ answer is never turned into a zero.
 
 Execution controls:
 
-- Paid calls need both `--execute` and `OPENAI_API_KEY`. The key isn't written
-  to records, and error text is redacted before it's saved.
+- Paid calls need both `--execute` and `OPENAI_API_KEY`, taken from the shell
+  or, failing that, the git-ignored repo-root `.env` (only that variable is
+  read). The key isn't written to records, and error text is redacted before
+  it's saved.
 - Bounded concurrency, a per-request deadline, and retries for transient
   failures only (timeouts, network errors, 408/409/429/5xx), with backoff that
   honours `Retry-After`.

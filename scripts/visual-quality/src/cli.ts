@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { parseArgs } from "node:util";
+import { parseArgs, parseEnv } from "node:util";
 
 import { captureRun } from "./capture/index.ts";
 import { SPLITS, type Split } from "./contracts.ts";
@@ -50,7 +50,7 @@ Commands:
   judge           Score captured views with the OpenAI Decisions API
                     --run <run-id>         (required)
                     --mock                 offline deterministic judge (no API calls)
-                    --execute              make paid API calls (needs OPENAI_API_KEY)
+                    --execute              make paid API calls (OPENAI_API_KEY from the shell or .env)
                                            without --mock/--execute: dry run, prints the plan
                     --rubric <path>        (default: evals/visual-quality/rubric/v1.json)
                     --model <id>           (default: ${DEFAULT_JUDGE_CONFIG.model})
@@ -220,8 +220,8 @@ async function judgeCommand(argv: string[]) {
   let client: DecisionsClient;
   let secrets: string[] = [];
   if (values.execute) {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new UsageError("--execute needs OPENAI_API_KEY in the environment");
+    const apiKey = openAiApiKey();
+    if (!apiKey) throw new UsageError("--execute needs OPENAI_API_KEY in the environment or the repo-root .env");
     client = new HttpDecisionsClient(apiKey);
     secrets = [apiKey];
     console.log(`paid judging: ${BUDGET_DISCLOSURE}`);
@@ -339,6 +339,17 @@ function printReport(runId: string, labelFiles: string[], primaryReviewer: strin
   console.log(`  ${repoRelative(path.join(report.outDir, "index.html"))}  (comparison report)`);
   console.log(`  ${repoRelative(path.join(report.outDir, "blind.html"))}  (blind labelling)`);
   console.log(`  ${repoRelative(path.join(report.outDir, "results.json"))}, results.csv`);
+}
+
+// The shell environment wins; otherwise read only OPENAI_API_KEY from the
+// git-ignored repo-root .env, without loading anything else into process.env.
+function openAiApiKey(): string | undefined {
+  if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY;
+  const file = path.join(repoRoot, ".env");
+  if (!existsSync(file)) return undefined;
+  const key = parseEnv(readFileSync(file, "utf8")).OPENAI_API_KEY;
+  if (key) console.log("using OPENAI_API_KEY from .env");
+  return key || undefined;
 }
 
 // Parses --samples and rejects unknown IDs, so a typo can't silently select
