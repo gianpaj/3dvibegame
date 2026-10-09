@@ -8,7 +8,11 @@ import { captureRun, DEFAULT_CAPTURE_SETTINGS } from "../src/capture/index.ts";
 import { serveDirectory } from "../src/capture/staticServer.ts";
 import type { CaptureRecord, ViewStats } from "../src/contracts.ts";
 import { loadDataset } from "../src/dataset.ts";
+import { MockDecisionsClient } from "../src/judge/client.ts";
+import { judgeRun } from "../src/judge/index.ts";
+import { loadRubric } from "../src/judge/rubric.ts";
 import { evalsRoot } from "../src/paths.ts";
+import { generateReport } from "../src/report/index.ts";
 import { openRun, readCapture } from "../src/run.ts";
 
 // Browser smoke for the capture pipeline (needs Chromium: `pnpm test:browser`).
@@ -112,6 +116,28 @@ describe("capture pipeline", () => {
     const summary = await captureRun("smoke-c", { reuse: true, sampleIds: ["pine-tree"] });
     expect(summary.reused).toBe(1);
     expect(capture("smoke-c", "pine-tree").reused_from).not.toBeNull();
+  });
+
+  it("feeds real captures through mock judging into an offline report", async () => {
+    const summary = await judgeRun("smoke-a", {
+      client: new MockDecisionsClient(),
+      config: { model: "gpt-6-luna", image_detail: "auto" },
+      rubric: loadRubric(path.join(evalsRoot, "rubric", "v1.json")),
+      limits: { maxRequests: 50, maxCostUsd: 1, usdPerInputToken: 1e-7 },
+      concurrency: 2,
+      deadlineMs: 5_000,
+      maxRetries: 0,
+      reuse: false,
+      trials: 1,
+      estimatedTokensPerImage: 1_600,
+    });
+    expect(summary.completed).toBe(validIds.length);
+    const report = generateReport("smoke-a", { labelFiles: [path.join(evalsRoot, "fixtures", "labels.json")] });
+    expect(report.coverage.by_status).toMatchObject({
+      completed: validIds.length,
+      input_invalid: dataset.validations.length - validIds.length,
+    });
+    expect(report.labelled).toBe(validIds.length);
   });
 
   it("treats a blank render as a capture failure", async () => {

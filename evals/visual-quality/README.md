@@ -146,3 +146,68 @@ Execution controls:
   `--no-reuse` forces fresh calls. `--trials N` repeats judging for
   repeatability (only trial 0 may reuse).
 - Live judging of `holdout` samples requires a rubric with `"status": "frozen"`.
+
+## Reports
+
+```sh
+pnpm vq report --run <run-id> [--labels a.json,b.json] [--primary-reviewer <id>]
+pnpm vq offline     # new fixture run: capture, mock judging, report with fixture labels
+```
+
+`report` reads only saved records, so it works offline and can be re-run at
+any time. It writes to `.tmp/visual-quality/runs/<run-id>/report/`:
+
+- `index.html`: the comparison report. It covers coverage by status (with
+  denominators), agreement with human labels per split, inter-reviewer
+  agreement, repeatability, results by generator and prompt version, latency
+  and usage, and a per-sample gallery that can be filtered and sorted.
+  Generator identity is shown here.
+- `blind.html`: the blind labelling view, with prompt and views only, under
+  opaque blind IDs. It has no sample IDs, generator identity, statuses or AI
+  scores. Reviewers fill in levels and notes, then download a labels file.
+- `results.json` and `results.csv`: machine-readable results. Scores keep
+  their state, so `not_applicable`, `refused` and failures are never written
+  as 0.
+
+All dataset text is HTML-escaped, and CSV cells that could start a spreadsheet
+formula are neutralised. The pages carry a CSP that blocks network access, so
+viewing a report contacts no external service.
+
+Notes on the numbers:
+
+- AI scores are probability-weighted level indices. Exact and within-one
+  agreement compare the score rounded to the nearest level with the human
+  level.
+- Diagnostic bins (`bins-v1` in `src/report/metrics.ts`) define severe failures
+  scored high, successes scored low, and large over/under-scores. Change them
+  on development data only, and before looking at holdout results.
+- Calibration metrics are reported separately for `development` and `holdout`.
+  `unassigned` samples are excluded.
+- Generator means are hidden unless every group covers the same prompt
+  families with at least 90% evaluation coverage. Counts of every status are
+  always shown. There's deliberately no blended overall score.
+
+## Human labels (`vq-labels/v1`)
+
+```jsonc
+{
+  "format": "vq-labels/v1",
+  "rubric_version": "v1",
+  "labels": [
+    {
+      "blind_id": "b-1a2b3c4d5e",          // or "sample_id"; exactly one
+      "reviewer_id": "r1",
+      "recognizability": 2,                // 0-3, same levels as the rubric
+      "attribute_fidelity": "not_applicable", // or 0-3
+      "visual_coherence": 3,
+      "notes": "Canopy floats above the trunk."
+    }
+  ]
+}
+```
+
+Reviewers should label from `blind.html` without seeing model identity or AI
+scores. Use a second reviewer on a subset to find subjective criteria. Player
+thumbs up/down (`provenance.player_rating`) is a supporting signal, not
+ground truth. Keep labels on private prompts under `private/`.
+`fixtures/labels.json` is synthetic; it only exercises the report code.

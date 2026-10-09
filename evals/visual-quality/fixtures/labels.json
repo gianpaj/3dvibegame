@@ -1,0 +1,81 @@
+{
+  "format": "vq-labels/v1",
+  "rubric_version": "v1",
+  "note": "Synthetic labels that exercise the report and calibration code paths. They are not calibration evidence.",
+  "labels": [
+    {
+      "sample_id": "pine-tree",
+      "reviewer_id": "fixture-synthetic",
+      "recognizability": 3,
+      "attribute_fidelity": "not_applicable",
+      "visual_coherence": 3
+    },
+    {
+      "sample_id": "yellow-jelly-blob",
+      "reviewer_id": "fixture-synthetic",
+      "recognizability": 3,
+      "attribute_fidelity": 3,
+      "visual_coherence": 3
+    },
+    {
+      "sample_id": "color-swatch",
+      "reviewer_id": "fixture-synthetic",
+      "recognizability": 2,
+      "attribute_fidelity": 3,
+      "visual_coherence": 3,
+      "notes": "Blocks read as a swatch row; colors all correct."
+    },
+    {
+      "blind_id": "b-0bec20c0d0",
+      "reviewer_id": "fixture-synthetic",
+      "recognizability": 2,
+      "attribute_fidelity": 2,
+      "visual_coherence": 2,
+      "notes": "Three separate barrels; reads as a layout more than a stack."
+    },
+    {
+      "blind_id": "b-0c32c4ce4a",
+      "reviewer_id": "fixture-synthetic",
+      "recognizability": 3,
+      "attribute_fidelity": 3,
+      "visual_coherence": 3
+    },
+    {
+      "sample_id": "flat-rug",
+      "reviewer_id": "fixture-synthetic",
+      "recognizability": 2,
+      "attribute_fidelity": 2,
+      "visual_coherence": 2,
+      "notes": "Stripe is a raised bar rather than woven into the rug."
+    },
+    {
+      "sample_id": "floating-orbs",
+      "reviewer_id": "fixture-synthetic",
+      "recognizability": 3,
+      "attribute_fidelity": 3,
+      "visual_coherence": 3,
+      "notes": "Disconnected orbs are requested, so not a coherence defect."
+    },
+    {
+      "sample_id": "pine-tree",
+      "reviewer_id": "fixture-synthetic-2",
+      "recognizability": 3,
+      "attribute_fidelity": "not_applicable",
+      "visual_coherence": 3
+    },
+    {
+      "sample_id": "barrel-triangle",
+      "reviewer_id": "fixture-synthetic-2",
+      "recognizability": 1,
+      "attribute_fidelity": 2,
+      "visual_coherence": 2
+    },
+    {
+      "sample_id": "flat-rug",
+      "reviewer_id": "fixture-synthetic-2",
+      "recognizability": 2,
+      "attribute_fidelity": 3,
+      "visual_coherence": 2
+    }
+  ]
+}

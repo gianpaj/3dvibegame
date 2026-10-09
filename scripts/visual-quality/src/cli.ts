@@ -11,11 +11,13 @@ import { importFeedbackRows } from "./importFeedback.ts";
 import { HttpDecisionsClient, MockDecisionsClient, type DecisionsClient } from "./judge/client.ts";
 import { DEFAULT_JUDGE_CONFIG, DEFAULT_USD_PER_INPUT_TOKEN, judgeRun } from "./judge/index.ts";
 import { loadRubric } from "./judge/rubric.ts";
+import { generateReport } from "./report/index.ts";
 import { evalsRoot, repoRelative, repoRoot, resolveUserPath, tmpRoot } from "./paths.ts";
 import { newRunId, openRun, readCapture, readRunManifest, readSamples, recordStep, runDir } from "./run.ts";
 
 const DEFAULT_DATASET = path.join(evalsRoot, "fixtures", "manifest.json");
 const DEFAULT_RUBRIC = path.join(evalsRoot, "rubric", "v1.json");
+const DEFAULT_FIXTURE_LABELS = path.join(evalsRoot, "fixtures", "labels.json");
 
 const BUDGET_DISCLOSURE =
   "Limits are enforced before each attempt (retries included), but they are not an exact dollar cap: " +
@@ -53,6 +55,13 @@ Commands:
                     --trials <n>           repeated judging per sample (default: 1)
                     --samples <a,b>        only these sample IDs
                     --no-reuse             ignore cached judgments
+  report          Regenerate the HTML gallery, blind labelling view and JSON/CSV (offline)
+                    --run <run-id>         (required)
+                    --labels <a.json,b.json>  human label files
+                    --primary-reviewer <id>   reviewer compared with the judge (default: first label)
+  offline         Full offline check on a new run: capture, mock judging, report
+                    --dataset <path>   (default: fixtures)
+                    --labels <files>   (default: fixture labels when using fixtures)
 `;
 
 type Handler = (argv: string[]) => Promise<number>;
@@ -260,6 +269,62 @@ function positiveNumber(value: string, flag: string) {
 }
 
 commands.judge = JUDGE_COMMAND;
+
+commands.report = async (argv) => {
+  const { values } = parseArgs({
+    args: argv,
+    options: { run: { type: "string" }, labels: { type: "string" }, "primary-reviewer": { type: "string" } },
+  });
+  if (!values.run) throw new UsageError("--run is required");
+  printReport(values.run, splitList(values.labels).map(resolveUserPath), values["primary-reviewer"]);
+  return 0;
+};
+
+commands.offline = async (argv) => {
+  const { values } = parseArgs({ args: argv, options: { dataset: { type: "string" }, labels: { type: "string" } } });
+  const labels = values.labels
+    ? splitList(values.labels).map(resolveUserPath)
+    : values.dataset
+      ? []
+      : [DEFAULT_FIXTURE_LABELS];
+  const { runId } = openRunFor(undefined, values.dataset);
+  for (const [name, args] of [
+    ["capture", ["--run", runId]],
+    ["judge", ["--run", runId, "--mock"]],
+  ] as const) {
+    console.log(`\n== ${name}`);
+    const code = await commands[name]!([...args]);
+    if (code !== 0) return code;
+  }
+  console.log("\n== report");
+  printReport(runId, labels, undefined);
+  return 0;
+};
+
+function printReport(runId: string, labelFiles: string[], primaryReviewer: string | undefined) {
+  const started = new Date().toISOString();
+  const report = generateReport(runId, { labelFiles, primaryReviewer });
+  recordStep(runId, {
+    command: "report",
+    started_at: started,
+    finished_at: new Date().toISOString(),
+    options: { labels: labelFiles.map((f) => repoRelative(f)), primary_reviewer: primaryReviewer ?? null },
+    summary: { samples: report.results.length, labelled: report.labelled, ...report.coverage.by_status },
+  });
+  const statuses = Object.entries(report.coverage.by_status)
+    .filter(([, n]) => n)
+    .map(([status, n]) => `${n} ${status}`)
+    .join(", ");
+  console.log(`run ${runId}: ${report.results.length} samples (${statuses}); ${report.labelled} with human labels`);
+  if (report.unmatchedLabels.length) console.log(`  ${report.unmatchedLabels.length} label(s) matched no sample in this run`);
+  console.log(`  ${repoRelative(path.join(report.outDir, "index.html"))}  (comparison report)`);
+  console.log(`  ${repoRelative(path.join(report.outDir, "blind.html"))}  (blind labelling)`);
+  console.log(`  ${repoRelative(path.join(report.outDir, "results.json"))}, results.csv`);
+}
+
+function splitList(value: string | undefined) {
+  return value?.split(",").map((item) => item.trim()).filter(Boolean) ?? [];
+}
 
 // Opens an existing run (defaulting to its own dataset) or creates a new one.
 function openRunFor(runOption: string | undefined, datasetOption: string | undefined) {
