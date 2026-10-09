@@ -74,10 +74,11 @@ export function fileJsonReader(baseDir: string): JsonReader {
 export function validateDataset(rawSamples: unknown[], readJson: JsonReader): SampleValidation[] {
   const validations = rawSamples.map((raw, index) => validateSample(raw, readJson, index));
 
-  // Duplicate IDs would collide in run directories and label joins.
+  // Duplicate IDs would collide in run directories and label joins. Compare
+  // case-insensitively: "Pine" and "pine" share a directory on macOS.
   const idCounts = new Map<string, number>();
   for (const v of validations) {
-    const id = v.status === "valid" ? v.sample.sample_id : v.meta.sample_id;
+    const id = (v.status === "valid" ? v.sample.sample_id : v.meta.sample_id).toLowerCase();
     idCounts.set(id, (idCounts.get(id) ?? 0) + 1);
   }
 
@@ -96,7 +97,7 @@ export function validateDataset(rawSamples: unknown[], readJson: JsonReader): Sa
     const id = v.status === "valid" ? v.sample.sample_id : v.meta.sample_id;
     const family = v.status === "valid" ? v.sample.prompt_family_id : v.meta.prompt_family_id;
     const reasons: string[] = [];
-    if ((idCounts.get(id) ?? 0) > 1) reasons.push(`duplicate sample_id "${id}"`);
+    if ((idCounts.get(id.toLowerCase()) ?? 0) > 1) reasons.push(`duplicate sample_id "${id}" (IDs are case-insensitive)`);
     if (family && (familySplits.get(family)?.size ?? 0) > 1) {
       reasons.push(`prompt family "${family}" appears in both development and holdout`);
     }

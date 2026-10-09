@@ -31,13 +31,14 @@ export function generateReport(runId: string, options: ReportOptions) {
   const manifest = readRunManifest(runId);
   const sampleIds = readSamples(runId).map(sampleIdOf);
   const labels: LoadedLabels | null = options.labelFiles.length ? loadLabelFiles(options.labelFiles, sampleIds) : null;
-  const results = collectResults(runId, labels, options.primaryReviewer);
+  const { mode, results } = collectResults(runId, labels, options.primaryReviewer);
   const outDir = path.join(runDir(runId), "report");
   rmSync(outDir, { recursive: true, force: true });
   mkdirSync(outDir, { recursive: true });
 
   const model: ReportModel = {
     manifest,
+    judgeMode: mode,
     generatedAt: new Date().toISOString(),
     results,
     coverage: coverage(results),
@@ -57,6 +58,7 @@ export function generateReport(runId: string, options: ReportOptions) {
     run_id: runId,
     generated_at: model.generatedAt,
     disclaimer: SCALE_DISCLAIMER,
+    judge_mode: mode,
     mock: model.usage.mock,
     diagnostic_bins: DIAGNOSTIC_BINS,
     rubric_versions: model.rubricVersions,
@@ -115,6 +117,7 @@ export function generateReport(runId: string, options: ReportOptions) {
 
   return {
     outDir,
+    mode,
     results,
     coverage: model.coverage,
     labelled: results.filter((r) => r.human.primary).length,

@@ -233,6 +233,9 @@ export interface JudgmentRecord {
   // Non-fatal notes, e.g. unexpected extra answers or unreported usage.
   warnings: string[];
   cache_key: string;
+  // Hashes of the judged views, so reports can drop judgments of images that
+  // a later capture replaced.
+  view_sha256: string[];
   // evaluated_at of the cached judgment this record was copied from.
   reused_from: string | null;
   judge: { model: string; request_format: string; image_detail: string; mock: boolean };

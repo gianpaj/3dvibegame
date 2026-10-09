@@ -93,7 +93,10 @@ type TaskOutcome = JudgmentRecord["status"] | "reused" | "resumed" | "not_judged
 
 export async function judgeRun(runId: string, options: JudgeOptions): Promise<JudgeSummary> {
   const log = options.log ?? (() => {});
-  const budget = new Budget(options.limits);
+  // Limits guard paid calls; the free mock client must cover every sample.
+  const budget = new Budget(
+    options.client.mock ? { ...options.limits, maxRequests: Infinity, maxCostUsd: Infinity } : options.limits,
+  );
   const summary: JudgeSummary = {
     mock: options.client.mock,
     tasks: 0,
@@ -159,9 +162,12 @@ export async function judgeRun(runId: string, options: JudgeOptions): Promise<Ju
       mock: options.client.mock,
     });
 
+    const viewHashes = task.capture.views.map((v) => v.sha256);
     if (options.reuse) {
       const existing = readJudgments(runId, task.sample.sample_id).find((j) => j.trial === task.trial);
-      if (existing?.status === "completed" && existing.cache_key === key) return "resumed";
+      if (existing?.status === "completed" && existing.cache_key === key && existing.view_sha256?.join() === viewHashes.join()) {
+        return "resumed";
+      }
       // Only the first trial reuses earlier results; later trials measure
       // repeatability and always call the judge.
       const cached = task.trial === 0 ? readCachedJudgment(key) : null;
@@ -170,6 +176,8 @@ export async function judgeRun(runId: string, options: JudgeOptions): Promise<Ju
           ...cached,
           sample_id: task.sample.sample_id,
           trial: task.trial,
+          // The reuse key covers image hashes, so these are the judged views.
+          view_sha256: viewHashes,
           reused_from: cached.evaluated_at,
           attempts: [],
         } satisfies JudgmentRecord);
@@ -196,13 +204,9 @@ export async function judgeRun(runId: string, options: JudgeOptions): Promise<Ju
     let finalError: string | null = null;
     const started = performance.now();
 
+    let reservation = budget.reserve(estimate());
+    if (!reservation) return "not_judged";
     for (;;) {
-      const reservation = budget.reserve(estimate());
-      if (!reservation) {
-        if (!attempts.length) return "not_judged";
-        finalError = `${budget.exhausted}; no retry sent after: ${attempts.at(-1)!.error}`;
-        break;
-      }
       const attemptStart = performance.now();
       const startedAt = new Date().toISOString();
       last = await options.client.send(request, options.deadlineMs);
@@ -235,6 +239,14 @@ export async function judgeRun(runId: string, options: JudgeOptions): Promise<Ju
         finalError = attempts.at(-1)!.error;
         break;
       }
+      // Reserve the retry before waiting, so an exhausted budget neither
+      // sleeps nor counts a retry it never sends.
+      const next = budget.reserve(estimate());
+      if (!next) {
+        finalError = `${budget.exhausted}; no retry sent after: ${attempts.at(-1)!.error}`;
+        break;
+      }
+      reservation = next;
       summary.retries += 1;
       const backoff = Math.min(
         MAX_BACKOFF_MS,
@@ -255,6 +267,7 @@ export async function judgeRun(runId: string, options: JudgeOptions): Promise<Ju
       error: null,
       warnings: [],
       cache_key: key,
+      view_sha256: viewHashes,
       reused_from: null,
       judge: {
         model: options.config.model,

@@ -43,6 +43,9 @@ export const SCALE_DISCLAIMER =
 
 export interface ReportModel {
   manifest: RunManifest;
+  // Live results are used whenever the run has any; the other mode's
+  // judgments are left out (those samples show as not_judged).
+  judgeMode: "live" | "mock";
   generatedAt: string;
   results: SampleResult[];
   coverage: Coverage;
@@ -64,7 +67,8 @@ export function reportHtml(model: ReportModel): string {
     `<p class="meta">Dataset <code>${escapeHtml(manifest.dataset.dataset_id)}</code> (${escapeHtml(manifest.dataset.path)}),
       created ${escapeHtml(manifest.created_at)}, report generated ${escapeHtml(model.generatedAt)}.
       Git ${escapeHtml(manifest.git.commit?.slice(0, 12) ?? "unknown")}${manifest.git.dirty ? " (dirty)" : ""}.
-      Rubric ${escapeHtml(model.rubricVersions.join(", ") || "—")}.</p>`,
+      Rubric ${escapeHtml(model.rubricVersions.join(", ") || "—")}. Judge results: ${model.judgeMode}
+      (only judgments of the current captures count).</p>`,
     model.usage.mock
       ? `<p class="banner">Mock judge: scores in this run are synthetic and say nothing about visual quality.</p>`
       : "",
@@ -123,7 +127,7 @@ function calibrationSection(model: ReportModel) {
     <p class="note">AI scores are probability-weighted level indices; exact and within-one compare the score rounded to the
       nearest level. Diagnostic bins ${DIAGNOSTIC_BINS.version}: severe failure = human level ${DIAGNOSTIC_BINS.severe_human_level}
       with AI ≥ ${DIAGNOSTIC_BINS.high_ai_score}; success = human level ${DIAGNOSTIC_BINS.success_human_level} with AI ≤
-      ${DIAGNOSTIC_BINS.low_ai_score}; over/under = |AI − human| &gt; ${DIAGNOSTIC_BINS.large_error}.
+      ${DIAGNOSTIC_BINS.low_ai_score}; over/under = rounded AI level more than ${DIAGNOSTIC_BINS.large_error} level(s) from the human level.
       ${model.unmatchedLabels ? `${model.unmatchedLabels} label(s) didn't match a sample in this run.` : ""}</p>
     ${splits.join("")}`;
 }
@@ -188,7 +192,7 @@ function samplesSection(model: ReportModel) {
     <div class="controls">
       <label>Status <select id="f-status"><option value="">all</option>${statusOptions}</select></label>
       <label>Split <select id="f-split"><option value="">all</option><option>development</option><option>holdout</option><option>unassigned</option></select></label>
-      <label><input type="checkbox" id="f-disagree"> Large disagreement only</label>
+      <label><input type="checkbox" id="f-disagree"> Large disagreement only (rounded level off by more than ${DIAGNOSTIC_BINS.large_error})</label>
       <label>Sort by <select id="f-sort"><option value="">sample ID</option>
         ${DIMENSIONS.map((d) => `<option value="${d}">${DIMENSION_LABELS[d]} (AI, low first)</option><option value="err-${d}">${DIMENSION_LABELS[d]} |AI−human| (high first)</option>`).join("")}
       </select></label>
@@ -204,7 +208,11 @@ function sampleCard(r: SampleResult, model: ReportModel) {
     const h = label?.[d];
     return q?.state === "answered" && typeof h === "number" ? Math.abs(q.score - h) : null;
   });
-  const disagree = errors.some((e) => e !== null && e > DIAGNOSTIC_BINS.large_error);
+  const disagree = DIMENSIONS.some((d) => {
+    const q = r.scores[d];
+    const h = label?.[d];
+    return q?.state === "answered" && typeof h === "number" && Math.abs(Math.round(q.score) - h) > DIAGNOSTIC_BINS.large_error;
+  });
   const data = [
     `data-status="${r.status}"`,
     `data-split="${escapeHtml(r.split ?? "")}"`,

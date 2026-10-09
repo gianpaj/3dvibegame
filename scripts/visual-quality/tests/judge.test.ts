@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
@@ -187,6 +187,23 @@ describe("judgeRun", () => {
     expect(record!.evaluated_at).toBe(record!.reused_from);
   });
 
+  it("stamps reused results with the current view hashes, even from older cache entries", async () => {
+    fabricateCapturedRun("judge-old-cache-a", "old-cache-images");
+    fabricateCapturedRun("judge-old-cache-b", "old-cache-images");
+    const client = new ScriptedClient((request) => okResponse(request));
+    await judgeRun("judge-old-cache-a", options({ client, sampleIds: ["pine-tree"] }));
+    // Simulate a cache entry written before view_sha256 existed.
+    const [record] = readJudgments("judge-old-cache-a", "pine-tree");
+    const cacheFile = path.join(process.env.VQ_TMP_ROOT!, "cache", "judgments", `${record!.cache_key}.json`);
+    const { view_sha256: _dropped, ...legacy } = JSON.parse(readFileSync(cacheFile, "utf8"));
+    writeFileSync(cacheFile, JSON.stringify(legacy));
+
+    await judgeRun("judge-old-cache-b", options({ client, sampleIds: ["pine-tree"] }));
+    expect(client.calls).toHaveLength(1);
+    const [reused] = readJudgments("judge-old-cache-b", "pine-tree");
+    expect(reused!.view_sha256).toEqual(record!.view_sha256);
+  });
+
   it("records attribute fidelity as not applicable, never as a score", async () => {
     fabricateCapturedRun("judge-na");
     await judgeRun("judge-na", options({ client: new ScriptedClient((r) => okResponse(r)), sampleIds: ["pine-tree"] }));
@@ -318,6 +335,28 @@ describe("judgeRun", () => {
     expect(summary).toMatchObject({ completed: 3, not_judged: 4, requests: 3 });
     expect(summary.budget_exhausted).toMatch(/request limit/);
     expect(client.calls).toHaveLength(3);
+  });
+
+  it("doesn't sleep or count a retry when the budget can't cover it", async () => {
+    fabricateCapturedRun("judge-no-retry-budget");
+    const sleep = vi.fn(async () => {});
+    const client = new ScriptedClient(() => ({ kind: "http", status: 503, retryAfterMs: null, body: {} }));
+    const summary = await judgeRun(
+      "judge-no-retry-budget",
+      options({ client, sleep, sampleIds: ["pine-tree"], limits: { maxRequests: 1, maxCostUsd: 10, usdPerInputToken: 1e-7 } }),
+    );
+    expect(summary).toMatchObject({ api_error: 1, requests: 1, retries: 0 });
+    expect(sleep).not.toHaveBeenCalled();
+    expect(readJudgments("judge-no-retry-budget", "pine-tree")[0]!.error).toMatch(/request limit.*no retry sent/);
+  });
+
+  it("doesn't apply paid limits to the free mock judge", async () => {
+    fabricateCapturedRun("judge-mock-unlimited");
+    const summary = await judgeRun(
+      "judge-mock-unlimited",
+      options({ client: new MockDecisionsClient(), sampleIds: undefined, limits: { maxRequests: 1, maxCostUsd: 1e-9, usdPerInputToken: 1 } }),
+    );
+    expect(summary).toMatchObject({ completed: 7, not_judged: 0 });
   });
 
   it("stops scheduling at the spending limit", async () => {

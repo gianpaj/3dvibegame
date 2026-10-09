@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 
-import { chromium, type Browser } from "playwright";
+import { chromium, type Browser, type BrowserContext } from "playwright";
 
 import type {
   CapturePageApi,
@@ -49,14 +49,16 @@ export class CaptureSession {
   async capture(request: PageCaptureRequest, timeoutMs: number): Promise<CaptureOutcome> {
     const started = performance.now();
     const browserErrors: string[] = [];
-    const context = await this.browser.newContext({
-      viewport: { width: request.settings.width, height: request.settings.height },
-      deviceScaleFactor: request.settings.device_pixel_ratio,
-    });
+    let context: BrowserContext | null = null;
     let info: PageInfo | null = null;
     let timer: NodeJS.Timeout | undefined;
 
     try {
+      // Inside the try: a crashed browser fails this sample instead of the run.
+      context = await this.browser.newContext({
+        viewport: { width: request.settings.width, height: request.settings.height },
+        deviceScaleFactor: request.settings.device_pixel_ratio,
+      });
       const page = await context.newPage();
       page.on("pageerror", (error) => browserErrors.push(`page error: ${error.message}`));
       page.on("console", (message) => {
@@ -114,7 +116,7 @@ export class CaptureSession {
       };
     } finally {
       clearTimeout(timer);
-      await context.close().catch(() => {});
+      await context?.close().catch(() => {});
     }
   }
 

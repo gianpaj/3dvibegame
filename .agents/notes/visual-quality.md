@@ -102,3 +102,21 @@ Working notes for `docs/plans/2026-10-08-visual-quality-evaluation.md`.
   `response.ts` expects.
 - Commit with explicit pathspecs (`git commit -- <paths>`). The user had their
   own staged edit to the plan doc, and a plain commit swept it in once.
+
+## Review fixes (2026-10-09)
+
+An independent review of steps 1–5 found real issues, now fixed with
+regression tests:
+
+- Reports have to drop judgments of images that a later capture replaced.
+  Judgment records now store `view_sha256`.
+- A run can hold mock and live judgments. Reports use live results whenever
+  any exist, and never blend the two.
+- Repeat trials count only if their `cache_key` matches trial 0's. Old trials
+  from an edited rubric otherwise looked like nondeterminism.
+- Sample IDs are compared case-insensitively for duplicates (APFS is
+  case-insensitive, so `Pine` and `pine` share a directory).
+- The mock judge ignores paid request/cost limits.
+- A retry is reserved before the backoff sleep.
+- Agreement categories bucket by rounded level, so exact + adjacent equals
+  within-one.

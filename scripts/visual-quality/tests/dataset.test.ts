@@ -95,6 +95,13 @@ describe("sample validation", () => {
     }
   });
 
+  it("treats sample IDs that differ only in case as duplicates", () => {
+    const results = validateDataset([validSample({ sample_id: "Pine" }), validSample({ sample_id: "pine" })], reader);
+    for (const v of results) {
+      expect(v.status === "input_invalid" && v.reasons.join()).toMatch(/duplicate sample_id/);
+    }
+  });
+
   it("flags a prompt family that spans development and holdout", () => {
     const results = validateDataset(
       [validSample(), validSample({ sample_id: "pine-tree-2", split: "holdout" })],

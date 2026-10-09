@@ -12,7 +12,8 @@ export const DIAGNOSTIC_BINS = {
   // AI scores that count as "high" for a severe failure, "low" for a success.
   high_ai_score: 2,
   low_ai_score: 1,
-  // |AI − human| above this is a large over- or under-score.
+  // Rounded AI level more than this many levels from the human level is a
+  // large over- or under-score.
   large_error: 1,
 } as const;
 
@@ -128,9 +129,11 @@ export function agreement(results: SampleResult[], dimension: Dimension): Dimens
     const level = Math.round(ai.score);
     if (level === human) exact += 1;
     if (Math.abs(level - human) <= 1) withinOne += 1;
-    if (level === human) out.categories.exact += 1;
-    else if (Math.abs(error) <= DIAGNOSTIC_BINS.large_error) out.categories.adjacent += 1;
-    else if (error > 0) out.categories.over += 1;
+    // Categories use the rounded level, so exact + adjacent = within one.
+    const levelError = level - human;
+    if (levelError === 0) out.categories.exact += 1;
+    else if (Math.abs(levelError) <= DIAGNOSTIC_BINS.large_error) out.categories.adjacent += 1;
+    else if (levelError > 0) out.categories.over += 1;
     else out.categories.under += 1;
     if (human <= DIAGNOSTIC_BINS.severe_human_level && ai.score >= DIAGNOSTIC_BINS.high_ai_score) out.false_pass.push(r.sample_id);
     if (human >= DIAGNOSTIC_BINS.success_human_level && ai.score <= DIAGNOSTIC_BINS.low_ai_score) out.false_fail.push(r.sample_id);

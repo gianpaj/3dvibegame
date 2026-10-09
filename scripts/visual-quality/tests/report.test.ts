@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { DIMENSIONS, type JudgmentRecord, type QuestionOutcome } from "../src/contracts.ts";
 import { MockDecisionsClient } from "../src/judge/client.ts";
 import { judgeRun } from "../src/judge/index.ts";
-import { loadRubric } from "../src/judge/rubric.ts";
+import { loadRubric, parseRubric } from "../src/judge/rubric.ts";
 import { blindId, loadLabelFiles } from "../src/labels.ts";
 import { evalsRoot } from "../src/paths.ts";
 import { csvCell, resultsCsv } from "../src/report/csv.ts";
@@ -22,9 +22,9 @@ import {
   reviewerAgreement,
   usage,
 } from "../src/report/metrics.ts";
-import type { SampleResult } from "../src/report/results.ts";
+import { collectResults, type SampleResult } from "../src/report/results.ts";
 import { sampleDir } from "../src/run.ts";
-import { fabricateCapturedRun } from "./helpers.ts";
+import { fabricateCapturedRun, okResponse, ScriptedClient } from "./helpers.ts";
 
 const rubric = loadRubric(path.join(evalsRoot, "rubric", "v1.json"));
 
@@ -41,6 +41,7 @@ function judgment(overrides: Partial<JudgmentRecord> = {}): JudgmentRecord {
     error: null,
     warnings: [],
     cache_key: "k",
+    view_sha256: [],
     reused_from: null,
     judge: { model: "gpt-6-luna", request_format: "r", image_detail: "auto", mock: false },
     rubric: { version: "v1", sha256: "x" },
@@ -170,9 +171,19 @@ describe("metrics", () => {
     expect(a.exact).toEqual({ count: 1, of: 4, rate: 0.25 });
     expect(a.within_one).toEqual({ count: 2, of: 4, rate: 0.5 });
     expect(a.categories).toEqual({ exact: 1, adjacent: 1, over: 1, under: 1 });
+    expect(a.categories.exact + a.categories.adjacent).toBe(a.within_one.count);
     expect(a.false_pass).toEqual([results[2]!.sample_id]);
     expect(a.false_fail).toEqual([results[3]!.sample_id]);
     expect(a.excluded.ai_not_answered).toEqual([results[4]!.sample_id]);
+  });
+
+  it("buckets by rounded level, so a 1.5 against a human 3 is adjacent, not a large miss", () => {
+    const a = agreement(
+      [result({ scores: withScore("recognizability", answered(1.5)), human: { recognizability: 3 } })],
+      "recognizability",
+    );
+    expect(a.within_one.count).toBe(1);
+    expect(a.categories).toEqual({ exact: 0, adjacent: 1, over: 0, under: 0 });
   });
 
   it("keeps not-applicable attribute fidelity out of the pairs and flags applicability mismatches", () => {
@@ -282,6 +293,56 @@ describe("HTML", () => {
     expect(html).not.toContain('src="https://evil.example');
     expect(html).toContain("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;");
     expect(html).toContain("Content-Security-Policy");
+  });
+});
+
+describe("collectResults (review regressions)", () => {
+  const mockOptions = {
+    config: { model: "gpt-6-luna", image_detail: "auto" as const },
+    rubric,
+    limits: { maxRequests: 100, maxCostUsd: 1, usdPerInputToken: 1e-7 },
+    concurrency: 2,
+    deadlineMs: 1_000,
+    maxRetries: 0,
+    reuse: false,
+    trials: 1,
+    estimatedTokensPerImage: 100,
+  };
+
+  it("ignores judgments of images a later capture replaced", async () => {
+    fabricateCapturedRun("stale-a", "first-images");
+    await judgeRun("stale-a", { ...mockOptions, client: new MockDecisionsClient() });
+    fabricateCapturedRun("stale-a", "second-images"); // re-capture with new images
+    const { results } = collectResults("stale-a", null);
+    const pine = results.find((r) => r.sample_id === "pine-tree")!;
+    expect(pine.status).toBe("not_judged");
+    expect(pine.reasons.join()).toMatch(/earlier capture/);
+    expect(pine.scores.recognizability).toBeNull();
+  });
+
+  it("uses live judgments only once any exist, never blending in mock scores", async () => {
+    fabricateCapturedRun("mixed-modes");
+    await judgeRun("mixed-modes", { ...mockOptions, client: new MockDecisionsClient() });
+    const live = new ScriptedClient((request) => okResponse(request));
+    await judgeRun("mixed-modes", { ...mockOptions, client: live, sampleIds: ["pine-tree"] });
+    const { mode, results } = collectResults("mixed-modes", null);
+    expect(mode).toBe("live");
+    expect(results.find((r) => r.sample_id === "pine-tree")!.status).toBe("completed");
+    const others = results.filter((r) => r.status !== "input_invalid" && r.sample_id !== "pine-tree");
+    expect(others.every((r) => r.status === "not_judged")).toBe(true);
+    expect(usage(results).mock).toBe(false);
+  });
+
+  it("counts only repeat trials made from the same inputs as trial 0", async () => {
+    fabricateCapturedRun("stale-trials");
+    const client = new MockDecisionsClient();
+    await judgeRun("stale-trials", { ...mockOptions, client, trials: 3, sampleIds: ["pine-tree"] });
+    const edited = parseRubric(rubric.text.replace("How clearly does", "How clearly and completely does"));
+    await judgeRun("stale-trials", { ...mockOptions, client, rubric: edited, sampleIds: ["pine-tree"] });
+    const { results } = collectResults("stale-trials", null);
+    const pine = results.find((r) => r.sample_id === "pine-tree")!;
+    expect(pine.judgments.map((j) => j.trial)).toEqual([0]);
+    expect(repeatability(results).recognizability.samples).toBe(0);
   });
 });
 

@@ -54,14 +54,36 @@ export interface SampleResult {
   human: { primary: ResolvedLabel | null; all: ResolvedLabel[] };
 }
 
-export function collectResults(runId: string, labels: LoadedLabels | null, primaryReviewer?: string): SampleResult[] {
-  return readSamples(runId).map((validation): SampleResult => {
+// Which judge's results a report uses. A run can hold both (a mock pipeline
+// check followed by a partial live run); mixing them would blend synthetic
+// scores into real metrics, so a report uses live results whenever any exist.
+export type JudgeMode = "live" | "mock";
+
+export function collectResults(
+  runId: string,
+  labels: LoadedLabels | null,
+  primaryReviewer?: string,
+): { mode: JudgeMode; results: SampleResult[] } {
+  const samples = readSamples(runId).map((validation) => {
+    const sampleId = validation.status === "valid" ? validation.sample.sample_id : validation.meta.sample_id;
+    const capture = validation.status === "valid" ? readCapture(runId, sampleId) : null;
+    const judgments = validation.status === "valid" ? readJudgments(runId, sampleId) : [];
+    return { validation, sampleId, capture, judgments };
+  });
+  const mode: JudgeMode = samples.some((s) => s.judgments.some((j) => !j.judge.mock)) ? "live" : "mock";
+
+  const results = samples.map(({ validation, sampleId, capture, judgments: allJudgments }): SampleResult => {
     const valid = validation.status === "valid" ? validation.sample : null;
     const meta = validation.status === "valid" ? null : validation.meta;
-    const sampleId = valid?.sample_id ?? meta!.sample_id;
-    const capture = valid ? readCapture(runId, sampleId) : null;
-    const judgments = valid ? readJudgments(runId, sampleId) : [];
-    const primary = judgments.find((j) => j.trial === 0) ?? null;
+    // Only judgments of the current images, from the chosen judge mode.
+    const currentViews = capture?.status === "captured" ? capture.views.map((v) => v.sha256).join() : null;
+    const current = allJudgments.filter(
+      (j) => currentViews !== null && j.view_sha256?.join() === currentViews && j.judge.mock === (mode === "mock"),
+    );
+    const primary = current.find((j) => j.trial === 0) ?? null;
+    // Repeat trials count only when made from exactly the same inputs as
+    // trial 0 (same images, rubric, model and mode).
+    const judgments = primary ? current.filter((j) => j.cache_key === primary.cache_key) : [];
     const humanAll = labels?.bySample.get(sampleId) ?? [];
 
     let status: SampleStatus;
@@ -76,6 +98,12 @@ export function collectResults(runId: string, labels: LoadedLabels | null, prima
       reasons = [capture.error ?? "capture failed", ...capture.browser_errors];
     } else if (!primary) {
       status = "not_judged";
+      if (allJudgments.some((j) => j.trial === 0)) {
+        reasons = [
+          `existing judgment is from ${allJudgments.some((j) => j.judge.mock !== (mode === "mock")) ? "the other judge mode or " : ""}` +
+            "an earlier capture; re-run judge",
+        ];
+      }
     } else {
       status = primary.status;
       reasons = [primary.error, ...primary.warnings].filter((r): r is string => Boolean(r));
@@ -100,4 +128,5 @@ export function collectResults(runId: string, labels: LoadedLabels | null, prima
       human: { primary: primaryLabel(humanAll, primaryReviewer), all: humanAll },
     };
   });
+  return { mode, results };
 }
