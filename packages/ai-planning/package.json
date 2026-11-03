@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@3dvibegame/scene-authority-ts": "workspace:*",
-    "zod": "^4.1.8"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "typescript": "^5.9.2"
